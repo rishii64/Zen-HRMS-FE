@@ -28,7 +28,8 @@ import { MdEdit } from "react-icons/md";
 const API = "http://localhost:5001/api/auth";
 
 const STATUS_BADGES = {
-  Present: { bg: "#ecfdf5", color: "#10b981", border: "#a7f3d0", label: "Present" },
+  Present: { bg: "#ecfdf5", color: "#10b981", border: "#a7f3d0", label: "On Time" },
+  "On Time": { bg: "#ecfdf5", color: "#10b981", border: "#a7f3d0", label: "On Time" },
   "Late Present": { bg: "#fffbeb", color: "#f59e0b", border: "#fde68a", label: "Late" },
   Late: { bg: "#fffbeb", color: "#f59e0b", border: "#fde68a", label: "Late" },
   Absent: { bg: "#fef2f2", color: "#ef4444", border: "#fecaca", label: "Absent" },
@@ -249,7 +250,7 @@ const MyAttendance = () => {
 
     // 3. Status Filter
     if (selectedStatus !== "All") {
-      if (selectedStatus === "Present" && r.status !== "Present") return false;
+      if (selectedStatus === "Present" && r.status !== "Present" && r.status !== "On Time") return false;
       if (selectedStatus === "Late" && r.status !== "Late Present" && r.status !== "Late") return false;
       if (selectedStatus === "Absent" && r.status !== "Absent") return false;
       if (selectedStatus === "Leave" && r.status !== "Leave") return false;
@@ -272,9 +273,13 @@ const MyAttendance = () => {
   });
 
   // Calculate Metrics for Summary Cards (Inspired by Attached UI)
-  const onTimeCount = filteredRecords.filter((r) => r.status === "Present" && !r.late_count).length;
+  const onTimeCount = filteredRecords.filter((r) => (r.status === "Present" || r.status === "On Time") && !r.late_count).length;
   const lateCount = filteredRecords.filter((r) => r.status === "Late Present" || r.status === "Late" || r.late_count > 0).length;
-  const earlyCount = filteredRecords.filter((r) => r.status === "Present" && r.check_in && r.check_in < "09:15:00").length;
+  const earlyCount = filteredRecords.filter((r) => {
+    if ((r.status !== "Present" && r.status !== "On Time") || !r.check_in || r.check_in === "—") return false;
+    const shiftStart = r.shift_start ? (r.shift_start.length === 5 ? `${r.shift_start}:00` : r.shift_start) : "10:00:00";
+    return r.check_in < shiftStart;
+  }).length;
 
   const absentCount = filteredRecords.filter((r) => r.status === "Absent").length;
   const noClockInCount = filteredRecords.filter((r) => !r.check_in && r.status !== "Absent" && r.status !== "Leave").length;
@@ -642,7 +647,7 @@ const MyAttendance = () => {
                 <th style={{ minWidth: "120px" }}>Designation</th>
                 <th style={{ minWidth: "110px" }}>Shift</th>
                 <th style={{ minWidth: "100px" }}>Check-In</th>
-                <th style={{ minWidth: "100px" }}>Check-Out</th>
+                <th style={{ minWidth: "110px" }}>Check-Out</th>
                 <th style={{ minWidth: "200px" }}>Working Hours</th>
                 <th style={{ minWidth: "90px" }}>Overtime</th>
                 <th style={{ minWidth: "100px" }}>Status</th>
@@ -701,8 +706,19 @@ const MyAttendance = () => {
 
                       {/* Shift */}
                       <td>
-                        <span className="px-2 py-0.5 text-[10px] font-bold rounded-md bg-blue-50 text-blue-700 border border-blue-200">
-                          General Shift
+                        <span
+                          className="px-2 py-0.5 text-[10px] font-bold rounded-md border"
+                          style={
+                            (r.shift_name || "").includes("Morning")
+                              ? { backgroundColor: "#ecfdf5", color: "#065f46", borderColor: "#a7f3d0" }
+                              : (r.shift_name || "").includes("Evening")
+                              ? { backgroundColor: "#fffbeb", color: "#92400e", borderColor: "#fde68a" }
+                              : (r.shift_name || "").includes("Night")
+                              ? { backgroundColor: "#f5f3ff", color: "#5b21b6", borderColor: "#ddd6fe" }
+                              : { backgroundColor: "#eff6ff", color: "#1e40af", borderColor: "#bfdbfe" }
+                          }
+                        >
+                          {r.shift_name || "General Shift"}
                         </span>
                       </td>
 
@@ -740,7 +756,7 @@ const MyAttendance = () => {
                             borderColor: sBadge.border
                           }}
                         >
-                          {sBadge.label}
+                          {r.status === "Present" && !r.late_count ? "On Time" : sBadge.label}
                         </span>
                       </td>
 

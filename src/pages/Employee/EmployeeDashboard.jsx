@@ -224,13 +224,13 @@ const EmployeeDashboard = () => {
   };
 
   const calculateOnTimeRate = () => {
-    const presentLogs = attendanceLogs.filter(log => log.status === "Present" || log.status === "Late Present");
+    const presentLogs = attendanceLogs.filter(log => log.status === "Present" || log.status === "On Time" || log.status === "Late Present");
     if (presentLogs.length === 0) {
       const onTime = onTimeCount;
       const total = onTimeCount + lateCount;
       return total > 0 ? ((onTime / total) * 100).toFixed(2) + " %" : "0 %";
     }
-    const onTimeLogs = presentLogs.filter(log => log.status === "Present");
+    const onTimeLogs = presentLogs.filter(log => (log.status === "Present" || log.status === "On Time") && !log.late_count);
     return ((onTimeLogs.length / presentLogs.length) * 100).toFixed(2) + " %";
   };
 

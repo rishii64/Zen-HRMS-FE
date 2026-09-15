@@ -35,7 +35,8 @@ const ALL_APPS = [
   { id: "profile", title: "My Profile", icon: <LuUser className="text-blue-500" />, route: `/employee/profile`, roles: ["employee", "hr", "hod", "accounts"] },
   { id: "progression", title: "Progression", icon: <LuTrendingUp className="text-emerald-500" />, route: "/appraisal", roles: ["employee", "hr", "hod"] },
   { id: "warning", title: "Warning", icon: <CiCircleAlert className="text-amber-500" />, route: "/appraisal", roles: ["hr", "hod"] },
-  { id: "schedule", title: "Schedule", icon: <LuCalendar className="text-purple-500" />, route: "/schedule", roles: ["employee", "hr", "hod", "accounts"] },
+  { id: "accounts_dashboard", title: "Accounts Dashboard", icon: <LuTrendingUp className="text-emerald-500" />, route: "/accounts/dashboard", roles: ["accounts", "payroll", "admin"] },
+  { id: "payroll_mgmt", title: "Payroll Management", icon: <LuWallet className="text-blue-600" />, route: "/payroll", roles: ["accounts", "payroll", "hr", "admin"] },
   { id: "salary_slip", title: "Salary Slip", icon: <LuWallet className="text-emerald-600" />, route: "/payslip", roles: ["employee", "hr", "accounts"] },
   { id: "kt", title: "Kat", icon: <LuFileText className="text-cyan-500" />, route: "/onboarding", roles: ["employee", "hr", "hod"] },
   { id: "question_bank", title: "Question Bank", icon: <SiGoogledocs className="text-indigo-500" />, route: "/interview", roles: ["hr", "hod"] },
@@ -203,12 +204,13 @@ const AppNavbar = () => {
           { to: "/admin/leaves", label: "Leaves" },
         ];
       case "accounts":
+      case "payroll":
         return [
-          { to: "/payroll", label: "Payroll Dashboard" },
+          { to: "/accounts/dashboard", label: "Dashboard" },
+          { to: "/payroll", label: "Payroll" },
+          { to: "/payslip", label: "Salary Slips" },
           { to: "/attendance", label: "Attendance" },
           { to: "/admin/leaves", label: "Leaves" },
-          { to: "/resignation", label: "Resignation" },
-          { to: profRoute, label: "My Profile" },
         ];
       case "hod":
         return [

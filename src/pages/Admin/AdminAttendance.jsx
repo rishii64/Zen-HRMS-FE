@@ -32,7 +32,7 @@ const AdminAttendance = () => {
 
   const totalEmployees = attendanceData.length;
   const presentCount = attendanceData.filter(
-    (item) => item.status === "Present" || item.status === "Late Present",
+    (item) => item.status === "Present" || item.status === "On Time" || item.status === "Late Present",
   ).length;
   const lateCount = attendanceData.filter(
     (item) => item.status === "Late Present",
@@ -186,7 +186,7 @@ const SummaryCard = ({ title, count, color }) => (
 
 const StatusBadge = ({ status }) => {
   let config = { bg: "secondary-subtle", text: "secondary", label: status };
-  if (status === "Present")
+  if (status === "Present" || status === "On Time")
     config = { bg: "success-subtle", text: "success", label: "P" }; // Mobile-e space bachatay short form use kora hoyeche (Optional)
   if (status === "Late Present")
     config = { bg: "warning-subtle", text: "dark", label: "Late" };

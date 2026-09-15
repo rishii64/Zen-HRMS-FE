@@ -37,6 +37,19 @@ const fmt = (val) => {
   return `₹${num.toLocaleString("en-IN")}`;
 };
 
+// Clean number formatter for PDF export (avoids non-ASCII UTF-16 character spacing and alignment bugs in jsPDF)
+const formatPdfNum = (v) => {
+  const num =
+    typeof v === "number"
+      ? v
+      : parseFloat(String(v || 0).replace(/[^\d.-]/g, ""));
+  const valid = isNaN(num) ? 0 : num;
+  return valid.toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+};
+
 // Convert number to Indian currency words
 const numberToWords = (n) => {
   const num = Math.round(parseFloat(n) || 0);
@@ -396,14 +409,16 @@ const PayslipPage = () => {
 
     autoTable(doc, {
       startY: 40,
+      margin: { left: 14, right: 14 },
+      tableWidth: 182,
       body: metaRows,
       theme: "plain",
       styles: { fontSize: 8.5, cellPadding: 2, textColor: [51, 65, 85] },
       columnStyles: {
         0: { cellWidth: 32 },
-        1: { cellWidth: 65 },
+        1: { cellWidth: 59 },
         2: { cellWidth: 32 },
-        3: { cellWidth: 65 },
+        3: { cellWidth: 59 },
       },
     });
 
@@ -420,22 +435,26 @@ const PayslipPage = () => {
       const ded = slipBreakdown.deductions[i];
       combinedRows.push([
         earn ? earn.label : "",
-        earn ? fmt(earn.amount) : "",
+        earn ? formatPdfNum(earn.amount) : "",
         ded ? ded.label : "",
-        ded ? fmt(ded.amount) : "",
+        ded ? formatPdfNum(ded.amount) : "",
       ]);
     }
 
     // Totals Row
     combinedRows.push([
       { content: "Total Gross Earnings", styles: { fontStyle: "bold" } },
-      { content: fmt(slipBreakdown.gross), styles: { fontStyle: "bold" } },
+      { content: formatPdfNum(slipBreakdown.gross), styles: { fontStyle: "bold", halign: "right" } },
       { content: "Total Deductions", styles: { fontStyle: "bold" } },
-      { content: fmt(slipBreakdown.totalDeds), styles: { fontStyle: "bold" } },
+      { content: formatPdfNum(slipBreakdown.totalDeds), styles: { fontStyle: "bold", halign: "right" } },
     ]);
 
+    const tableFinalY = doc.lastAutoTable?.finalY || 60;
+
     autoTable(doc, {
-      startY: 68,
+      startY: tableFinalY + 14,
+      margin: { left: 14, right: 14 },
+      tableWidth: 182,
       head: [
         [
           { content: "EARNINGS", colSpan: 2, styles: { halign: "center" } },
@@ -453,8 +472,10 @@ const PayslipPage = () => {
       },
       styles: { fontSize: 8.5, cellPadding: 3 },
       columnStyles: {
-        1: { halign: "right" },
-        3: { halign: "right" },
+        0: { cellWidth: 56, halign: "left" },
+        1: { cellWidth: 35, halign: "right" },
+        2: { cellWidth: 56, halign: "left" },
+        3: { cellWidth: 35, halign: "right" },
       },
     });
 
@@ -462,6 +483,7 @@ const PayslipPage = () => {
 
     // 5. Net Salary Payable Box
     doc.setFillColor(248, 250, 252);
+    doc.setDrawColor(203, 213, 225);
     doc.roundedRect(14, finalY + 8, 182, 18, 2, 2, "FD");
 
     doc.setTextColor(15, 23, 42);
@@ -469,9 +491,9 @@ const PayslipPage = () => {
     doc.setFontSize(11);
     doc.text("NET SALARY PAYABLE:", 22, finalY + 19);
 
-    doc.setFontSize(14);
+    doc.setFontSize(13);
     doc.setTextColor(22, 101, 52); // Green
-    doc.text(fmt(slipBreakdown.net), 188, finalY + 19, { align: "right" });
+    doc.text(`Rs. ${formatPdfNum(slipBreakdown.net)}`, 190, finalY + 19, { align: "right" });
 
     // Amount in Words
     doc.setTextColor(100, 116, 139);

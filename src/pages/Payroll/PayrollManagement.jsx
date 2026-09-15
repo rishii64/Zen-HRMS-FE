@@ -107,6 +107,19 @@ const fmt = (v) => {
   );
 };
 
+// Clean number formatter for PDF export (avoids non-ASCII UTF-16 character spacing and alignment bugs in jsPDF)
+const formatPdfNum = (v) => {
+  const num =
+    typeof v === "number"
+      ? v
+      : parseFloat(String(v || 0).replace(/[^\d.-]/g, ""));
+  const valid = isNaN(num) ? 0 : num;
+  return valid.toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+};
+
 const MONTHS = [
   "January",
   "February",
@@ -1196,14 +1209,16 @@ const PayrollManagement = () => {
 
     autoTable(doc, {
       startY: 40,
+      margin: { left: 14, right: 14 },
+      tableWidth: 182,
       body: metaRows,
       theme: "plain",
       styles: { fontSize: 8.5, cellPadding: 2, textColor: [51, 65, 85] },
       columnStyles: {
         0: { cellWidth: 32 },
-        1: { cellWidth: 65 },
+        1: { cellWidth: 59 },
         2: { cellWidth: 32 },
-        3: { cellWidth: 65 },
+        3: { cellWidth: 59 },
       },
     });
 
@@ -1278,22 +1293,26 @@ const PayrollManagement = () => {
       const ded = deductionsList[i];
       combinedRows.push([
         earn ? earn.label : "",
-        earn ? fmt(earn.amount) : "",
+        earn ? formatPdfNum(earn.amount) : "",
         ded ? ded.label : "",
-        ded ? fmt(ded.amount) : "",
+        ded ? formatPdfNum(ded.amount) : "",
       ]);
     }
 
     // Totals Row
     combinedRows.push([
       { content: "Total Gross Earnings", styles: { fontStyle: "bold" } },
-      { content: fmt(totalGross), styles: { fontStyle: "bold" } },
+      { content: formatPdfNum(totalGross), styles: { fontStyle: "bold", halign: "right" } },
       { content: "Total Deductions", styles: { fontStyle: "bold" } },
-      { content: fmt(totalDeds), styles: { fontStyle: "bold" } },
+      { content: formatPdfNum(totalDeds), styles: { fontStyle: "bold", halign: "right" } },
     ]);
 
+    const tableFinalY = doc.lastAutoTable?.finalY;
+
     autoTable(doc, {
-      startY: 68,
+      startY: tableFinalY + 8,
+      margin: { left: 14, right: 14 },
+      tableWidth: 182,
       head: [
         [
           { content: "EARNINGS", colSpan: 2, styles: { halign: "center" } },
@@ -1311,8 +1330,10 @@ const PayrollManagement = () => {
       },
       styles: { fontSize: 8.5, cellPadding: 3 },
       columnStyles: {
-        1: { halign: "right" },
-        3: { halign: "right" },
+        0: { cellWidth: 56, halign: "left" },
+        1: { cellWidth: 35, halign: "right" },
+        2: { cellWidth: 56, halign: "left" },
+        3: { cellWidth: 35, halign: "right" },
       },
     });
 
@@ -1320,6 +1341,7 @@ const PayrollManagement = () => {
 
     // 5. Net Salary Payable Box
     doc.setFillColor(248, 250, 252);
+    doc.setDrawColor(203, 213, 225);
     doc.roundedRect(14, finalY + 8, 182, 18, 2, 2, "FD");
 
     doc.setTextColor(15, 23, 42);
@@ -1327,9 +1349,9 @@ const PayrollManagement = () => {
     doc.setFontSize(11);
     doc.text("NET SALARY PAYABLE:", 22, finalY + 19);
 
-    doc.setFontSize(14);
+    doc.setFontSize(13);
     doc.setTextColor(22, 101, 52); // Green
-    doc.text(fmt(netPayable), 188, finalY + 19, { align: "right" });
+    doc.text(`Rs. ${formatPdfNum(netPayable)}`, 190, finalY + 19, { align: "right" });
 
     // Amount in Words
     doc.setTextColor(100, 116, 139);
@@ -1378,8 +1400,8 @@ const PayrollManagement = () => {
         emp?.employee_code || "",
         emp?.name || "",
         emp?.designation || emp?.dept || "Staff",
-        fmt(m.basePay),
-        fmt(m.totalPayout),
+        formatPdfNum(m.basePay),
+        formatPdfNum(m.totalPayout),
         m.isPaid ? "Paid" : "Unpaid",
       ];
     });
@@ -1391,8 +1413,8 @@ const PayrollManagement = () => {
           "Emp Code",
           "Staff Member",
           "Role",
-          "Base Pay",
-          "Total Payout",
+          "Base Pay (INR)",
+          "Total Payout (INR)",
           "Status",
         ],
       ],
@@ -1556,45 +1578,46 @@ const PayrollManagement = () => {
           </div>
         </Card>
 
-        {/* 4 Summary Stat Metric Cards */}
-        <Row className="g-3 mb-4">
-          <Col xs={12} sm={6} lg={3}>
-            <Card className="border-0 shadow-sm rounded-4 p-3 bg-white h-100">
-              <span className="text-muted small fw-medium">Annual CTC</span>
-              <h4 className="fw-bold text-dark mt-2 mb-1">{fmt(viewGrossTotal * 12)}</h4>
-              <span className="text-muted" style={{ fontSize: "11px" }}>Total Cost to Company / Year</span>
-            </Card>
-          </Col>
+        {/* Live Attendance & Shift Timing Summary */}
+        <Card className="border-0 shadow-sm rounded-4 p-4 bg-white mb-4">
+          <div className="d-flex justify-content-between align-items-center mb-3">
+            <h6 className="fw-bold mb-0 text-dark">
+              Attendance & Shift Summary ({currentMonthYear})
+            </h6>
+            <Badge bg="light" text="dark" className="border fw-normal">
+              {shiftTiming.dateStr ? `${shiftTiming.dateStr} Log` : "Today"}
+            </Badge>
+          </div>
 
-          <Col xs={12} sm={6} lg={3}>
-            <Card className="border-0 shadow-sm rounded-4 p-3 bg-white h-100">
-              <span className="text-muted small fw-medium">Monthly Gross</span>
-              <h4 className="fw-bold text-dark mt-2 mb-1">{fmt(viewGrossTotal)}</h4>
-              <span className="text-success" style={{ fontSize: "11px" }}>100% Fixed Base + Allowances</span>
-            </Card>
-          </Col>
-
-          <Col xs={12} sm={6} lg={3}>
-            <Card className="border-0 shadow-sm rounded-4 p-3 bg-white h-100">
-              <span className="text-muted small fw-medium">Monthly Deductions</span>
-              <h4 className="fw-bold text-danger mt-2 mb-1">{fmt(viewDeductionsTotal)}</h4>
-              <span className="text-muted" style={{ fontSize: "11px" }}>PF, ESI, PT, Taxes</span>
-            </Card>
-          </Col>
-
-          <Col xs={12} sm={6} lg={3}>
-            <Card className="border-0 shadow-sm rounded-4 p-3 h-100" style={{ background: "#f0fdf4", border: "1px solid #bbf7d0" }}>
-              <div className="d-flex justify-content-between align-items-start">
-                <span className="text-success small fw-bold">Net In-Hand Pay</span>
-                <span className="badge bg-success-subtle text-success px-2 py-0.5 rounded-pill" style={{ fontSize: "10px" }}>
-                  Take Home
-                </span>
+          <Row className="g-3 text-center">
+            <Col xs={6} md={3}>
+              <div className="p-3 rounded-3" style={{ background: "#ecfdf5", border: "1px solid #d1fae5" }}>
+                <span className="small text-muted d-block">Present Days</span>
+                <h4 className="fw-bold text-success mb-0 mt-1">{attendance.present_days ?? 0}</h4>
               </div>
-              <h4 className="fw-bold text-success mt-2 mb-1">{fmt(viewNetSalary)}</h4>
-              <span className="text-muted" style={{ fontSize: "11px" }}>Monthly Take-Home</span>
-            </Card>
-          </Col>
-        </Row>
+            </Col>
+            <Col xs={6} md={3}>
+              <div className="p-3 rounded-3" style={{ background: "#fefce8", border: "1px solid #fef08a" }}>
+                <span className="small text-muted d-block">Late Days</span>
+                <h4 className="fw-bold text-warning mb-0 mt-1">{attendance.late_days ?? 0}</h4>
+              </div>
+            </Col>
+            <Col xs={6} md={3}>
+              <div className="p-3 rounded-3" style={{ background: "#fff1f2", border: "1px solid #ffe4e6" }}>
+                <span className="small text-muted d-block">Unpaid Leaves (LOP)</span>
+                <h4 className="fw-bold text-danger mb-0 mt-1">{attendance.lop_days ?? 0}</h4>
+              </div>
+            </Col>
+            <Col xs={6} md={3}>
+              <div className="p-3 rounded-3" style={{ background: "#eff6ff", border: "1px solid #dbeafe" }}>
+                <span className="small text-muted d-block">Clock In / Out</span>
+                <div className="fw-bold text-primary fs-6 mt-1">
+                  {shiftTiming.check_in || "--:--"} - {shiftTiming.check_out || "--:--"}
+                </div>
+              </div>
+            </Col>
+          </Row>
+        </Card>
 
         {/* 2 Detailed Breakdown Cards */}
         <Row className="g-4 mb-4">
@@ -1681,6 +1704,46 @@ const PayrollManagement = () => {
           </Col>
         </Row>
 
+        {/* 4 Summary Stat Metric Cards */}
+        <Row className="g-3 mb-4">
+          <Col xs={12} sm={6} lg={3}>
+            <Card className="border-0 shadow-sm rounded-4 p-3 bg-white h-100">
+              <span className="text-muted small fw-medium">Annual CTC</span>
+              <h4 className="fw-bold text-dark mt-2 mb-1">{fmt(viewGrossTotal * 12)}</h4>
+              <span className="text-muted" style={{ fontSize: "11px" }}>Total Cost to Company / Year</span>
+            </Card>
+          </Col>
+
+          <Col xs={12} sm={6} lg={3}>
+            <Card className="border-0 shadow-sm rounded-4 p-3 bg-white h-100">
+              <span className="text-muted small fw-medium">Monthly Gross</span>
+              <h4 className="fw-bold text-dark mt-2 mb-1">{fmt(viewGrossTotal)}</h4>
+              <span className="text-success" style={{ fontSize: "11px" }}>100% Fixed Base + Allowances</span>
+            </Card>
+          </Col>
+
+          <Col xs={12} sm={6} lg={3}>
+            <Card className="border-0 shadow-sm rounded-4 p-3 bg-white h-100">
+              <span className="text-muted small fw-medium">Monthly Deductions</span>
+              <h4 className="fw-bold text-danger mt-2 mb-1">{fmt(viewDeductionsTotal)}</h4>
+              <span className="text-muted" style={{ fontSize: "11px" }}>PF, ESI, PT, Taxes</span>
+            </Card>
+          </Col>
+
+          <Col xs={12} sm={6} lg={3}>
+            <Card className="border-0 shadow-sm rounded-4 p-3 h-100" style={{ background: "#f0fdf4", border: "1px solid #bbf7d0" }}>
+              <div className="d-flex justify-content-between align-items-start">
+                <span className="text-success small fw-bold">Net In-Hand Pay</span>
+                <span className="badge bg-success-subtle text-success px-2 py-0.5 rounded-pill" style={{ fontSize: "10px" }}>
+                  Take Home
+                </span>
+              </div>
+              <h4 className="fw-bold text-success mt-2 mb-1">{fmt(viewNetSalary)}</h4>
+              <span className="text-muted" style={{ fontSize: "11px" }}>Monthly Take-Home</span>
+            </Card>
+          </Col>
+        </Row>
+
         {/* Net Take-Home Highlight Banner */}
         <div
           className="p-4 rounded-4 text-white d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-3 mb-4 shadow-sm"
@@ -1699,46 +1762,7 @@ const PayrollManagement = () => {
           </div>
         </div>
 
-        {/* Live Attendance & Shift Timing Summary */}
-        <Card className="border-0 shadow-sm rounded-4 p-4 bg-white mb-4">
-          <div className="d-flex justify-content-between align-items-center mb-3">
-            <h6 className="fw-bold mb-0 text-dark">
-              Attendance & Shift Summary ({currentMonthYear})
-            </h6>
-            <Badge bg="light" text="dark" className="border fw-normal">
-              {shiftTiming.dateStr ? `${shiftTiming.dateStr} Log` : "Today"}
-            </Badge>
-          </div>
 
-          <Row className="g-3 text-center">
-            <Col xs={6} md={3}>
-              <div className="p-3 rounded-3" style={{ background: "#ecfdf5", border: "1px solid #d1fae5" }}>
-                <span className="small text-muted d-block">Present Days</span>
-                <h4 className="fw-bold text-success mb-0 mt-1">{attendance.present_days ?? 0}</h4>
-              </div>
-            </Col>
-            <Col xs={6} md={3}>
-              <div className="p-3 rounded-3" style={{ background: "#fefce8", border: "1px solid #fef08a" }}>
-                <span className="small text-muted d-block">Late Days</span>
-                <h4 className="fw-bold text-warning mb-0 mt-1">{attendance.late_days ?? 0}</h4>
-              </div>
-            </Col>
-            <Col xs={6} md={3}>
-              <div className="p-3 rounded-3" style={{ background: "#fff1f2", border: "1px solid #ffe4e6" }}>
-                <span className="small text-muted d-block">Unpaid Leaves (LOP)</span>
-                <h4 className="fw-bold text-danger mb-0 mt-1">{attendance.lop_days ?? 0}</h4>
-              </div>
-            </Col>
-            <Col xs={6} md={3}>
-              <div className="p-3 rounded-3" style={{ background: "#eff6ff", border: "1px solid #dbeafe" }}>
-                <span className="small text-muted d-block">Clock In / Out</span>
-                <div className="fw-bold text-primary fs-6 mt-1">
-                  {shiftTiming.check_in || "--:--"} - {shiftTiming.check_out || "--:--"}
-                </div>
-              </div>
-            </Col>
-          </Row>
-        </Card>
       </div>
     );
   }

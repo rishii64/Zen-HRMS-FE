@@ -17,8 +17,7 @@ import AdminDashboard from "../pages/Admin/AdminDashboard";
 import LeavesPage from "../pages/Admin/LeavesPage";
 import AdminAttendance from "../pages/Admin/AdminAttendance";
 import HolidayManager from "../pages/Admin/HolidayManager";
-import ManageEmployee from "../pages/Admin/ManageEmployee";
-import Login from "../pages/Login";
+import ManageEmployees from "../pages/Admin/ManageEmployees";
 import Register from "../pages/Register";
 import Holiday from "../pages/Apps/Holiday";
 import Policies from "../pages/Apps/Policies";
@@ -32,6 +31,9 @@ import EmployeeForm from "../pages/Employee/EmployeeForm";
 import Employee from "../pages/Employee/Employee";
 import Separation from "../pages/Apps/Separation";
 import MyAttendance from "../components/Attendance/Attendance";
+
+// Accounts Pages
+import AccountsDashboard from "../pages/Accounts/AccountsDashboard";
 
 // Payroll Pages
 import PayrollManagement from "../pages/Payroll/PayrollManagement";
@@ -73,13 +75,14 @@ export default function AppRoute() {
       <Route path="/admin/dashboard" element={<ProtectedRoute allowedRoles={["hr"]}> <AdminDashboard /> </ProtectedRoute>} />
       <Route path="/attendance" element={<ProtectedRoute allowedRoles={["employee", "hr", "hod", "accounts"]}> <MyAttendance /> </ProtectedRoute>} />
       <Route path="/admin/leaves" element={<ProtectedRoute allowedRoles={["hr", "admin", "accounts", "payroll"]}> <LeavesPage /> </ProtectedRoute>} />
-      <Route path="/admin/manage-employees" element={<ProtectedRoute allowedRoles={["hr"]}> <Login /> </ProtectedRoute>} />
+      <Route path="/admin/manage-employees" element={<ProtectedRoute allowedRoles={["hr", "admin", "hod", "accounts"]}> <ManageEmployees /> </ProtectedRoute>} />
       <Route path="/admin/register-employee" element={<ProtectedRoute allowedRoles={["hr"]}> <Register /> </ProtectedRoute>} />
 
       <Route path="/hr-dashboard" element={<ProtectedRoute allowedRoles={["hr"]}> <HRDashboard /> </ProtectedRoute>} />
       <Route path="/onboarding" element={<ProtectedRoute allowedRoles={["hr"]}> <Onboarding /> </ProtectedRoute>} />
       <Route path="/recruitment" element={<ProtectedRoute allowedRoles={["hr"]}> <Recruitment /> </ProtectedRoute>} />
-      <Route path="/manage-employee" element={<ProtectedRoute allowedRoles={["hr"]}> <ManageEmployee /> </ProtectedRoute>} />
+      <Route path="/manage-employee" element={<ProtectedRoute allowedRoles={["hr", "admin", "hod", "accounts"]}> <ManageEmployees /> </ProtectedRoute>} />
+      <Route path="/admin/manage-employee" element={<ProtectedRoute allowedRoles={["hr", "admin", "hod", "accounts"]}> <ManageEmployees /> </ProtectedRoute>} />
       <Route path="/holidaymanager" element={<ProtectedRoute allowedRoles={["hr"]}> <HolidayManager /> </ProtectedRoute>} />
       <Route path="/holidays" element={<ProtectedRoute allowedRoles={["employee", "hr", "hod", "accounts"]}> <Holiday /> </ProtectedRoute>} />
       <Route path="/policies" element={<ProtectedRoute allowedRoles={["employee", "hr", "hod", "accounts"]}> <Policies /> </ProtectedRoute>} />
@@ -91,6 +94,10 @@ export default function AppRoute() {
       <Route path="/employee/create" element={<ProtectedRoute allowedRoles={["employee"]}> <EmployeeForm /> </ProtectedRoute>} />
       <Route path="/employee/leave" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager"]}> <Leave /> </ProtectedRoute>} />
       <Route path="/employee/profile/:employeeid" element={<ProtectedRoute allowedRoles={["employee", "hr", "hod", "accounts"]}> <Employee /> </ProtectedRoute>} />
+
+      {/* Accounts Dashboard & Payroll Routes */}
+      <Route path="/accounts/dashboard" element={<ProtectedRoute allowedRoles={["accounts", "payroll", "admin"]}> <AccountsDashboard /> </ProtectedRoute>} />
+      {/* <Route path="/accounts-dashboard" element={<ProtectedRoute allowedRoles={["accounts", "payroll", "admin"]}> <AccountsDashboard /> </ProtectedRoute>} /> */}
 
       {/* Accounts / Payroll Route (Accessible by Accounts, HR, Admin, and Employee) */}
       <Route path="/payroll" element={<ProtectedRoute allowedRoles={["accounts", "hr", "admin", "payroll", "employee"]}> <PayrollManagement /> </ProtectedRoute>} />

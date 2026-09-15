@@ -79,7 +79,7 @@ const Home = () => {
     const userRole = (localStorage.getItem("role") || "").toLowerCase();
     if (userRole === "hr" || userRole === "admin" || userRole === "hrmanager") return "/admin/dashboard";
     if (userRole === "hod" || userRole === "manager") return "/hod/dashboard";
-    if (userRole === "accounts" || userRole === "payroll") return "/payroll";
+    if (userRole === "accounts" || userRole === "payroll") return "/accounts/dashboard";
     return "/employee/dashboard";
   };
 

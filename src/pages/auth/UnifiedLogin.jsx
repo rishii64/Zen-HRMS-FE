@@ -51,8 +51,8 @@ export default function UnifiedLogin() {
             navigate("/admin/dashboard");
           } else if (data.user.role === "employee") {
             navigate("/employee/dashboard");
-          } else if (data.user.role === "accounts") {
-            navigate("/payroll");
+          } else if (data.user.role === "accounts" || data.user.role === "payroll") {
+            navigate("/accounts/dashboard");
           } else if (data.user.role === "hod") {
             navigate("/hod/dashboard");
           } else {

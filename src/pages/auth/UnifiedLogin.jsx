@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { FiHash, FiLock, FiEye, FiEyeOff, FiLoader } from "react-icons/fi";
+import { FiHash, FiLock, FiEye, FiEyeOff, FiLoader, FiUserCheck, FiChevronDown } from "react-icons/fi";
 import loginIllustration from "../../assets/login_illustration.png";
 import toast from 'react-hot-toast';
 import { getApiBaseUrl } from "../../api/axios";
@@ -107,44 +107,39 @@ export default function UnifiedLogin() {
               </svg>
             </div>
 
-            {/* Title & Role Tabs Group */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 border-b border-slate-100 pb-4">
-              <div className="relative pb-1 select-none">
+            {/* Title */}
+            <div className="mb-6 border-b border-slate-100 pb-3">
+              <div className="relative pb-1 select-none inline-block">
                 <h2 className="text-xl font-bold text-slate-800">Sign In</h2>
                 <div className="absolute bottom-0 left-0 w-8 h-0.5 bg-amber-500 rounded-full"></div>
               </div>
-              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs font-semibold text-slate-500">
-                <span className="text-slate-400 font-medium">Login As:</span>
-                {[
-                  { id: "employee", label: "Employee" },
-                  { id: "hr", label: "HR" },
-                  { id: "accounts", label: "Finance" },
-                  { id: "hod", label: "HOD" },
-                ].map((r) => (
-                  <button
-                    key={r.id}
-                    type="button"
-                    onClick={() => setRole(r.id)}
-                    className={`transition-all duration-200 pb-0.5 border-b-2 ${role === r.id
-                      ? "text-orange-500 border-orange-500 font-bold"
-                      : "text-slate-400 border-transparent hover:text-slate-600 font-medium"
-                      }`}
-                  >
-                    {r.label}
-                  </button>
-                ))}
-              </div>
+              <p className="text-xs text-slate-400 mt-1">Select your role and enter credentials to continue</p>
             </div>
-
-            {/* Error Message */}
-            {/* {error && (
-              <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-xs font-medium text-center">
-                {error}
-              </div>
-            )} */}
 
             {/* Form */}
             <form onSubmit={handleLogin} className="space-y-4">
+              {/* Role Selection Dropdown */}
+              <div className="relative flex items-center">
+                <div className="absolute left-1.5 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-tr from-orange-400 to-amber-500 text-white shadow-sm pointer-events-none">
+                  <FiUserCheck className="h-4.5 w-4.5" />
+                </div>
+                <select
+                  id="role"
+                  value={role}
+                  onChange={(e) => setRole(e.target.value)}
+                  className="w-full appearance-none rounded-full border border-slate-200 py-3 pl-14 pr-10 text-sm font-medium text-slate-700 bg-white placeholder-slate-400 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-200/40 transition-all shadow-sm cursor-pointer"
+                  required
+                >
+                  <option value="employee">Employee</option>
+                  <option value="hr">HR Manager</option>
+                  <option value="accounts">Finance & Accounts</option>
+                  <option value="hod">Department Head (HOD)</option>
+                </select>
+                <div className="absolute right-4 pointer-events-none text-slate-400">
+                  <FiChevronDown className="h-4 w-4" />
+                </div>
+              </div>
+
               {/* Employee ID Input */}
               <div className="relative flex items-center">
                 <div className="absolute left-1.5 flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-tr from-orange-400 to-amber-500 text-white shadow-sm">
@@ -165,17 +160,29 @@ export default function UnifiedLogin() {
                 <div className="absolute left-1.5 flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-tr from-orange-400 to-amber-500 text-white shadow-sm">
                   <FiLock className="h-4.5 w-4.5" />
                 </div>
-                <input type={showPassword ? "text" : "password"}
+                <input
+                  type={showPassword ? "text" : "password"}
                   className="w-full rounded-full border border-slate-200 py-3 pl-14 pr-12 text-sm text-slate-700 bg-white placeholder-slate-400 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-200/40 transition-all shadow-sm"
-                  placeholder="••••••" value={password} onChange={(e) => setPassword(e.target.value)} required
+                  placeholder="••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
                 />
-                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 text-slate-400 hover:text-slate-600 focus:outline-none transition-colors">
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 text-slate-400 hover:text-slate-600 focus:outline-none transition-colors"
+                >
                   {showPassword ? <FiEyeOff className="h-4 w-4" /> : <FiEye className="h-4 w-4" />}
                 </button>
               </div>
 
               {/* Submit Button */}
-              <button type="submit" disabled={loading} className="w-full rounded-full bg-gradient-to-r from-orange-400 via-amber-400 to-amber-500 hover:from-orange-500 hover:to-amber-600 text-white font-semibold py-3 mt-6 shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5 active:translate-y-0 duration-200 flex items-center justify-center disabled:opacity-50 disabled:pointer-events-none">
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full rounded-full bg-gradient-to-r from-orange-400 via-amber-400 to-amber-500 hover:from-orange-500 hover:to-amber-600 text-white font-semibold py-3 mt-6 shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5 active:translate-y-0 duration-200 flex items-center justify-center disabled:opacity-50 disabled:pointer-events-none"
+              >
                 {loading ? <FiLoader className="animate-spin h-5 w-5 mr-2" /> : null}
                 {loading ? "Signing in..." : "Sign In"}
               </button>
@@ -183,19 +190,13 @@ export default function UnifiedLogin() {
           </div>
 
           {/* Footer & Forgot Password */}
-          <div className="mt-8 space-y-4">
+          <div className="mt-8">
             <div className="flex justify-center">
               <Link
                 to="/forgot-password"
                 className="px-6 py-1.5 rounded-full border border-amber-300 bg-amber-50/20 text-xs font-semibold text-amber-600 hover:bg-amber-50 transition-colors shadow-sm select-none"
               >
                 Forgot Password ?
-              </Link>
-            </div>
-            <div className="text-center text-xs text-slate-500">
-              Don't have portal credentials?{" "}
-              <Link to="/register" className="text-orange-500 font-bold hover:underline">
-                Register Here
               </Link>
             </div>
           </div>

@@ -101,14 +101,9 @@ const Home = () => {
                     Go to Dashboard
                   </Button>
                 ) : (
-                  <>
-                    <Button as={Link} to="/login" variant="light" size="lg" className="px-4 me-2 shadow-sm fw-bold">
-                      Get Started
-                    </Button>
-                    <Button as={Link} to="/register" variant="outline-light" size="lg" className="px-4 shadow-sm fw-bold">
-                      Register Now
-                    </Button>
-                  </>
+                  <Button as={Link} to="/login" variant="light" size="lg" className="px-4 shadow-sm fw-bold">
+                    Get Started
+                  </Button>
                 )}
               </div>
             </Col>

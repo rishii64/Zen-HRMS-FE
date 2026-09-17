@@ -2,7 +2,6 @@ import { Routes, Route, Navigate } from "react-router-dom";
 
 // Auth Pages
 import UnifiedLogin from "../pages/auth/UnifiedLogin";
-import UnifiedRegister from "../pages/auth/UnifiedRegister";
 import ForgotPassword from "../pages/auth/ForgotPassword";
 
 // HR Pages
@@ -68,7 +67,7 @@ export default function AppRoute() {
       {/* Public Routes */}
       <Route path="/" element={<Home />} />
       <Route path="/login" element={<UnifiedLogin />} />
-      <Route path="/register" element={<UnifiedRegister />} />
+      <Route path="/register" element={<Navigate to="/login" replace />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
 
       {/* HR & Admin Restricted Routes */}

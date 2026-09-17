@@ -8,6 +8,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
 import { getApiBaseUrl, getBackendBaseUrl } from "../../api";
+import toast from "react-hot-toast";
 
 const API_BASE = getApiBaseUrl();
 const UPLOAD_API = `${API_BASE}/leave/apply`;
@@ -251,7 +252,7 @@ const LeavesPage = () => {
 
   useEffect(() => { fetchLeaves(); fetchBalance(); }, [fetchLeaves, fetchBalance]);
 
-  const handleDownloadPDF = () => { if (!lastForm) { alert("Please submit a leave application first."); return; } generatePDF(lastForm, salary, balanceList); };
+  const handleDownloadPDF = () => { if (!lastForm) { toast.error("Please submit a leave application first."); return; } generatePDF(lastForm, salary, balanceList); };
 
   const handleDelete = async (id) => {
     if (!window.confirm("Are you sure you want to cancel this leave record?")) return;
@@ -727,7 +728,7 @@ const EmployeeLeaveForm = ({ salary, balanceList, onSubmitSuccess }) => {
   const handleSubmit = async (e) => {
     e.preventDefault(); setError(null);
     if (!empName.trim()) { setError("Employee name is required."); return; }
-    if (isDocRequired && !uploadStatus) { alert("Please upload a medical certificate for Sick Leave exceeding 3 days."); return; }
+    if (isDocRequired && !uploadStatus) { toast.error("Please upload a medical certificate for Sick Leave exceeding 3 days."); return; }
     const leaveType = LEAVE_POLICY.find(p => p.code === leaveCode)?.name || leaveCode;
     const formData = {
       employee_name: empName.trim(), employee_code: empCode.trim() || "EMP001",

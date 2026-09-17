@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 const API = process.env.REACT_APP_API_URL || "http://localhost:5007/api";
 
 // ====================== NOTIFICATION SOUND (Web Audio API) ======================
@@ -372,11 +373,11 @@ const EmployeeForm = () => {
 
   const addEmployee = () => {
     if (!selectedDesig) {
-      alert("Please select a designation.");
+      toast.error("Please select a designation.");
       return;
     }
     if (salaryTotal === 0) {
-      alert("Please enter salary details.");
+      toast.error("Please enter salary details.");
       return;
     }
     setEmployees([
@@ -395,11 +396,11 @@ const EmployeeForm = () => {
 
   const addHr = () => {
     if (!hrName.trim()) {
-      alert("Please enter HR manager name.");
+      toast.error("Please enter HR manager name.");
       return;
     }
     if (!hrEmail.trim()) {
-      alert("Please enter HR manager email.");
+      toast.error("Please enter HR manager email.");
       return;
     }
     const joiningDate =
@@ -426,7 +427,7 @@ const EmployeeForm = () => {
 
   const handleCvUpload = (e) => {
     if (!cvDesig) {
-      alert("Please select a designation for this CV.");
+      toast.error("Please select a designation for this CV.");
       return;
     }
     const files = Array.from(e.target.files);
@@ -496,18 +497,18 @@ const EmployeeForm = () => {
   };
   const addInterview = () => {
     if (!interviewForm.candidateName.trim()) {
-      alert("Please enter candidate name.");
+      toast.error("Please enter candidate name.");
       return;
     }
     if (!interviewForm.dateOfInterview) {
-      alert("Please enter date of interview.");
+      toast.error("Please enter date of interview.");
       return;
     }
     if (
       interviewForm.remarksRequired === "Yes" &&
       !interviewForm.remarks.trim()
     ) {
-      alert("Remarks are required.");
+      toast.error("Remarks are required.");
       return;
     }
     if (editingInterviewId !== null) {
@@ -561,11 +562,11 @@ const EmployeeForm = () => {
 
   const handleSubmit = async () => {
     if (!totalBudget) {
-      alert("Please enter the recruitment budget.");
+      toast.error("Please enter the recruitment budget.");
       return;
     }
     if (designations.length === 0) {
-      alert("Please add at least one designation.");
+      toast.error("Please add at least one designation.");
       return;
     }
     try {

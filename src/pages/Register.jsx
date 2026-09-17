@@ -12,12 +12,11 @@ import {
   Spinner,
   Modal,
 } from "react-bootstrap";
-
-import { getBackendBaseUrl } from "../api/axios";
+import toast from "react-hot-toast";
 
 const DEFAULT_PASSWORD = "Admin@123";
-const API_BASE = getBackendBaseUrl();
-const UPLOAD_BASE = getBackendBaseUrl();
+const API_BASE = "http://localhost:5007";
+const UPLOAD_BASE = "http://localhost:5007";
 
 const styleSheet = document.createElement("style");
 styleSheet.textContent = `
@@ -1747,11 +1746,14 @@ const Register = () => {
         method: "DELETE",
       });
       const data = await res.json();
-      if (data.success)
+      if (data.success) {
+        toast.success("Employee deleted successfully!");
         setEmployees((prev) => prev.filter((emp) => emp.id !== id));
-      else alert("❌ " + data.message);
+      } else {
+        toast.error(data.message || "Failed to delete employee");
+      }
     } catch {
-      alert("❌ Backend is not running!");
+      toast.error("Backend is not running!");
     }
   }, []);
 
@@ -1906,10 +1908,10 @@ const Register = () => {
         setLoginEmail("");
         setLoginPassword("");
       } else {
-        alert("❌ " + result.message);
+        toast.error(result.message || "Login failed");
       }
     } catch {
-      alert("❌ Backend (Port 5001) is not running!");
+      toast.error("Backend (Port 5001) is not running!");
     }
     setLoginLoading(false);
   };
@@ -1917,15 +1919,15 @@ const Register = () => {
   const handleChangePassword = async (e) => {
     e.preventDefault();
     if (newPassword !== confirmPassword) {
-      alert("❌ Passwords do not match!");
+      toast.error("Passwords do not match!");
       return;
     }
     if (newPassword.length < 6) {
-      alert("❌ Password must be at least 6 characters.");
+      toast.error("Password must be at least 6 characters.");
       return;
     }
     if (newPassword === DEFAULT_PASSWORD) {
-      alert("❌ New password cannot be the default password.");
+      toast.error("New password cannot be the default password.");
       return;
     }
     setChangeLoading(true);
@@ -1941,11 +1943,13 @@ const Register = () => {
       });
       const result = await response.json();
       if (result.success) {
-        alert("✅ Password changed! Welcome.");
+        toast.success("Password changed! Welcome.");
         setAuthStep("main");
-      } else alert("❌ " + result.message);
+      } else {
+        toast.error(result.message || "Failed to change password");
+      }
     } catch {
-      alert("❌ Backend is not running!");
+      toast.error("Backend is not running!");
     }
     setChangeLoading(false);
   };
@@ -2147,8 +2151,8 @@ const Register = () => {
       });
       const result = await response.json();
       if (result.success) {
-        alert(
-          `✅ Employee Registered Successfully!\n\nDefault Password: ${DEFAULT_PASSWORD}`,
+        toast.success(
+          `Employee Registered Successfully! Default Password: ${DEFAULT_PASSWORD}`,
         );
         fetchEmployees();
         setFormData({
@@ -2256,12 +2260,12 @@ const Register = () => {
         setDocErrors({});
         setEducationErrors([]);
       } else {
-        alert(
-          "❌ " + (result.message || result.error || "Registration failed"),
+        toast.error(
+          result.message || result.error || "Registration failed",
         );
       }
     } catch (err) {
-      alert("❌ Backend is not running or network error!");
+      toast.error("Backend is not running or network error!");
     }
   };
 

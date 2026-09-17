@@ -3,6 +3,7 @@ import {
   Table, Button, Container, Spinner, Badge,
   Card, OverlayTrigger, Tooltip, Modal, Form
 } from "react-bootstrap";
+import toast from "react-hot-toast";
 
 const API = "http://localhost:5003/api";
 
@@ -45,7 +46,7 @@ const EmployeeLeavePortal = () => {
   const handleApply = async (e) => {
     e.preventDefault();
     const totalDays = calculateDays(newLeave.fromDate, newLeave.toDate);
-    if (totalDays <= 0) { alert("To Date must be after From Date!"); return; }
+    if (totalDays <= 0) { toast.error("To Date must be after From Date!"); return; }
 
     try {
       const res = await fetch(`${API}/apply-leave`, {
@@ -61,13 +62,13 @@ const EmployeeLeavePortal = () => {
         }),
       });
       const msg = await res.text();
-      alert(msg);
+      toast.success(msg || "Leave application submitted successfully!");
       setNewLeave({ employeeName: "", leaveType: "CL", fromDate: "", toDate: "", reason: "" });
       setShowModal(false);
       fetchLeaves();
     } catch (err) {
       console.error("Failed to apply leave:", err);
-      alert("Something went wrong. Please try again!");
+      toast.error("Something went wrong. Please try again!");
     }
   };
 
@@ -77,13 +78,13 @@ const EmployeeLeavePortal = () => {
       const res  = await fetch(`${API}/leave-delete/${id}`, { method: "DELETE" });
       const data = await res.json();
       if (data.success) {
-        alert("Leave application deleted successfully!");
+        toast.success("Leave application deleted successfully!");
         fetchLeaves();
       } else {
-        alert("Error: " + data.error);
+        toast.error("Error: " + data.error);
       }
     } catch (err) {
-      alert("Error: " + err.message);
+      toast.error("Error: " + err.message);
     }
   };
 

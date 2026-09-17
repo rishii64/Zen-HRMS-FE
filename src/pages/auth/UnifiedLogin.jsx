@@ -27,9 +27,9 @@ export default function UnifiedLogin() {
     try {
       const API = getApiBaseUrl();
       const response = await fetch(`${API}/login`, {
-          method: "POST",
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ employee_id: employeeId, password, role }),
+        body: JSON.stringify({ employee_id: employeeId.trim(), password, role }),
       });
 
       const data = await response.json();
@@ -41,10 +41,10 @@ export default function UnifiedLogin() {
         localStorage.setItem("userName", data.user.name);
         localStorage.setItem("email", data.user.email);
         localStorage.setItem("userId", data.user.id);
-        if (data.user.employee_id) {
-          // localStorage.setItem("employeeCode", data.user.employee_id);
-          localStorage.setItem("empId", data.user.employee_id);
-        }
+        const empCode = data.user.employee_id || data.user.employee_code || "";
+        localStorage.setItem("employeeCode", empCode);
+        localStorage.setItem("empId", empCode);
+        localStorage.setItem("user", JSON.stringify(data.user));
 
         setTimeout(() => {
           setLoading(false);

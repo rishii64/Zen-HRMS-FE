@@ -15,6 +15,7 @@ import {
   Dropdown,
 } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 import {
   LuMail,
   LuPhone,
@@ -241,7 +242,7 @@ const SalaryStructureModal = ({
 
   const handleSave = async () => {
     if (!isHRUser) {
-      alert("❌ Access denied: Only HR can edit the salary structure.");
+      toast.error("Access denied: Only HR can edit the salary structure.");
       return;
     }
 
@@ -1016,9 +1017,9 @@ const ManageEmployees = () => {
       const res = await fetch(`${API}/employees?_t=${Date.now()}`, { headers: { role } });
       const data = await res.json();
       if (data.success) setEmployees(Array.isArray(data.data) ? data.data : []);
-      else if (!silent) alert("Error fetching employees");
+      else if (!silent) toast.error("Error fetching employees");
     } catch (e) {
-      if (!silent) alert("Error: " + e.message);
+      if (!silent) toast.error("Error: " + e.message);
     }
     if (!silent) setLoading(false);
     else setRefreshing(false);
@@ -1061,14 +1062,20 @@ const ManageEmployees = () => {
   };
 
   const openAdd = () => {
-    if (isManager || isEmployee) return alert("❌ Not allowed!");
+    if (isManager || isEmployee) {
+      toast.error("Not allowed!");
+      return;
+    }
     setEditMode(false);
     setEmpForm(EMPTY_FORM);
     setShowModal(true);
   };
 
   const openEdit = (emp) => {
-    if (isManager || isEmployee) return alert("❌ Not allowed!");
+    if (isManager || isEmployee) {
+      toast.error("Not allowed!");
+      return;
+    }
     setEditMode(true);
 
     let salutation = emp.salutation || "Mr.";
@@ -1098,7 +1105,10 @@ const ManageEmployees = () => {
   };
 
   const handleSave = async () => {
-    if (isManager || isEmployee) return alert("❌ Not allowed!");
+    if (isManager || isEmployee) {
+      toast.error("Not allowed!");
+      return;
+    }
     const {
       employee_code,
       salutation,
@@ -1122,8 +1132,10 @@ const ManageEmployees = () => {
       !joining_date ||
       !reporting_manager ||
       !phone_no
-    )
-      return alert("❌ Fill all fields!");
+    ) {
+      toast.error("Please fill all required fields!");
+      return;
+    }
 
     // Ensure full formatted name with title prefix
     const titlePrefix = salutation || "Mr.";
@@ -1157,18 +1169,23 @@ const ManageEmployees = () => {
       });
       const data = await res.json();
       if (data.success) {
-        alert("✅ Saved!");
+        toast.success(data.message || (editMode ? "Employee updated successfully!" : "Employee added successfully! Login credentials have been sent via email."));
         fetchEmployees();
         setShowModal(false);
-      } else alert("❌ " + data.error);
+      } else {
+        toast.error(data.error || "Failed to save employee");
+      }
     } catch (e) {
-      alert("❌ " + e.message);
+      toast.error(e.message || "Failed to save employee");
     }
     setSaving(false);
   };
 
   const handleDelete = async (emp) => {
-    if (!isAdmin) return alert("❌ Only Admin can delete!");
+    if (!isAdmin) {
+      toast.error("Only Admin can delete!");
+      return;
+    }
     if (!window.confirm("Delete employee?")) return;
     try {
       const res = await fetch(`${API}/employees/delete`, {
@@ -1177,10 +1194,14 @@ const ManageEmployees = () => {
         body: JSON.stringify({ employee_code: emp.employee_code }),
       });
       const data = await res.json();
-      if (data.success) fetchEmployees();
-      else alert(data.error);
+      if (data.success) {
+        toast.success("Employee deleted successfully!");
+        fetchEmployees();
+      } else {
+        toast.error(data.error || "Failed to delete employee");
+      }
     } catch (e) {
-      alert(e.message);
+      toast.error(e.message || "Failed to delete employee");
     }
   };
 
@@ -1211,13 +1232,14 @@ const ManageEmployees = () => {
       });
       const data = await res.json();
       if (data.success) {
+        toast.success("Tab permissions updated successfully!");
         fetchEmployees();
         setTabsModal({ show: false, employee: null, selectedTabs: [] });
       } else {
-        alert("❌ " + data.error);
+        toast.error(data.error || "Failed to update tabs");
       }
     } catch (e) {
-      alert("❌ " + e.message);
+      toast.error(e.message || "Failed to update tabs");
     }
   };
 
@@ -1235,13 +1257,13 @@ const ManageEmployees = () => {
       });
       const data = await res.json();
       if (data.success) {
-        alert(`✅ Documents marked as ${status}!`);
+        toast.success(`Documents marked as ${status}!`);
         fetchEmployees();
       } else {
-        alert("❌ " + data.error);
+        toast.error(data.error || "Failed to verify documents");
       }
     } catch (e) {
-      alert("❌ " + e.message);
+      toast.error(e.message || "Failed to verify documents");
     }
   };
 
@@ -1879,14 +1901,23 @@ const ManageEmployees = () => {
           <Modal.Body>
             <Row className="g-3">
               <Col xs={12} md={4}>
-                <Form.Label className="small fw-bold">Emp ID</Form.Label>
+                <Form.Label className="small fw-bold">
+                  Emp ID / Code {!editMode && <span className="text-danger">*</span>}
+                </Form.Label>
                 <Form.Control
                   size="sm"
                   name="employee_code"
+                  placeholder="e.g. EMP-001"
                   value={empForm.employee_code}
                   onChange={handleChange}
                   disabled={editMode}
+                  required
                 />
+                {!editMode && (
+                  <div className="text-muted mt-1" style={{ fontSize: "11px" }}>
+                    Emailed to employee for portal login & attendance
+                  </div>
+                )}
               </Col>
               <Col xs={12} md={4}>
                 <Form.Label className="small fw-bold">Name</Form.Label>

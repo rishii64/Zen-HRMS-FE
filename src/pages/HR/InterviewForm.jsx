@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import toast from "react-hot-toast";
 import OnboardingForm from "./onboarding";
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
@@ -510,12 +511,12 @@ function AssessmentForm({ onSubmit, userRole }) {
   const handleOfferFileChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    if (file.type !== "application/pdf") { alert("Only PDF files are accepted."); return; }
+    if (file.type !== "application/pdf") { toast.error("Only PDF files are accepted."); return; }
     setOfferFile(file); setOfferFileUrl(URL.createObjectURL(file));
   };
 
   const handleSubmit = async () => {
-    if (!candidate.name.trim()) { alert("Please enter candidate name"); return; }
+    if (!candidate.name.trim()) { toast.error("Please enter candidate name."); return; }
     setLoading(true); setError("");
     const record = {
       ...candidate,

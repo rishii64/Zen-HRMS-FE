@@ -1,6 +1,8 @@
 export {
   default,
   api,
+  LOCALHOST_URL,
+  HOSTED_URL,
   getApiBaseUrl,
   getBackendBaseUrl,
   getUploadUrl,

@@ -27,8 +27,9 @@ import { LuLogOut, LuBuilding, LuCheckCheck } from "react-icons/lu";
 import toast from "react-hot-toast";
 import ResignationModal from "../../components/Resignation/ResignationModal";
 import Navbar from "../../components/layout/Navbar";
+import { getApiBaseUrl } from "../../api/axios";
 
-const API = "http://localhost:5001/api/auth";
+const API = getApiBaseUrl();
 
 export default function Separation() {
   const token = localStorage.getItem("token");

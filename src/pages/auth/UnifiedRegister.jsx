@@ -4,6 +4,7 @@ import { FiUser, FiMail, FiLock, FiEye, FiEyeOff, FiHash, FiLoader } from "react
 import { LuShieldAlert } from "react-icons/lu";
 import loginIllustration from "../../assets/login_illustration.png";
 import toast from 'react-hot-toast';
+import { getApiBaseUrl } from "../../api/axios";
 
 export default function UnifiedRegister() {
   const [name, setName] = useState("");
@@ -29,7 +30,8 @@ export default function UnifiedRegister() {
     // setSuccess("");
 
     try {
-      const response = await fetch("http://localhost:5001/api/auth/register", {
+      const API = getApiBaseUrl();
+      const response = await fetch(`${API}/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

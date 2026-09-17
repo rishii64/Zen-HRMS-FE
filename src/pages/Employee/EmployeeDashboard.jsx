@@ -112,15 +112,7 @@ const EmployeeDashboard = () => {
         }
       })
       .catch(() => {
-        fetch("http://localhost:5003/api/leaves")
-          .then(res => res.json())
-          .then(data => {
-            if (Array.isArray(data)) {
-              const pending = data.filter(l => l.status === "Pending").length;
-              setPendingLeavesCount(pending > 0 ? pending : 0);
-            }
-          })
-          .catch(() => setPendingLeavesCount(0));
+        setPendingLeavesCount(0);
       });
   }, [navigate]);
 

@@ -26,8 +26,9 @@ import {
 } from "react-icons/lu";
 import { MdMoreVert } from "react-icons/md";
 import { FaRegCircleCheck } from "react-icons/fa6";
+import { getApiBaseUrl } from "../../api/axios";
 
-const API = "http://localhost:5001/api/auth";
+const API = getApiBaseUrl();
 
 const LEAVE_TYPE_COLORS = {
   "Casual Leave": { bg: "#ecfdf5", color: "#10b981", border: "#a7f3d0", badge: "CL" },

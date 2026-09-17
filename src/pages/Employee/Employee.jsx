@@ -4,9 +4,10 @@ import { Form, Button, Card, Container, Row, Col, Table, Badge, Spinner } from "
 import { useParams, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { FaClipboardList } from "react-icons/fa";
+import { getApiBaseUrl, getBackendBaseUrl } from "../../api/axios";
 
-const API = "http://localhost:5001/api/auth";
-const UPLOADS_BASE = "http://localhost:5001/uploads";
+const API = getApiBaseUrl();
+const UPLOADS_BASE = `${getBackendBaseUrl()}/uploads`;
 
 const Employee = () => {
   const { employeeid } = useParams();

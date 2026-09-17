@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { FiHash, FiLock, FiEye, FiEyeOff, FiLoader } from "react-icons/fi";
 import loginIllustration from "../../assets/login_illustration.png";
 import toast from 'react-hot-toast';
+import { getApiBaseUrl } from "../../api/axios";
 
 export default function UnifiedLogin() {
   const [employeeId, setEmployeeId] = useState("");
@@ -24,8 +25,9 @@ export default function UnifiedLogin() {
     // setError("");
 
     try {
-      const response = await fetch("http://localhost:5001/api/auth/login", {
-        method: "POST",
+      const API = getApiBaseUrl();
+      const response = await fetch(`${API}/login`, {
+          method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ employee_id: employeeId, password, role }),
       });

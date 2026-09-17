@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { getApiBaseUrl } from "../../api/axios";
 import {
   Table,
   Container,
@@ -10,6 +11,8 @@ import {
   Card,
 } from "react-bootstrap";
 
+const API = getApiBaseUrl();
+
 const AdminAttendance = () => {
   const [attendanceData, setAttendanceData] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -17,10 +20,14 @@ const AdminAttendance = () => {
   useEffect(() => {
     const fetchAttendance = async () => {
       try {
-        const response = await axios.get(
-          "http://localhost:5007/api/attendance",
-        );
-        setAttendanceData(response.data);
+        const token = localStorage.getItem("token");
+        const response = await axios.get(`${API}/attendance`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        const records = Array.isArray(response.data)
+          ? response.data
+          : response.data?.data || [];
+        setAttendanceData(records);
         setLoading(false);
       } catch (error) {
         console.error("Error fetching attendance data:", error);

@@ -13,9 +13,11 @@ import {
   Modal,
 } from "react-bootstrap";
 
+import { getBackendBaseUrl } from "../api/axios";
+
 const DEFAULT_PASSWORD = "Admin@123";
-const API_BASE = "http://localhost:5007";
-const UPLOAD_BASE = "http://localhost:5007";
+const API_BASE = getBackendBaseUrl();
+const UPLOAD_BASE = getBackendBaseUrl();
 
 const styleSheet = document.createElement("style");
 styleSheet.textContent = `

@@ -24,8 +24,9 @@ import {
   LuPencil
 } from "react-icons/lu";
 import { MdEdit } from "react-icons/md";
+import { getApiBaseUrl } from "../../api/axios";
 
-const API = "http://localhost:5001/api/auth";
+const API = getApiBaseUrl();
 
 const STATUS_BADGES = {
   Present: { bg: "#ecfdf5", color: "#10b981", border: "#a7f3d0", label: "On Time" },

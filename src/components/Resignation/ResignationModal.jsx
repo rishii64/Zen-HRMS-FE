@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { FiX, FiCalendar, FiChevronDown, FiClock, FiUser, FiCheck, FiInfo } from "react-icons/fi";
 import toast from "react-hot-toast";
+import { getApiBaseUrl } from "../../api/axios";
 
-const API = "http://localhost:5001/api/auth";
+const API = getApiBaseUrl();
 
 const REASONS_LIST = [
   "Better Career Opportunity",

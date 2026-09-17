@@ -13,8 +13,9 @@ import {
 import { useNavigate, useLocation } from "react-router-dom";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { getApiBaseUrl } from "../../api/axios";
 
-const API = "http://localhost:5001/api/auth";
+const API = getApiBaseUrl();
 
 const MONTHS = [
   "January",

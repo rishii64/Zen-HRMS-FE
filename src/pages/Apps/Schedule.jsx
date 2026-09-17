@@ -21,8 +21,9 @@ import {
 } from "react-icons/lu";
 import { FaCheckCircle } from "react-icons/fa";
 import toast from "react-hot-toast";
+import { getApiBaseUrl } from "../../api/axios";
 
-const API = "http://localhost:5001/api/auth";
+const API = getApiBaseUrl();
 
 const SHIFT_TYPES = [
   { name: "Morning Shift", start: "09:00", end: "17:00", color: "#10b981", bg: "#ecfdf5", border: "#a7f3d0" },

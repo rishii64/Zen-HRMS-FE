@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { FiMail, FiLock, FiKey, FiEye, FiEyeOff, FiLoader } from "react-icons/fi";
 import loginIllustration from "../../assets/login_illustration.png";
 import toast from "react-hot-toast";
+import { getApiBaseUrl } from "../../api/axios";
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
@@ -23,7 +24,8 @@ export default function ForgotPassword() {
 
     setLoading(true);
     try {
-      const response = await fetch("http://localhost:5001/api/auth/forgot-password", {
+      const API = getApiBaseUrl();
+      const response = await fetch(`${API}/forgot-password`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
@@ -63,7 +65,8 @@ export default function ForgotPassword() {
 
     setLoading(true);
     try {
-      const response = await fetch("http://localhost:5001/api/auth/verify-otp", {
+      const API = getApiBaseUrl();
+      const response = await fetch(`${API}/verify-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

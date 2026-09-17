@@ -5,8 +5,9 @@ import { LuUsers, LuClock, LuCalendar, LuBuilding2, LuUserCheck, LuUserX, LuSear
 import { BsThreeDotsVertical } from "react-icons/bs";
 import TodayClockWidget from "../../components/layout/TodayClockWidget";
 import toast from "react-hot-toast";
+import { getApiBaseUrl } from "../../api/axios";
 
-const API = "http://localhost:5001/api/auth";
+const API = getApiBaseUrl();
 
 const AdminDashboard = () => {
   const navigate = useNavigate();

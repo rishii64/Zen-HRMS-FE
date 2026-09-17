@@ -27,8 +27,9 @@ import {
 } from "react-icons/lu";
 import { FaRegCircleCheck } from "react-icons/fa6";
 import { FaRegTimesCircle } from "react-icons/fa";
+import { getApiBaseUrl } from "../../api/axios";
 
-const API = "http://localhost:5001/api/auth";
+const API = getApiBaseUrl();
 
 const HODDashboard = () => {
   const navigate = useNavigate();

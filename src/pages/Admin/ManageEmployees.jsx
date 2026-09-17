@@ -41,10 +41,10 @@ import {
   LuArrowUpDown,
 } from "react-icons/lu";
 import { BsThreeDots } from "react-icons/bs";
-import { getApiBaseUrl } from "../../api/axios";
+import { getApiBaseUrl, getBackendBaseUrl } from "../../api/axios";
 
 const API = getApiBaseUrl();
-const UPLOADS_BASE = "http://localhost:5001/uploads";
+const UPLOADS_BASE = `${getBackendBaseUrl()}/uploads`;
 
 const DEFAULT_USER_AVATAR = "/default-avatar.svg";
 

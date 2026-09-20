@@ -61,28 +61,36 @@ export const BACKEND_URL = getDetectedBackendUrl();
 // Active API URL
 export const API_BASE_URL = `${BACKEND_URL}/api/auth`;
 
+// Base URL for uploads (routed through /api/uploads to be proxied by Nginx in production)
+export const UPLOADS_BASE = `${BACKEND_URL}/api/uploads`;
+
 // Helper functions for backwards compatibility across components
 export const getApiBaseUrl = () => API_BASE_URL;
 export const getBackendBaseUrl = () => BACKEND_URL;
 
 /**
  * Format full URL for uploaded files
+ * In production reverse proxies (like Nginx on EC2), only /api/* is routed to the Node backend,
+ * while /* serves the frontend SPA index.html.
+ * Therefore, uploaded assets MUST be routed through /api/uploads/
  */
 export const getUploadUrl = (filename) => {
-  if (!filename) return "";
+  if (!filename || typeof filename !== "string") return "";
+  const trimmed = filename.trim();
   if (
-    filename.startsWith("http://") ||
-    filename.startsWith("https://") ||
-    filename.startsWith("data:")
+    trimmed.startsWith("http://") ||
+    trimmed.startsWith("https://") ||
+    trimmed.startsWith("data:") ||
+    trimmed.startsWith("blob:")
   ) {
-    return filename;
+    return trimmed;
   }
-  const clean = filename
+  const clean = trimmed
     .replace(/^\/+/, "")
     .replace(/^api\/auth\/uploads\//i, "")
     .replace(/^api\/uploads\//i, "")
     .replace(/^uploads\//i, "");
-  return `${getBackendBaseUrl()}/uploads/${clean}`;
+  return `${getBackendBaseUrl()}/api/uploads/${clean}`;
 };
 
 export const setApiBaseUrl = (url) => {

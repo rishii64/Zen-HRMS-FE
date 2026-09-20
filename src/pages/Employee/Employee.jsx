@@ -4,10 +4,9 @@ import { Form, Button, Card, Container, Row, Col, Table, Badge, Spinner } from "
 import { useParams, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { FaClipboardList } from "react-icons/fa";
-import { getApiBaseUrl, getBackendBaseUrl, getUploadUrl } from "../../api/axios";
+import { getApiBaseUrl, getBackendBaseUrl, getUploadUrl, UPLOADS_BASE } from "../../api/axios";
 
 const API = getApiBaseUrl();
-const UPLOADS_BASE = `${getBackendBaseUrl()}/uploads`;
 
 const Employee = () => {
   const { employeeid } = useParams();
@@ -352,6 +351,10 @@ const Employee = () => {
                 alt="profile"
                 className="w-48 h-48 rounded-circle border border-4 border-white shadow-sm"
                 style={{ objectFit: "cover" }}
+                onError={(e) => {
+                  e.target.onerror = null;
+                  e.target.src = "https://cdn-icons-png.flaticon.com/512/3135/3135715.png";
+                }}
               />
             </Col>
             <Col md={9}>

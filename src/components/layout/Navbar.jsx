@@ -104,6 +104,7 @@ const AppNavbar = () => {
       }
     })()
   );
+  const [imgError, setImgError] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
@@ -111,6 +112,11 @@ const AppNavbar = () => {
   const [isAppsOpen, setIsAppsOpen] = useState(false);
   const [isMobileAppsOpen, setIsMobileAppsOpen] = useState(false);
   const [appSearch, setAppSearch] = useState("");
+
+  // Reset image error state whenever profilePhoto string changes
+  useEffect(() => {
+    setImgError(false);
+  }, [profilePhoto]);
 
   const handleLogout = () => {
     toast.success("Logged out!");
@@ -159,17 +165,19 @@ const AppNavbar = () => {
         }
       })();
 
-      setIsLoggedIn(!!currentToken);
-      setRole(currentRole);
-      setUserName(currentUserName);
-      setEmail(currentEmail);
-      setEmployeeCode(currentEmpCode);
-      setProfilePhoto(currentPhoto);
+      const nextLoggedIn = !!currentToken;
+      setIsLoggedIn((prev) => (prev !== nextLoggedIn ? nextLoggedIn : prev));
+      setRole((prev) => (prev !== currentRole ? currentRole : prev));
+      setUserName((prev) => (prev !== currentUserName ? currentUserName : prev));
+      setEmail((prev) => (prev !== currentEmail ? currentEmail : prev));
+      setEmployeeCode((prev) => (prev !== currentEmpCode ? currentEmpCode : prev));
+      setProfilePhoto((prev) => (prev !== currentPhoto ? currentPhoto : prev));
     };
 
     const handleProfileUpdate = (e) => {
       const p = e.detail?.profile_photo || localStorage.getItem("profile_photo") || "";
       setProfilePhoto(p);
+      setImgError(false);
     };
 
     const closeDropdowns = (e) => {
@@ -181,7 +189,7 @@ const AppNavbar = () => {
       }
     };
 
-    const interval = setInterval(checkLogin, 1000);
+    const interval = setInterval(checkLogin, 2500);
     document.addEventListener("click", closeDropdowns);
     window.addEventListener("profileUpdated", handleProfileUpdate);
     window.addEventListener("storage", checkLogin);
@@ -357,12 +365,12 @@ const AppNavbar = () => {
                 <button type="button" onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                   className="flex items-center gap-2 rounded-full p-0.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-300"
                 >
-                  {profilePhoto ? (
+                  {profilePhoto && !imgError ? (
                     <img
                       src={getUploadUrl(profilePhoto)}
                       alt={userName || "Profile"}
                       className="h-9 w-9 rounded-full object-cover shadow-md border-2 border-white dark:border-slate-800 hover:shadow-lg transition-all duration-200"
-                      onError={() => setProfilePhoto("")}
+                      onError={() => setImgError(true)}
                     />
                   ) : (
                     <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-tr from-blue-500 to-indigo-600 text-sm font-bold text-white shadow-md border-2 border-white dark:border-slate-800 hover:shadow-lg hover:from-blue-600 hover:to-indigo-700 transition-all duration-200">
@@ -377,12 +385,12 @@ const AppNavbar = () => {
                   : "opacity-0 scale-95 pointer-events-none group-hover:opacity-100 group-hover:scale-100 group-hover:pointer-events-auto"
                   }`}>
                   <div className="flex flex-col items-center pb-3 border-b border-slate-100 dark:border-slate-800">
-                    {profilePhoto ? (
+                    {profilePhoto && !imgError ? (
                       <img
                         src={getUploadUrl(profilePhoto)}
                         alt={userName || "Profile"}
                         className="h-14 w-14 rounded-full object-cover shadow-inner mb-2 border-2 border-blue-500/20"
-                        onError={() => setProfilePhoto("")}
+                        onError={() => setImgError(true)}
                       />
                     ) : (
                       <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-tr from-blue-500 to-indigo-600 text-base font-bold text-white shadow-inner mb-2">
@@ -589,9 +597,18 @@ const AppNavbar = () => {
                 {/* Mobile Profile info card */}
                 <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-800">
                   <div className="flex items-center gap-3 px-3 py-2">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-tr from-blue-500 to-indigo-600 text-sm font-bold text-white shadow">
-                      {getInitials(userName)}
-                    </div>
+                    {profilePhoto && !imgError ? (
+                      <img
+                        src={getUploadUrl(profilePhoto)}
+                        alt={userName || "Profile"}
+                        className="h-10 w-10 rounded-full object-cover shadow border border-slate-200"
+                        onError={() => setImgError(true)}
+                      />
+                    ) : (
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-tr from-blue-500 to-indigo-600 text-sm font-bold text-white shadow">
+                        {getInitials(userName)}
+                      </div>
+                    )}
                     <div className="flex-1 min-w-0">
                       <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">
                         {userName || "User"}

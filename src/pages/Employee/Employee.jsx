@@ -4,7 +4,7 @@ import { Form, Button, Card, Container, Row, Col, Table, Badge, Spinner } from "
 import { useParams, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { FaClipboardList } from "react-icons/fa";
-import { getApiBaseUrl, getBackendBaseUrl } from "../../api/axios";
+import { getApiBaseUrl, getBackendBaseUrl, getUploadUrl } from "../../api/axios";
 
 const API = getApiBaseUrl();
 const UPLOADS_BASE = `${getBackendBaseUrl()}/uploads`;
@@ -12,6 +12,9 @@ const UPLOADS_BASE = `${getBackendBaseUrl()}/uploads`;
 const Employee = () => {
   const { employeeid } = useParams();
   const navigate = useNavigate();
+  const activeEmpId = (!employeeid || employeeid === "me")
+    ? (localStorage.getItem("employeeCode") || localStorage.getItem("empId") || "me")
+    : employeeid;
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -69,7 +72,10 @@ const Employee = () => {
 
   // Load existing profile details
   useEffect(() => {
-    fetch(`${API}/employee/${employeeid}`)
+    const token = localStorage.getItem("token");
+    fetch(`${API}/employee/${activeEmpId}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
+    })
       .then(res => res.json())
       .then(data => {
         if (data.success && data.employee) {
@@ -272,16 +278,32 @@ const Employee = () => {
     if (files.profile_photo) formData.append("profile_photo", files.profile_photo);
 
     try {
-      const res = await fetch(`${API}/employee/${employeeid}/profile`, {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API}/employee/${activeEmpId}/profile`, {
         method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: formData
       });
       const data = await res.json();
       if (data.success) {
+        if (data.profile_photo) {
+          localStorage.setItem("profile_photo", data.profile_photo);
+          setEmpData(prev => ({ ...prev, profile_photo: data.profile_photo }));
+        }
+        try {
+          const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+          if (data.profile_photo) storedUser.profile_photo = data.profile_photo;
+          localStorage.setItem("user", JSON.stringify(storedUser));
+        } catch (_) {}
+
+        // Notify Navbar and other listening components
+        window.dispatchEvent(new Event("storage"));
+        window.dispatchEvent(new CustomEvent("profileUpdated", { detail: { profile_photo: data.profile_photo } }));
+
         toast.success("Profile updated successfully!");
         setTimeout(() => {
           navigate("/employee/dashboard");
-        }, 1500);
+        }, 1200);
       } else {
         toast.error(data.error || "Failed to update profile");
       }
@@ -324,7 +346,7 @@ const Employee = () => {
                   files.profile_photo
                     ? URL.createObjectURL(files.profile_photo)
                     : empData?.profile_photo
-                      ? `${UPLOADS_BASE}/${empData.profile_photo}`
+                      ? getUploadUrl(empData.profile_photo)
                       : "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"
                 }
                 alt="profile"

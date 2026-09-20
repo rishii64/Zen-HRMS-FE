@@ -1,29 +1,65 @@
 import axios from "axios";
 
 // ============================================================================
-// 1. API URL CONFIGURATION (Distinct Localhost & Hosted Links)
+// 1. API URL CONFIGURATION (Intelligent Dynamic Localhost, EC2 & Domain Detection)
 // ============================================================================
-// Local development URL
 export const LOCALHOST_URL = "http://localhost:5001/api/auth";
-
-// Hosted / Production backend URL (replace with your live backend domain)
 export const HOSTED_URL = "https://hrms.zentelex.com/api/auth";
 
-// Auto-detect environment: use localhost when running locally, hosted URL otherwise
-const isLocalhost =
+export const isLocalhost =
   typeof window !== "undefined" &&
   (window.location.hostname === "localhost" ||
     window.location.hostname === "127.0.0.1");
 
-// Active API URL (prioritizes VITE_API_BASE_URL from .env if present)
-export const API_BASE_URL =
-  (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_BASE_URL) ||
-  (isLocalhost ? LOCALHOST_URL : HOSTED_URL);
+export const getDetectedBackendUrl = () => {
+  if (typeof window === "undefined") {
+    return "http://localhost:5001";
+  }
 
-// Root backend URL for static assets/uploads (strips /api/auth or /api)
-export const BACKEND_URL =
-  (typeof import.meta !== "undefined" && import.meta.env?.VITE_BACKEND_URL) ||
-  API_BASE_URL.replace(/\/api\/auth\/?$/i, "").replace(/\/api\/?$/i, "");
+  // Check if explicit backend URL is provided and valid
+  const envBackend = import.meta.env?.VITE_BACKEND_URL;
+  if (envBackend && (!envBackend.includes("localhost") || isLocalhost)) {
+    return envBackend.replace(/\/+$/, "");
+  }
+
+  const envApi = import.meta.env?.VITE_API_BASE_URL;
+  if (envApi) {
+    // If env has localhost but we are browsing on EC2/external host, don't use localhost!
+    if (!isLocalhost && (envApi.includes("localhost") || envApi.includes("127.0.0.1"))) {
+      // ignore mismatched localhost env
+    } else {
+      return envApi.replace(/\/api\/auth\/?$/i, "").replace(/\/api\/?$/i, "");
+    }
+  }
+
+  if (isLocalhost) {
+    return "http://localhost:5001";
+  }
+
+  // Custom production domain
+  if (window.location.hostname === "hrms.zentelex.com") {
+    return "https://hrms.zentelex.com";
+  }
+
+  // EC2 or custom host: if frontend is on port (e.g. 5173, 3000), backend is on 5001
+  if (
+    window.location.port &&
+    window.location.port !== "80" &&
+    window.location.port !== "443" &&
+    window.location.port !== "5001"
+  ) {
+    return `${window.location.protocol}//${window.location.hostname}:5001`;
+  }
+
+  // Standard reverse proxy (e.g. Nginx on EC2 port 80/443)
+  return window.location.origin;
+};
+
+// Root backend URL for static assets/uploads
+export const BACKEND_URL = getDetectedBackendUrl();
+
+// Active API URL
+export const API_BASE_URL = `${BACKEND_URL}/api/auth`;
 
 // Helper functions for backwards compatibility across components
 export const getApiBaseUrl = () => API_BASE_URL;
@@ -41,8 +77,12 @@ export const getUploadUrl = (filename) => {
   ) {
     return filename;
   }
-  const clean = filename.replace(/^\/+/, "").replace(/^uploads\//, "");
-  return `${BACKEND_URL}/uploads/${clean}`;
+  const clean = filename
+    .replace(/^\/+/, "")
+    .replace(/^api\/auth\/uploads\//i, "")
+    .replace(/^api\/uploads\//i, "")
+    .replace(/^uploads\//i, "");
+  return `${getBackendBaseUrl()}/uploads/${clean}`;
 };
 
 export const setApiBaseUrl = (url) => {

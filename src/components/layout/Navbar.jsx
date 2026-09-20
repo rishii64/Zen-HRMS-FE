@@ -29,6 +29,7 @@ import { FaListCheck } from "react-icons/fa6";
 import logo from "../../assets/zentelex-logo.png";
 import toast from 'react-hot-toast';
 import { TbPassword } from "react-icons/tb";
+import { getUploadUrl } from "../../api/axios";
 
 
 const ALL_APPS = [
@@ -52,19 +53,38 @@ const ALL_APPS = [
 
   { id: "policies", title: "Policy", icon: <LuShieldCheck className="text-indigo-600" />, route: "/policies", roles: ["employee", "hr", "hod", "accounts"] },
   { id: "confirmation", title: "Confirmation", icon: <LuBadgeCheck className="text-emerald-600" />, route: "/admin/manage-employees", roles: ["hr"] },
-  { id: "caf_nte", title: "CAF/NTE/NOD", icon: <LuFileCheck className="text-rose-500" />, route: "/admin/manage-employees", roles: ["hr"] },
-  { id: "break_monitor", title: "Break Monitor", icon: <LuClock className="text-sky-500" />, route: "/attendance", roles: ["employee", "hr", "hod"] },
+  { id: "attendance", title: "Attendance Tracking", icon: <LuCalendar className="text-emerald-600" />, route: "/attendance", roles: ["hr", "employee", "accounts", "hod"] },
+  { id: "leave", title: "Leave Portal", icon: <LuFileText className="text-indigo-600" />, route: "/leave", roles: ["hr", "employee", "accounts", "hod"] },
+  { id: "payroll", title: "Payroll Management", icon: <LuWallet className="text-amber-600" />, route: "/payroll", roles: ["hr", "accounts"] },
+  { id: "payslip", title: "Salary Slips", icon: <LuFileCheck className="text-purple-600" />, route: "/payslip", roles: ["hr", "accounts", "employee"] },
+  { id: "onboarding", title: "Onboarding Portal", icon: <LuGraduationCap className="text-teal-600" />, route: "/onboarding", roles: ["hr"] },
+  { id: "recruitment", title: "Recruitment Desk", icon: <LuBriefcase className="text-cyan-600" />, route: "/recruitment", roles: ["hr"] },
+  { id: "interview", title: "Candidate Evaluation", icon: <LuUsers className="text-sky-600" />, route: "/interview", roles: ["hod", "hr"] },
+  { id: "manage_emp", title: "Employee Directory", icon: <LuBadgeCheck className="text-violet-600" />, route: "/manage-employee", roles: ["hr", "admin", "hod", "accounts"] },
+  { id: "holiday_mgr", title: "Holiday Calendar", icon: <LuCalendar className="text-pink-600" />, route: "/holidays", roles: ["hr", "employee", "accounts", "hod"] },
+  { id: "policies", title: "Company Policies", icon: <SiGoogledocs className="text-red-500" />, route: "/policies", roles: ["employee", "hr", "hod", "accounts"] },
+  { id: "schedule", title: "Duty Roaster", icon: <LuClock className="text-orange-500" />, route: "/schedule", roles: ["employee", "hr", "hod", "accounts"] },
+  { id: "separation", title: "Exit & Resignation", icon: <LuLogOut className="text-rose-500" />, route: "/resignation", roles: ["employee", "hr", "hod"] },
   { id: "mediclaim", title: "Mediclaim Card", icon: <LuStethoscope className="text-rose-600" />, route: "/employee/profile", roles: ["employee", "hr"] },
-  { id: "pip", title: "PIP", icon: <FaListCheck className="text-violet-600" />, route: "/appraisal", roles: ["hr", "hod"] },
-  { id: "misc_report", title: "Miscellaneous Report", icon: <LuClipboardList className="text-slate-600" />, route: "/admin/dashboard", roles: ["hr", "admin"] },
-
-  { id: "recruitment", title: "Recruitment", icon: <LuBriefcase className="text-amber-600" />, route: "/recruitment", roles: ["hr"] },
   { id: "id_card", title: "ID-Card", icon: <LuUser className="text-teal-600" />, route: "/employee/profile", roles: ["employee", "hr"] },
-  { id: "appraisal", title: "Appraisal / Revision", icon: <LuAward className="text-indigo-500" />, route: "/appraisal", roles: ["hr", "hod"] },
-  { id: "att_reversal", title: "Attendance Reversal V2", icon: <LuClock className="text-blue-600" />, route: "/attendance", roles: ["hr", "accounts"] },
+  { id: "misc_report", title: "Monthly Reports", icon: <LuChartNoAxesColumn className="text-emerald-500" />, route: "/admin/dashboard", roles: ["hr", "hod"] },
   { id: "level_up", title: "Level Up", icon: <LuSparkles className="text-yellow-500" />, route: "/appraisal", roles: ["employee", "hr"] },
   { id: "quality_report", title: "Quality Report", icon: <LuClipboardList className="text-slate-700" />, route: "/admin/dashboard", roles: ["hr", "hod"] },
 ];
+
+const HONORIFICS = new Set([
+  "mr", "mr.", "mrs", "mrs.", "ms", "ms.", "miss", "dr", "dr.", 
+  "prof", "prof.", "er", "er.", "mx", "mx.", "shri", "smt", "sir", "madam"
+]);
+
+const getCleanNameParts = (name) => {
+  if (!name) return [];
+  const parts = name.trim().split(/\s+/);
+  while (parts.length > 0 && HONORIFICS.has(parts[0].toLowerCase())) {
+    parts.shift();
+  }
+  return parts;
+};
 
 const AppNavbar = () => {
   const navigate = useNavigate();
@@ -74,6 +94,16 @@ const AppNavbar = () => {
   const [userName, setUserName] = useState(localStorage.getItem("userName") || "");
   const [email, setEmail] = useState(localStorage.getItem("email") || "");
   const [employeeCode, setEmployeeCode] = useState(localStorage.getItem("empId") || "");
+  const [profilePhoto, setProfilePhoto] = useState(
+    localStorage.getItem("profile_photo") ||
+    (() => {
+      try {
+        return JSON.parse(localStorage.getItem("user") || "{}").profile_photo || "";
+      } catch (_) {
+        return "";
+      }
+    })()
+  );
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
@@ -94,12 +124,14 @@ const AppNavbar = () => {
     localStorage.removeItem("userName");
     localStorage.removeItem("email");
     localStorage.removeItem("empId");
+    localStorage.removeItem("profile_photo");
 
     setRole(null);
     setIsLoggedIn(false);
     setUserName("");
     setEmail("");
     setEmployeeCode("");
+    setProfilePhoto("");
     setIsMobileMenuOpen(false);
     setIsDropdownOpen(false);
     setIsAppsOpen(false);
@@ -119,12 +151,25 @@ const AppNavbar = () => {
       const currentUserName = localStorage.getItem("userName") || "";
       const currentEmail = localStorage.getItem("email") || "";
       const currentEmpCode = localStorage.getItem("employeeCode") || localStorage.getItem("empId") || "";
+      const currentPhoto = localStorage.getItem("profile_photo") || (() => {
+        try {
+          return JSON.parse(localStorage.getItem("user") || "{}").profile_photo || "";
+        } catch (_) {
+          return "";
+        }
+      })();
 
       setIsLoggedIn(!!currentToken);
       setRole(currentRole);
       setUserName(currentUserName);
       setEmail(currentEmail);
       setEmployeeCode(currentEmpCode);
+      setProfilePhoto(currentPhoto);
+    };
+
+    const handleProfileUpdate = (e) => {
+      const p = e.detail?.profile_photo || localStorage.getItem("profile_photo") || "";
+      setProfilePhoto(p);
     };
 
     const closeDropdowns = (e) => {
@@ -138,17 +183,23 @@ const AppNavbar = () => {
 
     const interval = setInterval(checkLogin, 1000);
     document.addEventListener("click", closeDropdowns);
+    window.addEventListener("profileUpdated", handleProfileUpdate);
+    window.addEventListener("storage", checkLogin);
+
     return () => {
       clearInterval(interval);
       document.removeEventListener("click", closeDropdowns);
+      window.removeEventListener("profileUpdated", handleProfileUpdate);
+      window.removeEventListener("storage", checkLogin);
     };
   }, []);
 
   const getInitials = (name) => {
     if (!name) return "U";
-    const parts = name.trim().split(/\s+/);
+    const parts = getCleanNameParts(name);
+    if (parts.length === 0) return name.trim().charAt(0).toUpperCase() || "U";
     if (parts.length > 1) {
-      return (parts[0][0] + parts[1][0]).toUpperCase();
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
     }
     return parts[0][0].toUpperCase();
   };
@@ -306,9 +357,18 @@ const AppNavbar = () => {
                 <button type="button" onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                   className="flex items-center gap-2 rounded-full p-0.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-300"
                 >
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-tr from-blue-500 to-indigo-600 text-sm font-bold text-white shadow-md border-2 border-white dark:border-slate-800 hover:shadow-lg hover:from-blue-600 hover:to-indigo-700 transition-all duration-200">
-                    {getInitials(userName)}
-                  </div>
+                  {profilePhoto ? (
+                    <img
+                      src={getUploadUrl(profilePhoto)}
+                      alt={userName || "Profile"}
+                      className="h-9 w-9 rounded-full object-cover shadow-md border-2 border-white dark:border-slate-800 hover:shadow-lg transition-all duration-200"
+                      onError={() => setProfilePhoto("")}
+                    />
+                  ) : (
+                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-tr from-blue-500 to-indigo-600 text-sm font-bold text-white shadow-md border-2 border-white dark:border-slate-800 hover:shadow-lg hover:from-blue-600 hover:to-indigo-700 transition-all duration-200">
+                      {getInitials(userName)}
+                    </div>
+                  )}
                 </button>
 
                 {/* Profile Popup Card */}
@@ -317,9 +377,18 @@ const AppNavbar = () => {
                   : "opacity-0 scale-95 pointer-events-none group-hover:opacity-100 group-hover:scale-100 group-hover:pointer-events-auto"
                   }`}>
                   <div className="flex flex-col items-center pb-3 border-b border-slate-100 dark:border-slate-800">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-tr from-blue-500 to-indigo-600 text-base font-bold text-white shadow-inner mb-2">
-                      {getInitials(userName)}
-                    </div>
+                    {profilePhoto ? (
+                      <img
+                        src={getUploadUrl(profilePhoto)}
+                        alt={userName || "Profile"}
+                        className="h-14 w-14 rounded-full object-cover shadow-inner mb-2 border-2 border-blue-500/20"
+                        onError={() => setProfilePhoto("")}
+                      />
+                    ) : (
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-tr from-blue-500 to-indigo-600 text-base font-bold text-white shadow-inner mb-2">
+                        {getInitials(userName)}
+                      </div>
+                    )}
                     <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100 text-center truncate w-full">
                       {userName || "User"}
                     </h3>

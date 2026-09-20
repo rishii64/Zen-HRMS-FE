@@ -57,11 +57,12 @@ const EmployeeDashboard = () => {
             ? getUploadUrl(emp.profile_photo)
             : "https://cdn-icons-png.flaticon.com/512/3135/3135715.png";
           localStorage.setItem("profile_photo", emp.profile_photo || "");
+          if (emp.designation) localStorage.setItem("designation", emp.designation);
 
           setEmployee({
-            name: localStorage.getItem("userName") || emp.name || emp.first_name || "Sourav",
+            name: localStorage.getItem("userName") || emp.name || emp.first_name || "Employee",
             empId: emp.employee_id || empId,
-            designation: localStorage.getItem("designation") || emp.designation || "N/A",
+            designation: emp.designation || localStorage.getItem("designation") || "N/A",
             email: localStorage.getItem("email") || emp.email || "N/A",
             phone: localStorage.getItem("phone") || emp.phone_no || "N/A",
             department: emp.dept || emp.department || "N/A",

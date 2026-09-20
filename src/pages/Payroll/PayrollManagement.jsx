@@ -15,7 +15,7 @@ import {
 } from "react-bootstrap";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { getApiBaseUrl } from "../../api/axios";
+import { getApiBaseUrl, getUploadUrl } from "../../api/axios";
 
 const API = getApiBaseUrl();
 
@@ -1102,9 +1102,7 @@ const PayrollManagement = () => {
   // Avatar renderer with photo or colored initial circle
   const renderAvatar = (emp, size = 36) => {
     if (emp?.profile_photo) {
-      const photoUrl = emp.profile_photo.startsWith("http")
-        ? emp.profile_photo
-        : `${API}/uploads/${emp.profile_photo}`;
+      const photoUrl = getUploadUrl(emp.profile_photo);
       return (
         <img
           src={photoUrl}

@@ -42,7 +42,7 @@ import {
   LuArrowUpDown,
 } from "react-icons/lu";
 import { BsThreeDots } from "react-icons/bs";
-import { getApiBaseUrl, getBackendBaseUrl } from "../../api/axios";
+import { getApiBaseUrl, getBackendBaseUrl, getUploadUrl } from "../../api/axios";
 
 const API = getApiBaseUrl();
 const UPLOADS_BASE = `${getBackendBaseUrl()}/uploads`;
@@ -52,12 +52,7 @@ const DEFAULT_USER_AVATAR = "/default-avatar.svg";
 const getEmployeeAvatar = (emp) => {
   const photo = emp?.profile_photo || emp?.profile_pic || emp?.avatar;
   if (photo && typeof photo === "string" && photo.trim() !== "") {
-    const pic = photo.trim();
-    if (pic.startsWith("http://") || pic.startsWith("https://") || pic.startsWith("data:")) {
-      return pic;
-    }
-    const cleanPath = pic.replace(/^\/?(uploads\/)?/, "");
-    return `${UPLOADS_BASE}/${cleanPath}`;
+    return getUploadUrl(photo.trim());
   }
   return DEFAULT_USER_AVATAR;
 };
@@ -2043,7 +2038,7 @@ const ManageEmployees = () => {
           <Modal.Footer className="p-2">
             <Button
               variant="link"
-              className="text-muted"
+              className="text-muted text-decoration-none"
               onClick={() => setShowModal(false)}
             >
               Cancel

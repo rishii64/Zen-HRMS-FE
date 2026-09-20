@@ -12,6 +12,7 @@
 .env.backup
 .env.production.backup
 .env.production.latest
+dist/
 
 # testing
 /coverage

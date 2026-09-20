@@ -24,9 +24,42 @@ import {
   LuPencil
 } from "react-icons/lu";
 import { MdEdit } from "react-icons/md";
-import { getApiBaseUrl } from "../../api/axios";
+import { getApiBaseUrl, getUploadUrl } from "../../api/axios";
 
 const API = getApiBaseUrl();
+
+const HONORIFICS = new Set([
+  "mr", "mr.", "mrs", "mrs.", "ms", "ms.", "miss", "dr", "dr.", 
+  "prof", "prof.", "er", "er.", "mx", "mx.", "shri", "smt", "sir", "madam"
+]);
+
+const getAttendanceInitials = (name) => {
+  if (!name) return "E";
+  const parts = name.trim().split(/\s+/).filter(p => !HONORIFICS.has(p.toLowerCase()));
+  if (parts.length === 0) return name.trim().charAt(0).toUpperCase() || "E";
+  if (parts.length > 1) {
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+  return parts[0][0].toUpperCase();
+};
+
+const formatDateDisplay = (dateStr) => {
+  if (!dateStr) return "—";
+  try {
+    const cleanStr = String(dateStr).split("T")[0];
+    const parts = cleanStr.split("-");
+    if (parts.length === 3) {
+      const year = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1;
+      const day = parseInt(parts[2], 10);
+      const d = new Date(year, month, day);
+      return d.toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" });
+    }
+    return cleanStr;
+  } catch (_) {
+    return dateStr;
+  }
+};
 
 const STATUS_BADGES = {
   Present: { bg: "#ecfdf5", color: "#10b981", border: "#a7f3d0", label: "On Time" },
@@ -217,7 +250,11 @@ const MyAttendance = () => {
         const workH = r.work_hours ? `${r.work_hours}h` : "—";
         const status = r.status || "Present";
         const notes = r.notes ? `"${r.notes}"` : "";
-        return `"${empName}","${empCode}","${deptVal}","Staff","General Shift","${checkIn}","${checkOut}","${workH}","-","${status}",${notes}`;
+        const matchedEmp = employees.find(
+          (e) => (e.employee_code || e.employee_id || "").toLowerCase() === empCode.toLowerCase()
+        );
+        const desigVal = r.designation || matchedEmp?.designation || "Staff";
+        return `"${empName}","${empCode}","${deptVal}","${desigVal}","General Shift","${checkIn}","${checkOut}","${workH}","-","${status}",${notes}`;
       })
       .join("\n");
 
@@ -644,6 +681,7 @@ const MyAttendance = () => {
               <tr>
                 <th style={{ minWidth: "180px" }}>Employee Name</th>
                 <th style={{ minWidth: "110px" }}>Employee ID</th>
+                <th style={{ minWidth: "125px" }}>Date</th>
                 <th style={{ minWidth: "120px" }}>Department</th>
                 <th style={{ minWidth: "120px" }}>Designation</th>
                 <th style={{ minWidth: "110px" }}>Shift</th>
@@ -661,28 +699,48 @@ const MyAttendance = () => {
                 // SKELETON LOADERS (3 Skeleton Rows)
                 Array.from({ length: 4 }).map((_, idx) => (
                   <tr key={idx}>
-                    <td colSpan={12} className="py-3">
+                    <td colSpan={13} className="py-3">
                       <div className="skeleton-pulse h-8 w-full"></div>
                     </td>
                   </tr>
                 ))
               ) : paginatedRecords.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className="text-center py-5 text-xs text-slate-400">
+                  <td colSpan={13} className="text-center py-5 text-xs text-slate-400">
                     No attendance records found matching your filters.
                   </td>
                 </tr>
               ) : (
                 paginatedRecords.map((r) => {
                   const sBadge = STATUS_BADGES[r.status] || STATUS_BADGES.Present;
-                  const empInitials = (r.name || "E").split(" ").map(n => n[0]).slice(0, 2).join("").toUpperCase();
+                  const matchedEmp = employees.find(
+                    (e) => (e.employee_code || e.employee_id || "").toLowerCase() === (r.employee_id || "").toLowerCase()
+                  );
+                  const empDesignation = r.designation || matchedEmp?.designation || "Staff";
+                  const empPhoto = r.profile_photo || matchedEmp?.profile_photo || null;
+                  const empInitials = getAttendanceInitials(r.name || matchedEmp?.name || "Employee");
 
                   return (
                     <tr key={r.id} className="hover:bg-slate-50/80 transition-colors">
                       {/* Employee Name Column */}
                       <td>
                         <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-full bg-slate-900 text-white font-extrabold text-xs flex items-center justify-center shadow-xs">
+                          {empPhoto ? (
+                            <img
+                              src={getUploadUrl(empPhoto)}
+                              alt={r.name || "Employee"}
+                              className="w-8 h-8 rounded-full object-cover shadow-xs border border-slate-200"
+                              onError={(e) => {
+                                e.target.style.display = "none";
+                                const next = e.target.nextElementSibling;
+                                if (next) next.style.display = "flex";
+                              }}
+                            />
+                          ) : null}
+                          <div
+                            className="w-8 h-8 rounded-full bg-slate-900 text-white font-extrabold text-xs flex items-center justify-center shadow-xs"
+                            style={{ display: empPhoto ? "none" : "flex" }}
+                          >
                             {empInitials}
                           </div>
                           <div>
@@ -695,6 +753,14 @@ const MyAttendance = () => {
                       {/* Employee ID */}
                       <td className="font-semibold text-slate-700 text-xs">{r.employee_id}</td>
 
+                      {/* Date */}
+                      <td className="text-xs font-semibold text-slate-700 whitespace-nowrap">
+                        <div className="flex items-center gap-1.5 text-slate-600">
+                          <LuCalendar className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
+                          <span>{formatDateDisplay(r.date)}</span>
+                        </div>
+                      </td>
+
                       {/* Department */}
                       <td>
                         <span className="px-2 py-0.5 text-[11px] font-bold rounded-md bg-slate-100 text-slate-700">
@@ -703,7 +769,9 @@ const MyAttendance = () => {
                       </td>
 
                       {/* Designation */}
-                      <td className="text-xs text-slate-600 font-medium">Staff</td>
+                      <td className="text-xs text-slate-600 font-medium">
+                        {empDesignation}
+                      </td>
 
                       {/* Shift */}
                       <td>

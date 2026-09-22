@@ -14,7 +14,6 @@ import Apprasial from "../pages/HR/Appraisal";
 // Admin Pages
 import AdminDashboard from "../pages/Admin/AdminDashboard";
 import LeavesPage from "../pages/Admin/LeavesPage";
-import AdminAttendance from "../pages/Admin/AdminAttendance";
 import HolidayManager from "../pages/Admin/HolidayManager";
 import ManageEmployees from "../pages/Admin/ManageEmployees";
 import Register from "../pages/Register";
@@ -22,12 +21,13 @@ import Holiday from "../pages/Apps/Holiday";
 import Policies from "../pages/Apps/Policies";
 import Schedule from "../pages/Apps/Schedule";
 import Leave from "../pages/Apps/Leave";
+import IT_Declaration from "../pages/Apps/IT_Declaration";
+import ID_Card from "../pages/Apps/ID_Card";
+import Mediclaim from "../pages/Apps/Mediclaim";
+import Profile from "../pages/Apps/Profile";
 
 // Employee Pages
 import EmployeeDashboard from "../pages/Employee/EmployeeDashboard";
-import EmployeeLeaveForm from "../pages/Employee/EmployeeLeave";
-import EmployeeForm from "../pages/Employee/EmployeeForm";
-import Employee from "../pages/Employee/Employee";
 import Separation from "../pages/Apps/Separation";
 import MyAttendance from "../components/Attendance/Attendance";
 
@@ -73,6 +73,7 @@ export default function AppRoute() {
       {/* HR & Admin Restricted Routes */}
       <Route path="/admin/dashboard" element={<ProtectedRoute allowedRoles={["hr"]}> <AdminDashboard /> </ProtectedRoute>} />
       <Route path="/attendance" element={<ProtectedRoute allowedRoles={["employee", "hr", "hod", "accounts"]}> <MyAttendance /> </ProtectedRoute>} />
+      <Route path="/admin/attendance" element={<Navigate to="/attendance" replace />} />
       <Route path="/admin/leaves" element={<ProtectedRoute allowedRoles={["hr", "admin", "accounts", "payroll"]}> <LeavesPage /> </ProtectedRoute>} />
       <Route path="/admin/manage-employees" element={<ProtectedRoute allowedRoles={["hr", "admin", "hod", "accounts"]}> <ManageEmployees /> </ProtectedRoute>} />
       <Route path="/admin/register-employee" element={<ProtectedRoute allowedRoles={["hr"]}> <Register /> </ProtectedRoute>} />
@@ -87,16 +88,18 @@ export default function AppRoute() {
       <Route path="/policies" element={<ProtectedRoute allowedRoles={["employee", "hr", "hod", "accounts"]}> <Policies /> </ProtectedRoute>} />
       <Route path="/schedule" element={<ProtectedRoute allowedRoles={["employee", "hr", "hod", "accounts"]}> <Schedule /> </ProtectedRoute>} />
       <Route path="/leave" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager"]}> <Leave /> </ProtectedRoute>} />
+      <Route path="/employee/leave" element={<Navigate to="/leave" replace />} />
       
       {/* Employee Protected Routes */}
       <Route path="/employee/dashboard" element={<ProtectedRoute allowedRoles={["employee"]}> <EmployeeDashboard /> </ProtectedRoute>} />
-      <Route path="/employee/create" element={<ProtectedRoute allowedRoles={["employee"]}> <EmployeeForm /> </ProtectedRoute>} />
-      <Route path="/employee/leave" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager"]}> <Leave /> </ProtectedRoute>} />
-      <Route path="/employee/profile/:employeeid" element={<ProtectedRoute allowedRoles={["employee", "hr", "hod", "accounts"]}> <Employee /> </ProtectedRoute>} />
+      {/* Profile Routes (Mapped to Apps/Profile.jsx) */}
+      {/* <Route path="/profile" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager"]}><Profile /></ProtectedRoute>} />
+      <Route path="/profile/:employeeid" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager"]}><Profile /></ProtectedRoute>} /> */}
+      <Route path="/employee/profile/:employeeid" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager"]}><Profile /></ProtectedRoute>} />
 
       {/* Accounts Dashboard & Payroll Routes */}
       <Route path="/accounts/dashboard" element={<ProtectedRoute allowedRoles={["accounts", "payroll", "admin"]}> <AccountsDashboard /> </ProtectedRoute>} />
-      {/* <Route path="/accounts-dashboard" element={<ProtectedRoute allowedRoles={["accounts", "payroll", "admin"]}> <AccountsDashboard /> </ProtectedRoute>} /> */}
+      <Route path="/accounts-dashboard" element={<Navigate to="/accounts/dashboard" replace />} />
 
       {/* Accounts / Payroll Route (Accessible by Accounts, HR, Admin, and Employee) */}
       <Route path="/payroll" element={<ProtectedRoute allowedRoles={["accounts", "hr", "admin", "payroll", "employee"]}> <PayrollManagement /> </ProtectedRoute>} />
@@ -106,12 +109,24 @@ export default function AppRoute() {
 
       {/* Departmental Head (HOD) Protected Routes (HOD and HR can review) */}
       <Route path="/hod/dashboard" element={<ProtectedRoute allowedRoles={["hod", "manager", "hr"]}> <HODDashboard /> </ProtectedRoute>} />
-      {/* <Route path="/hod-dashboard" element={<ProtectedRoute allowedRoles={["hod", "manager", "hr"]}> <HODDashboard /> </ProtectedRoute>} /> */}
+      <Route path="/hod-dashboard" element={<Navigate to="/hod/dashboard" replace />} />
       <Route path="/appraisal" element={<ProtectedRoute allowedRoles={["hod", "hr"]}> <Apprasial /> </ProtectedRoute>} />
       <Route path="/interview" element={<ProtectedRoute allowedRoles={["hod", "hr"]}> <InterviewForm /> </ProtectedRoute>} />
 
       {/* Resignation Submission / Clearance Form (Employee can submit, Lead/HOD/HR can clear) */}
       <Route path="/resignation" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager"]}> <Separation /> </ProtectedRoute>} />
+
+      {/* IT Declaration (Income Tax Declaration) for all employees */}
+      <Route path="/it-declaration" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager"]}> <IT_Declaration /> </ProtectedRoute>} />
+      <Route path="/apps/it-declaration" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager"]}> <IT_Declaration /> </ProtectedRoute>} />
+
+      {/* Corporate ID Card & Documents for all employees */}
+      <Route path="/id-card" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager"]}> <ID_Card /> </ProtectedRoute>} />
+      <Route path="/apps/id-card" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager"]}> <ID_Card /> </ProtectedRoute>} />
+
+      {/* Corporate Mediclaim & Health Insurance for all employees and HR/Admin */}
+      <Route path="/mediclaim" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager"]}> <Mediclaim /> </ProtectedRoute>} />
+      <Route path="/apps/mediclaim" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager"]}> <Mediclaim /> </ProtectedRoute>} />
 
       {/* 404 Page */}
       <Route path="*" element={<h2 className="text-center mt-4">Page Not Found</h2>} />

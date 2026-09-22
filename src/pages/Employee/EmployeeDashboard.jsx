@@ -4,10 +4,12 @@ import { Link, useNavigate } from 'react-router-dom';
 import Loader from '../../components/Loader/Loader';
 import toast from 'react-hot-toast';
 import api, { getUploadUrl } from '../../api';
+import TodayClockWidget from '../../components/layout/TodayClockWidget';
 import {
   LuCalendar, LuClock, LuBuilding, LuTable, LuFingerprint,
   LuWallet, LuShieldCheck, LuTrendingUp, LuGraduationCap,
-  LuUsers, LuCircleCheck, LuLogOut, LuArrowUpRight, LuTriangleAlert, LuArrowRight, LuUserCheck
+  LuUsers, LuCircleCheck, LuLogOut, LuArrowUpRight, LuTriangleAlert, LuArrowRight, LuUserCheck, LuReceipt, LuBadgeCheck,
+  LuStethoscope
 } from "react-icons/lu";
 import { CiCircleCheck } from "react-icons/ci";
 
@@ -15,9 +17,7 @@ const EmployeeDashboard = () => {
   const navigate = useNavigate();
   const [employee, setEmployee] = useState(null);
   const [loader, setLoader] = useState(true);
-  const [checking, setChecking] = useState(false);
   const [attendanceLogs, setAttendanceLogs] = useState([]);
-  const [todayRecord, setTodayRecord] = useState(null);
   const [tickingTime, setTickingTime] = useState(new Date());
   const [pendingLeavesCount, setPendingLeavesCount] = useState(2);
 
@@ -119,77 +119,13 @@ const EmployeeDashboard = () => {
 
   const fetchAttendanceLogs = async () => {
     try {
-      const [logsRes, todayRes] = await Promise.allSettled([
-        api.get("/attendance?range=year"),
-        api.get("/attendance/today-status")
-      ]);
-
-      if (logsRes.status === "fulfilled" && logsRes.value.data?.success) {
-        const logs = logsRes.value.data.data || logsRes.value.data.logs || [];
+      const res = await api.get("/attendance?range=year");
+      if (res.data?.success) {
+        const logs = res.data.data || res.data.logs || [];
         setAttendanceLogs(logs);
-
-        const now = new Date();
-        const localDateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-        const isoDateStr = now.toISOString().split("T")[0];
-        const logTodayRec = logs.find(l => {
-          const d = typeof l.date === "string" ? l.date.split("T")[0] : "";
-          return d === localDateStr || d === isoDateStr;
-        });
-
-        if (todayRes.status === "fulfilled" && todayRes.value.data?.success) {
-          setTodayRecord(todayRes.value.data.record || logTodayRec || null);
-        } else {
-          setTodayRecord(logTodayRec || null);
-        }
-      } else if (todayRes.status === "fulfilled" && todayRes.value.data?.success) {
-        setTodayRecord(todayRes.value.data.record || null);
       }
     } catch (err) {
       console.error("Error fetching logs for dashboard:", err);
-    }
-  };
-
-  const handleDashboardCheckIn = async () => {
-    setChecking(true);
-    try {
-      const response = await api.post("/attendance/check-in");
-      const data = response.data;
-      if (data.success) {
-        toast.success(data.message || "Checked in successfully");
-        if (data.record) {
-          setTodayRecord(data.record);
-        }
-        fetchAttendanceLogs();
-      } else {
-        toast.error(data.error || "Check-in failed");
-      }
-    } catch (err) {
-      const errMsg = err.response?.data?.error || "Check-in request failed";
-      toast.error(errMsg);
-    } finally {
-      setChecking(false);
-    }
-  };
-
-  const handleDashboardCheckOut = async () => {
-    setChecking(true);
-    try {
-      const response = await api.post("/attendance/check-out");
-      const data = response.data;
-      if (data.success) {
-        toast.success(data.message || "Checked out successfully");
-        if (data.record) {
-          setTodayRecord(data.record);
-        }
-        fetchAttendanceLogs();
-      } else {
-        toast.error(data.error || "Check-out failed");
-      }
-    } catch (err) {
-      const errMsg = err.response?.data?.error || "Check-out request failed";
-      toast.error(errMsg);
-    } finally {
-      setChecking(false);
     }
   };
 
@@ -255,63 +191,6 @@ const EmployeeDashboard = () => {
     let hrs = Math.floor(avgMinutes / 60);
     const mins = Math.round(avgMinutes % 60);
     return `${hrs < 10 ? "0" + hrs : hrs}:${mins < 10 ? "0" + mins : mins} PM`;
-  };
-
-  // Today shift timer and calculations
-  const getTodayWorkedPercentage = () => {
-    if (!todayRecord || !todayRecord.check_in || todayRecord.check_in === "—" || todayRecord.status === "Absent") {
-      return { percent: 0, text: "0.0h", label: "NOT MARKED" };
-    }
-
-    let workMins = 0;
-    if (todayRecord.check_out && todayRecord.check_out !== "—") {
-      if (todayRecord.work_hours && parseFloat(todayRecord.work_hours) > 0) {
-        workMins = parseFloat(todayRecord.work_hours) * 60;
-      } else {
-        const inParts = todayRecord.check_in.split(":");
-        const outParts = todayRecord.check_out.split(":");
-        const inTime = new Date();
-        inTime.setHours(parseInt(inParts[0], 10) || 0, parseInt(inParts[1], 10) || 0, parseInt(inParts[2] || 0, 10) || 0, 0);
-        const outTime = new Date();
-        outTime.setHours(parseInt(outParts[0], 10) || 0, parseInt(outParts[1], 10) || 0, parseInt(outParts[2] || 0, 10) || 0, 0);
-        workMins = Math.max(0, (outTime.getTime() - inTime.getTime()) / 1000 / 60);
-      }
-    } else {
-      const checkInParts = todayRecord.check_in.split(":");
-      const checkInTime = new Date();
-      checkInTime.setHours(parseInt(checkInParts[0], 10) || 0, parseInt(checkInParts[1], 10) || 0, parseInt(checkInParts[2] || 0, 10) || 0, 0);
-      const diffMs = Math.max(0, tickingTime.getTime() - checkInTime.getTime());
-      workMins = diffMs / 1000 / 60;
-    }
-
-    const targetMins = 9 * 60; // 9 hours workday (10am to 7pm)
-    const percent = Math.min(100, Math.round((workMins / targetMins) * 100));
-    const hrs = (workMins / 60).toFixed(1);
-    let label = "IN PROGRESS";
-    if (todayRecord.check_out && todayRecord.check_out !== "—") {
-      label = percent >= 80 ? "GOOD" : percent >= 50 ? "AVERAGE" : "COMPLETED";
-    } else {
-      label = percent >= 80 ? "GOOD" : percent >= 50 ? "AVERAGE" : percent > 0 ? "IN PROGRESS" : "JUST STARTED";
-    }
-    return { percent, text: `${hrs}h`, label };
-  };
-
-  const getCheckInTimeLeft = () => {
-    if (todayRecord?.check_out && todayRecord?.check_out !== "—") {
-      return "Shift completed";
-    }
-    const endOfDay = new Date(tickingTime);
-    endOfDay.setHours(19, 0, 0, 0); // 7:00 PM target
-    const diffMs = endOfDay.getTime() - tickingTime.getTime();
-    if (diffMs <= 0) return "Office hours over";
-    const totalSecs = Math.floor(diffMs / 1000);
-    const hrs = Math.floor(totalSecs / 3600);
-    const mins = Math.floor((totalSecs % 3600) / 60);
-    const secs = totalSecs % 60;
-    if (hrs > 0) {
-      return `${hrs}h ${mins < 10 ? '0' + mins : mins}m ${secs < 10 ? '0' + secs : secs}s`;
-    }
-    return `${mins}m ${secs < 10 ? '0' + secs : secs}s`;
   };
 
   const getGreeting = () => {
@@ -421,28 +300,89 @@ const EmployeeDashboard = () => {
       iconColor: "#0891b2",
       onClick: () => navigate('/onboarding'),
     },
+    {
+      id: 8,
+      title: "IT Declaration",
+      desc: "Declare tax investments, 80C/80D deductions, and choose tax regime.",
+      btnText: "Declare Taxes",
+      icon: <LuReceipt size={24} />,
+      iconBg: "rgba(37, 99, 235, 0.08)",
+      iconColor: "#2563eb",
+      isLink: true,
+      linkTo: "/it-declaration",
+    },
+    {
+      id: 9,
+      title: "ID-Card & Documents",
+      desc: "Preview official corporate badge, upload ID proofs, and download digital ID.",
+      btnText: "Open ID Card",
+      icon: <LuBadgeCheck size={24} />,
+      iconBg: "rgba(6, 182, 212, 0.08)",
+      iconColor: "#0891b2",
+      isLink: true,
+      linkTo: "/id-card",
+    },
+    {
+      id: 10,
+      title: "Mediclaim & Health Insurance",
+      desc: "Access digital health E-card, manage covered dependents, and submit medical claims.",
+      btnText: "Open Mediclaim",
+      icon: <LuStethoscope size={24} />,
+      iconBg: "rgba(225, 29, 72, 0.08)",
+      iconColor: "#e11d48",
+      isLink: true,
+      linkTo: "/mediclaim",
+    },
+    {
+      id: 11,
+      title: "Holiday Calendar",
+      desc: "View company holiday list, festival breaks, and official days off.",
+      btnText: "View Holidays",
+      icon: <LuCalendar size={24} />,
+      iconBg: "rgba(244, 63, 94, 0.08)",
+      iconColor: "#f43f5e",
+      isLink: true,
+      linkTo: "/holidays",
+    },
+    {
+      id: 12,
+      title: "Company Policies",
+      desc: "Access company policies, code of conduct, and employee handbook.",
+      btnText: "Read Policies",
+      icon: <LuShieldCheck size={24} />,
+      iconBg: "rgba(37, 99, 235, 0.08)",
+      iconColor: "#2563eb",
+      isLink: true,
+      linkTo: "/policies",
+    },
+    {
+      id: 13,
+      title: "Separation & Clearance",
+      desc: "Submit formal resignation notice, track department clearances, and exit tasks.",
+      btnText: "Open Separation",
+      icon: <LuLogOut size={24} />,
+      iconBg: "rgba(239, 68, 68, 0.08)",
+      iconColor: "#ef4444",
+      isLink: true,
+      linkTo: "/resignation",
+    },
   ];
 
   const enabledTabIds = (() => {
     if (employee.enabled_tabs) {
+      let ids = [];
       if (typeof employee.enabled_tabs === "string") {
-        return employee.enabled_tabs.split(",").map(id => parseInt(id.trim())).filter(id => !isNaN(id));
+        ids = employee.enabled_tabs.split(",").map(id => parseInt(id.trim(), 10)).filter(id => !isNaN(id));
+      } else if (Array.isArray(employee.enabled_tabs)) {
+        ids = employee.enabled_tabs.map(Number).filter(id => !isNaN(id));
       }
-      if (Array.isArray(employee.enabled_tabs)) {
-        return employee.enabled_tabs.map(Number);
-      }
+      if (ids.length > 0) return ids;
     }
-    return [1, 2, 3, 4];
+    // Default fallback if no specific tab configuration has been saved yet
+    return [1, 2, 3, 4, 8, 9, 10, 11, 12];
   })();
 
   const visibleActions = quickActions.filter(action => enabledTabIds.includes(action.id));
-
-  // Render SVG Rings
-  const isMarkedPresent = Boolean(todayRecord && todayRecord.check_in && todayRecord.check_in !== "—" && todayRecord.status !== "Absent");
-  const todayProgress = getTodayWorkedPercentage();
-  const radius = 32;
-  const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (todayProgress.percent / 100) * circumference;
 
   return (
     <Container fluid className="px-4 py-4 max-w-6xl" style={{ backgroundColor: "#f8fafc", minHeight: "100vh" }}>
@@ -518,105 +458,7 @@ const EmployeeDashboard = () => {
           <Row className="g-3 mb-5 align-items-stretch">
             {/* Card 1: Today Clock Widget */}
             <Col xs={12} lg={4}>
-              <Card className="top-widget-card shadow-sm p-4 h-100 d-flex flex-column justify-content-between">
-                <div>
-                  <div className="d-flex justify-content-between align-items-center mb-3">
-                    <h5 className="fw-bold text-dark m-0" style={{ fontSize: "18px", color: "#0f172a" }}>Today</h5>
-                    <Badge
-                      pill
-                      style={{
-                        backgroundColor: isMarkedPresent ? "#16a34a" : "#ef4444",
-                        color: "#ffffff",
-                        padding: "6px 14px",
-                        fontSize: "12px",
-                        fontWeight: "600"
-                      }}
-                    >
-                      {isMarkedPresent ? "Present" : "Absent"}
-                    </Badge>
-                  </div>
-                  <hr style={{ borderColor: "#e2e8f0", opacity: 0.8, margin: "12px 0 20px 0" }} />
-
-                  <div className="d-flex align-items-center justify-content-between py-1">
-                    {/* Left Icon & Text */}
-                    <div className="d-flex flex-column gap-2" style={{ maxWidth: "58%" }}>
-                      <div className="p-2.5 rounded-circle bg-light d-inline-flex align-items-center justify-content-center" style={{ width: "42px", height: "42px", border: "1.5px stroke #3b82f6", background: "#eff6ff" }}>
-                        <LuFingerprint size={22} style={{ color: "#2563eb" }} />
-                      </div>
-                      <p className="text-dark mb-0 font-bold" style={{ fontSize: "13px", lineHeight: "1.35" }}>
-                        {isMarkedPresent
-                          ? "You have marked yourself as present today!"
-                          : "You have not marked yourself as present today!"
-                        }
-                      </p>
-
-                      <div className="d-flex align-items-center mt-1" style={{ borderLeft: "3px solid #ef4444", paddingLeft: "8px" }}>
-                        <span className="text-dark font-semibold me-1 text-[12px]">Time left :</span>
-                        <strong style={{ fontSize: "12px", color: "#ef4444", fontWeight: "700" }}>{getCheckInTimeLeft()}</strong>
-                      </div>
-                    </div>
-
-                    {/* SVG Gauge Donut Circle */}
-                    <div className="position-relative d-inline-flex justify-content-center align-items-center w-[125px] h-[125px]">
-                      <svg width="115" height="115" viewBox="0 0 115 115">
-                        <circle cx="57.5" cy="57.5" r={42} fill="transparent" stroke="#f1f5f9" strokeWidth="7" />
-                        <circle cx="57.5" cy="57.5" r={42} fill="transparent"
-                          stroke={todayProgress.percent > 0 ? (todayProgress.percent >= 80 ? "#22c55e" : todayProgress.percent >= 50 ? "#eab308" : "#f59e0b") : "transparent"}
-                          strokeWidth="8"
-                          strokeDasharray={2 * Math.PI * 42}
-                          strokeDashoffset={2 * Math.PI * 42 - (todayProgress.percent / 100) * 2 * Math.PI * 42}
-                          strokeLinecap="round"
-                          transform="rotate(-90 57.5 57.5)"
-                        />
-                      </svg>
-                      <div className="position-absolute text-center">
-                        <div className="fw-bold text-dark" style={{ color: "#0f172a", fontSize: "20px", lineHeight: "1" }}>{todayProgress.percent}%</div>
-                        <div className="fw-bold text-dark mt-0.5 text-[11px]">in office</div>
-                        <div style={{
-                          fontWeight: "700",
-                          color: todayProgress.percent >= 80 ? "#16a34a" : todayProgress.percent >= 50 ? "#ca8a04" : todayProgress.percent > 0 ? "#d97706" : "#94a3b8",
-                          marginTop: "2px",
-                          fontSize: "11px"
-                        }}>
-                          {todayProgress.label}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-4">
-                  {(() => {
-                    if (checking) {
-                      return (
-                        <Button className="btn-mark-present w-100 disabled">
-                          <Spinner animation="border" size="sm" className="me-2" />
-                          Processing...
-                        </Button>
-                      );
-                    }
-                    if (!isMarkedPresent) {
-                      return (
-                        <Button className="btn-mark-present w-100" onClick={handleDashboardCheckIn}>
-                          Mark Present
-                        </Button>
-                      );
-                    }
-                    if (!todayRecord.check_out || todayRecord.check_out === "—") {
-                      return (
-                        <Button variant="danger" className="w-100 py-2.5 rounded-3 fw-semibold shadow-xs" style={{ backgroundColor: "#dc2626", borderColor: "#dc2626", borderRadius: "10px" }} onClick={handleDashboardCheckOut}>
-                          Clock Out
-                        </Button>
-                      );
-                    }
-                    return (
-                      <Button variant="secondary" disabled className="w-100 py-2.5 rounded-3 fw-semibold opacity-75" style={{ borderRadius: "10px" }}>
-                        Completed Today
-                      </Button>
-                    );
-                  })()}
-                </div>
-              </Card>
+              <TodayClockWidget onStatusChange={fetchAttendanceLogs} />
             </Col>
 
             {/* Card 2 & 3: Middle KPI 2x2 Grid */}
@@ -642,7 +484,7 @@ const EmployeeDashboard = () => {
                       <LuArrowUpRight size={20} style={{ color: "#2563eb" }} />
                     </div>
                     <div className="mt-3">
-                      <div className="text-slate-700 fw-semibold" style={{ fontSize: "12px" }}>Average check-in</div>
+                      <div className="text-slate-700 fw-semibold" style={{ fontSize: "12px" }}>Average log-in</div>
                       <h4 className="fw-bold text-dark m-0 mt-1" style={{ fontSize: "22px" }}>{calculateAverageCheckIn()}</h4>
                     </div>
                   </Card>
@@ -668,7 +510,7 @@ const EmployeeDashboard = () => {
                       <LuLogOut size={20} style={{ color: "#ea580c" }} />
                     </div>
                     <div className="mt-3">
-                      <div className="text-slate-700 fw-semibold" style={{ fontSize: "12px" }}>Average check-out</div>
+                      <div className="text-slate-700 fw-semibold" style={{ fontSize: "12px" }}>Average log-out</div>
                       <h4 className="fw-bold text-dark m-0 mt-1" style={{ fontSize: "22px" }}>{calculateAverageCheckOut()}</h4>
                     </div>
                   </Card>
@@ -697,15 +539,15 @@ const EmployeeDashboard = () => {
                       </div>
                       <div className="d-flex align-items-center gap-2">
                         <span className="rounded-circle d-inline-block" style={{ width: "8px", height: "8px", backgroundColor: "#eab308" }}></span>
-                        <span className="text-slate-800 font-semibold"><strong className="text-dark" >{wfhCount.toLocaleString()}</strong> Work from home</span>
+                        <span className="text-slate-800 font-semibold"><strong className="text-dark" >{wfhCount.toLocaleString()}</strong> Work from Home</span>
                       </div>
                       <div className="d-flex align-items-center gap-2">
                         <span className="rounded-circle d-inline-block" style={{ width: "8px", height: "8px", backgroundColor: "#ef4444" }}></span>
-                        <span className="text-slate-800 font-semibold"><strong className="text-dark" >{lateCount.toLocaleString()}</strong> late attendance</span>
+                        <span className="text-slate-800 font-semibold"><strong className="text-dark" >{lateCount.toLocaleString()}</strong> Late check-in</span>
                       </div>
                       <div className="d-flex align-items-center gap-2">
                         <span className="rounded-circle d-inline-block" style={{ width: "8px", height: "8px", backgroundColor: "#94a3b8" }}></span>
-                        <span className="text-slate-800 font-semibold"><strong className="text-dark" >{absentCount.toLocaleString()}</strong> absent</span>
+                        <span className="text-slate-800 font-semibold"><strong className="text-dark" >{absentCount.toLocaleString()}</strong> Absent</span>
                       </div>
                     </div>
 

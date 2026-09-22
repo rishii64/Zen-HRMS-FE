@@ -27,6 +27,7 @@ import {
 import { MdMoreVert } from "react-icons/md";
 import { FaRegCircleCheck } from "react-icons/fa6";
 import { getApiBaseUrl } from "../../api/axios";
+import { exportToExcel } from "../../utils/excelExport";
 
 const API = getApiBaseUrl();
 
@@ -307,24 +308,41 @@ const Leave = () => {
     }
   };
 
-  // Export Leave Report CSV
-  const handleExportCSV = () => {
-    const headers = "Employee Name,Employee ID,Department,Leave Type,Start Date,End Date,Duration,Status,Approver,Reason\n";
-    const rows = filteredLeaves
-      .map((l) => {
-        return `"${l.name}","${l.employee_id}","${l.dept || "General"}","${l.leave_type}","${l.start_date}","${l.end_date}","${l.total_days} days","${l.status}","${l.approver || "—"}","${l.reason || ""}"`;
-      })
-      .join("\n");
+  // Export Leave Report Excel
+  const handleExportExcel = () => {
+    const headers = [
+      "Employee Name",
+      "Employee ID",
+      "Department",
+      "Leave Type",
+      "Start Date",
+      "End Date",
+      "Duration",
+      "Status",
+      "Approver",
+      "Reason"
+    ];
 
-    const blob = new Blob([headers + rows], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute("download", `Leave_Report_2025_2026.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toast.success("Leave Report exported successfully!");
+    const rows = filteredLeaves.map((l) => [
+      l.name || "",
+      l.employee_id || "",
+      l.dept || "General",
+      l.leave_type || "",
+      l.start_date || "",
+      l.end_date || "",
+      `${l.total_days || 0} days`,
+      l.status || "Pending",
+      l.approver || "—",
+      l.reason || ""
+    ]);
+
+    exportToExcel({
+      data: [headers, ...rows],
+      fileName: "Leave_Report_2025_2026.xlsx",
+      sheetName: "Leave Report",
+    });
+
+    toast.success("Leave Report exported to Excel successfully!");
   };
 
   // Filter leaves records
@@ -511,9 +529,9 @@ const Leave = () => {
             <LuCalendar className="h-4 w-4 text-slate-400 ml-1" />
           </div>
 
-          {/* Export CSV Button */}
-          <button onClick={handleExportCSV}
-            className="p-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 shadow-xs transition-colors" title="Export Leave Report CSV"><LuDownload className="h-4 w-4" />
+          {/* Export Excel Button */}
+          <button onClick={handleExportExcel}
+            className="p-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 shadow-xs transition-colors" title="Export Leave Report (Excel)"><LuDownload className="h-4 w-4" />
           </button>
 
           {/* Apply Leave Button */}

@@ -273,6 +273,7 @@ const PayrollManagement = () => {
 
   const [payrollStatus, setPayrollStatus] = useState("Draft");
   const [payrollHistory, setPayrollHistory] = useState([]);
+  const [itDeclarationInfo, setItDeclarationInfo] = useState(null);
 
   // Month-Year formatted string
   const currentMonthYear = `${selectedMonth} ${selectedYear}`;
@@ -473,6 +474,7 @@ const PayrollManagement = () => {
             setShiftTiming(data.shift_timing);
           }
         }
+        setItDeclarationInfo(data.it_declaration || null);
       }
     } catch (err) {
       console.error("Fetch payroll details error:", err);
@@ -1682,8 +1684,19 @@ const PayrollManagement = () => {
                   <span className="text-muted">Professional Tax (PT)</span>
                   <span className="fw-semibold text-danger">{fmt(statutory.pt)}</span>
                 </div>
-                <div className="d-flex justify-content-between small">
-                  <span className="text-muted">TDS / Income Tax (IT)</span>
+                <div className="d-flex justify-content-between align-items-center small">
+                  <span className="text-muted d-flex align-items-center gap-1.5">
+                    TDS / Income Tax (IT)
+                    {itDeclarationInfo && (
+                      <Badge
+                        bg={itDeclarationInfo.status === "Approved" ? "success" : "primary"}
+                        style={{ fontSize: "10px" }}
+                        title={`IT Declaration: ${itDeclarationInfo.status} (${itDeclarationInfo.regime === "new" ? "New Regime" : "Old Regime"})`}
+                      >
+                        {itDeclarationInfo.regime === "new" ? "New Regime" : "Old Regime"}
+                      </Badge>
+                    )}
+                  </span>
                   <span className="fw-semibold text-danger">
                     {fmt(parseFloat(taxData.tds) + parseFloat(taxData.other_tax || 0))}
                   </span>

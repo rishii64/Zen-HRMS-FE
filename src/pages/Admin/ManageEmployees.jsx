@@ -57,15 +57,19 @@ const getEmployeeAvatar = (emp) => {
 };
 
 const ALL_TABS = [
-  { id: 1, name: "Attendance" },
-  { id: 2, name: "Leave Request" },
-  { id: 3, name: "Payroll & Salary" },
-  { id: 4, name: "Holiday List" },
-  { id: 5, name: "Resignation" },
-  { id: 6, name: "Appraisal" },
-  { id: 7, name: "Training & Awareness" },
-  { id: 8, name: "Recruitment" },
-  { id: 9, name: "Leave Approval" }
+  { id: 1, name: "Attendance Tracker", desc: "Track daily shift times, logs, and check-in history", badge: "Attendance" },
+  { id: 2, name: "Leave Requests", desc: "Apply for leaves, view balances, and check status", badge: "Leaves" },
+  { id: 3, name: "Payroll & Salary", desc: "Review monthly salary slips, tax records, and allowances", badge: "Payroll" },
+  { id: 4, name: "Profile & Documents", desc: "Update personal records and upload files for HR review", badge: "Profile" },
+  { id: 5, name: "Interviews", desc: "Manage schedules and view candidate interview panels", badge: "Hiring" },
+  { id: 6, name: "Performance Appraisal", desc: "Review appraisals, feedback loops, and rating scorecards", badge: "Appraisal" },
+  { id: 7, name: "Training Modules", desc: "Access training modules and onboarding tasks", badge: "Training" },
+  { id: 8, name: "IT Declaration", desc: "Declare tax investments, 80C/80D deductions, and tax regime", badge: "Taxation" },
+  { id: 9, name: "ID-Card & Documents", desc: "Preview official corporate badge, upload ID proofs, and download digital ID", badge: "Identity" },
+  { id: 10, name: "Mediclaim & Health Insurance", desc: "Digital health E-card, covered dependents, and medical insurance claims", badge: "Mediclaim" },
+  { id: 11, name: "Holiday Calendar", desc: "View company holiday list, festival breaks, and official days off", badge: "Calendar" },
+  { id: 12, name: "Company Policies", desc: "Access company policies, code of conduct, and employee handbook", badge: "Policy" },
+  { id: 13, name: "Separation & Resignation", desc: "Submit formal resignation notice, track clearances, and exit tasks", badge: "Exit" },
 ];
 
 const EMPTY_FORM = {
@@ -977,6 +981,7 @@ const ManageEmployees = () => {
 
   const [viewMode, setViewMode] = useState("grid"); // "grid" | "list"
   const [selectedDesignation, setSelectedDesignation] = useState("All");
+  const [selectedStatus, setSelectedStatus] = useState("All");
   const [sortBy, setSortBy] = useState("newest");
   const [quickViewModal, setQuickViewModal] = useState({ show: false, employee: null });
 
@@ -1200,13 +1205,15 @@ const ManageEmployees = () => {
   };
 
   const openConfigureTabs = (emp) => {
-    let currentTabs = [1, 2, 3, 4]; // default limited tabs
+    let currentTabs = [1, 2, 3, 4, 8, 9, 10, 11, 12]; // default standard tabs
     if (emp.enabled_tabs) {
+      let parsed = [];
       if (typeof emp.enabled_tabs === "string") {
-        currentTabs = emp.enabled_tabs.split(",").map(id => parseInt(id.trim())).filter(id => !isNaN(id));
+        parsed = emp.enabled_tabs.split(",").map(id => parseInt(id.trim(), 10)).filter(id => !isNaN(id));
       } else if (Array.isArray(emp.enabled_tabs)) {
-        currentTabs = emp.enabled_tabs.map(Number);
+        parsed = emp.enabled_tabs.map(Number).filter(id => !isNaN(id));
       }
+      if (parsed.length > 0) currentTabs = parsed;
     }
     setTabsModal({
       show: true,
@@ -1316,7 +1323,11 @@ const ManageEmployees = () => {
         selectedDesignation === "All" ||
         empDesig === selectedDesignation.toLowerCase();
 
-      return matchesSearch && matchesDesig;
+      const matchesStatus =
+        selectedStatus === "All" ||
+        (emp.status || "").toLowerCase() === selectedStatus.toLowerCase();
+
+      return matchesSearch && matchesDesig && matchesStatus;
     });
 
     list.sort((a, b) => {
@@ -1340,91 +1351,105 @@ const ManageEmployees = () => {
     });
 
     return list;
-  }, [employees, searchTerm, selectedDesignation, sortBy]);
+  }, [employees, searchTerm, selectedDesignation, selectedStatus, sortBy]);
 
   return (
     <div className="emp-page-wrapper py-3 py-md-4">
-      <Container fluid className="max-w-6xl">
-        {/* Top Control Bar Matching Screenshot */}
-        <div className="emp-controls-card p-3 mb-4 bg-white border rounded-4 shadow-sm">
-          <div className="d-flex flex-wrap align-items-center justify-content-between gap-3">
-            {/* Left Filters Group */}
-            <div className="d-flex flex-wrap align-items-center gap-2 flex-grow-1">
-              {/* Designation Filter */}
-              <div className="filter-item">
-                <Form.Select
-                  size="sm"
-                  value={selectedDesignation}
-                  onChange={(e) => setSelectedDesignation(e.target.value)}
-                  className="filter-select rounded-3 py-2 px-3 fw-semibold text-secondary"
-                  style={{ minWidth: "160px", borderColor: "#cbd5e1" }}
-                >
-                  <option value="All">Designation : All</option>
-                  {allDesignations
-                    .filter((d) => d !== "All")
-                    .map((d) => (
-                      <option key={d} value={d}>
-                        {d}
-                      </option>
-                    ))}
-                </Form.Select>
-              </div>
+      <Container fluid className="px-md-4 max-w-7xl">
+        {/* Top Control Bar Adaptive Single Line */}
+        <div className="emp-controls-card py-2.5 px-3 mb-4 bg-white border rounded-4 shadow-sm">
+          <div className="emp-controls-scroll-row d-flex flex-nowrap align-items-center gap-2 w-100">
+            {/* Designation Filter */}
+            <div className="filter-item flex-shrink-0" style={{ width: "160px" }}>
+              <Form.Select
+                size="sm"
+                value={selectedDesignation}
+                onChange={(e) => setSelectedDesignation(e.target.value)}
+                className="filter-select rounded-3 py-1.5 px-2 fw-semibold text-secondary"
+                style={{ fontSize: "13px", borderColor: "#cbd5e1" }}
+              >
+                <option value="All">Designation : All</option>
+                {allDesignations
+                  .filter((d) => d !== "All")
+                  .map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
+              </Form.Select>
+            </div>
 
-              {/* Sort By Filter */}
-              <div className="filter-item">
-                <Form.Select
-                  size="sm"
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                  className="filter-select rounded-3 py-2 px-3 fw-semibold text-secondary"
-                  style={{ minWidth: "185px", borderColor: "#cbd5e1" }}
-                >
-                  <option value="newest">Sort By : Last 7 Days</option>
-                  <option value="oldest">Sort By : Oldest</option>
-                  <option value="name-asc">Sort By : Name (A - Z)</option>
-                  <option value="name-desc">Sort By : Name (Z - A)</option>
-                  <option value="salary-high">Sort By : Salary (High - Low)</option>
-                  <option value="salary-low">Sort By : Salary (Low - High)</option>
-                </Form.Select>
-              </div>
+            {/* Status Filter */}
+            <div className="filter-item flex-shrink-0" style={{ width: "150px" }}>
+              <Form.Select
+                size="sm"
+                value={selectedStatus}
+                onChange={(e) => setSelectedStatus(e.target.value)}
+                className="filter-select rounded-3 py-1.5 px-2 fw-semibold text-secondary"
+                style={{ fontSize: "13px", borderColor: "#cbd5e1" }}
+              >
+                <option value="All">Status : All</option>
+                <option value="Active">Status : Active</option>
+                <option value="Inactive">Status : Inactive</option>
+                <option value="Resigned">Status : Resigned</option>
+              </Form.Select>
+            </div>
 
-              {/* Search Bar */}
-              <div className="filter-item flex-grow-1" style={{ maxWidth: "320px", minWidth: "200px" }}>
-                <InputGroup size="sm">
-                  <InputGroup.Text className="bg-white border-end-0 text-muted" style={{ borderColor: "#cbd5e1" }}>
-                    <LuSearch size={15} />
-                  </InputGroup.Text>
-                  <Form.Control
-                    placeholder="Search name, code, dept..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="border-start-0 py-2"
+            {/* Sort By Filter */}
+            <div className="filter-item flex-shrink-0" style={{ width: "150px" }}>
+              <Form.Select
+                size="sm"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="filter-select rounded-3 py-1.5 px-2 fw-semibold text-secondary"
+                style={{ fontSize: "13px", borderColor: "#cbd5e1" }}
+              >
+                <option value="newest">Sort : Last 7 Days</option>
+                <option value="oldest">Sort : Oldest</option>
+                <option value="name-asc">Sort : Name (A - Z)</option>
+                <option value="name-desc">Sort : Name (Z - A)</option>
+                <option value="salary-high">Sort : Salary (High)</option>
+                <option value="salary-low">Sort : Salary (Low)</option>
+              </Form.Select>
+            </div>
+
+            {/* Search Bar */}
+            <div className="filter-item flex-grow-1" style={{ minWidth: "130px" }}>
+              <InputGroup size="sm">
+                <InputGroup.Text className="bg-white border-end-0 text-muted px-2" style={{ borderColor: "#cbd5e1" }}>
+                  <LuSearch size={14} />
+                </InputGroup.Text>
+                <Form.Control
+                  placeholder="Search name, code, dept..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="border-start-0 py-1.5 ps-1"
+                  style={{ fontSize: "13px", borderColor: "#cbd5e1" }}
+                />
+                {searchTerm && (
+                  <Button
+                    variant="outline-secondary"
+                    size="sm"
+                    onClick={() => setSearchTerm("")}
+                    className="py-1 px-2 border-start-0"
                     style={{ borderColor: "#cbd5e1" }}
-                  />
-                  {searchTerm && (
-                    <Button
-                      variant="outline-secondary"
-                      size="sm"
-                      onClick={() => setSearchTerm("")}
-                      style={{ borderColor: "#cbd5e1" }}
-                    >
-                      <LuX size={14} />
-                    </Button>
-                  )}
-                </InputGroup>
-              </div>
+                  >
+                    <LuX size={13} />
+                  </Button>
+                )}
+              </InputGroup>
             </div>
 
             {/* Right Controls: Role Switcher, View Switcher & Add Employee */}
-            <div className="d-flex align-items-center gap-3">
-              {/* Role selector for admin/HR testing */}
-              <div className="d-none d-md-block">
+            <div className="d-flex align-items-center gap-2 flex-shrink-0 ms-auto">
+              {/* Role selector for testing */}
+              <div className="d-none d-md-block flex-shrink-0">
                 <Form.Select
                   size="sm"
                   value={role}
                   onChange={(e) => setRole(e.target.value)}
-                  className="rounded-3 fw-semibold text-secondary"
-                  style={{ width: "135px", borderColor: "#cbd5e1" }}
+                  className="rounded-3 py-1.5 px-2 fw-semibold text-secondary"
+                  style={{ width: "135px", fontSize: "13px", borderColor: "#cbd5e1" }}
                   title="Active Workspace Role"
                 >
                   <option value="hr">HR Manager</option>
@@ -1436,37 +1461,44 @@ const ManageEmployees = () => {
               {/* View Toggle Pill */}
               <button
                 type="button"
-                className="view-toggle-btn"
+                className="view-toggle-btn flex-shrink-0"
                 onClick={() => fetchEmployees(true)}
                 title="Refresh employee list & latest photos"
                 style={{ width: "32px", height: "32px" }}
               >
-                <LuRefreshCw size={15} className={refreshing ? "spin-animation" : ""} />
+                <LuRefreshCw size={14} className={refreshing ? "spin-animation" : ""} />
               </button>
 
-              <div className="view-toggle-pill">
+              <div className="view-toggle-pill flex-shrink-0" style={{ display: "inline-flex", background: "#f1f5f9", padding: "2px", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
                 <button
                   type="button"
                   className={`view-toggle-btn ${viewMode === "grid" ? "active" : ""}`}
                   onClick={() => setViewMode("grid")}
                   title="Grid View"
+                  style={{ width: "28px", height: "28px" }}
                 >
-                  <LuLayoutGrid size={16} />
+                  <LuLayoutGrid size={15} />
                 </button>
                 <button
                   type="button"
                   className={`view-toggle-btn ${viewMode === "list" ? "active" : ""}`}
                   onClick={() => setViewMode("list")}
                   title="List View"
+                  style={{ width: "28px", height: "28px" }}
                 >
-                  <LuList size={16} />
+                  <LuList size={15} />
                 </button>
               </div>
 
               {/* Add Employee Button */}
               {(isAdmin || isHR) && (
-                <button type="button" className="btn-add-emp" onClick={openAdd}>
-                  <LuPlus size={16} />
+                <button
+                  type="button"
+                  className="btn-add-emp py-1.5 px-3 flex-shrink-0"
+                  onClick={openAdd}
+                  style={{ fontSize: "13px", whiteSpace: "nowrap" }}
+                >
+                  <LuPlus size={15} />
                   <span>Add Employee</span>
                 </button>
               )}
@@ -1496,6 +1528,7 @@ const ManageEmployees = () => {
                 onClick={() => {
                   setSearchTerm("");
                   setSelectedDesignation("All");
+                  setSelectedStatus("All");
                 }}
               >
                 Clear Filters
@@ -1615,8 +1648,8 @@ const ManageEmployees = () => {
                       {/* Active Status Dot */}
                       <span
                         className="emp-status-dot"
-                        style={{ backgroundColor: isOnline ? "#10b981" : "#94a3b8" }}
-                        title={isOnline ? "Active" : "Inactive"}
+                        style={{ backgroundColor: emp.status === "Active" ? "#10b981" : emp.status === "Resigned" ? "#f59e0b" : "#94a3b8" }}
+                        title={emp.status || (isOnline ? "Active" : "Inactive")}
                       />
                     </div>
 
@@ -1756,7 +1789,7 @@ const ManageEmployees = () => {
                                 width: "10px",
                                 height: "10px",
                                 borderRadius: "50%",
-                                backgroundColor: isOnline ? "#10b981" : "#ef4444",
+                                backgroundColor: emp.status === "Active" ? "#10b981" : emp.status === "Resigned" ? "#f59e0b" : "#ef4444",
                                 border: "1.5px solid #ffffff",
                               }}
                             />
@@ -1942,9 +1975,10 @@ const ManageEmployees = () => {
               </Col>
               <Col xs={6} md={4}>
                 <Form.Label className="small fw-bold">Status</Form.Label>
-                <Form.Select size="sm" name="status" value={empForm.status} onChange={handleChange}>
+                <Form.Select size="sm" name="status" value={empForm.status || "Active"} onChange={handleChange}>
                   <option value="Active">Active</option>
                   <option value="Inactive">Inactive</option>
+                  <option value="Resigned">Resigned</option>
                 </Form.Select>
               </Col>
               <Col xs={6} md={4}>
@@ -1956,6 +1990,10 @@ const ManageEmployees = () => {
                   <option value="hod">Reporting Manager (HOD)</option>
                   <option value="hr">HR Manager</option>
                   <option value="accounts">Accounts</option>
+                  <option value="manager">Manager</option>
+                  <option value="teamlead">Team Lead</option>
+                  <option value="payroll">Payroll Specialist</option>
+                  <option value="admin">Administrator</option>
                 </Form.Select>
               </Col>
               <Col xs={6} md={4}>
@@ -2069,49 +2107,104 @@ const ManageEmployees = () => {
         <Modal
           show={tabsModal.show}
           onHide={() => setTabsModal({ show: false, employee: null, selectedTabs: [] })}
-          size="md"
+          size="lg"
           centered
         >
-          <Modal.Header closeButton>
-            <Modal.Title className="fs-5 fw-bold">
-              ⚙️ Configure Tabs for {tabsModal.employee?.name}
-            </Modal.Title>
+          <Modal.Header closeButton className="border-0 pb-0">
+            <div>
+              <Modal.Title className="fs-5 fw-bold text-dark d-flex align-items-center gap-2">
+                <LuSettings className="text-primary" /> Configure Dashboard Modules
+              </Modal.Title>
+              <div className="text-muted small mt-0.5">
+                Employee: <strong className="text-dark">{tabsModal.employee?.name}</strong> ({tabsModal.employee?.employee_code}) &bull; {tabsModal.employee?.dept || "General"}
+              </div>
+            </div>
           </Modal.Header>
-          <Modal.Body>
-            <p className="text-muted small mb-3">
-              Select the dashboard tabs you want to enable for this employee.
-            </p>
-            <div className="d-flex flex-column gap-2">
+          <Modal.Body className="pt-2">
+            <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 bg-light p-2.5 rounded-3 mb-3 border">
+              <div className="small fw-semibold text-secondary">
+                Selected: <span className="badge bg-primary text-white rounded-pill px-2.5 py-1">{tabsModal.selectedTabs.length} of {ALL_TABS.length} Modules</span>
+              </div>
+              <div className="d-flex gap-1.5">
+                <Button
+                  variant="outline-secondary"
+                  size="sm"
+                  onClick={() => setTabsModal(prev => ({ ...prev, selectedTabs: ALL_TABS.map(t => t.id) }))}
+                  className="py-1 px-2 text-xs"
+                >
+                  Select All
+                </Button>
+                <Button
+                  variant="outline-secondary"
+                  size="sm"
+                  onClick={() => setTabsModal(prev => ({ ...prev, selectedTabs: [] }))}
+                  className="py-1 px-2 text-xs"
+                >
+                  Deselect All
+                </Button>
+                <Button
+                  variant="outline-primary"
+                  size="sm"
+                  onClick={() => setTabsModal(prev => ({ ...prev, selectedTabs: [1, 2, 4, 9, 11, 12] }))}
+                  className="py-1 px-2 text-xs"
+                >
+                  Standard Default
+                </Button>
+              </div>
+            </div>
+
+            <Row className="g-2">
               {ALL_TABS.map((tab) => {
                 const isChecked = tabsModal.selectedTabs.includes(tab.id);
                 return (
-                  <Form.Check
-                    key={tab.id}
-                    type="checkbox"
-                    id={`tab-checkbox-${tab.id}`}
-                    label={tab.name}
-                    checked={isChecked}
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setTabsModal(prev => {
-                        const updated = checked
-                          ? [...prev.selectedTabs, tab.id]
-                          : prev.selectedTabs.filter(id => id !== tab.id);
-                        return { ...prev, selectedTabs: updated };
-                      });
-                    }}
-                    className="fw-semibold text-secondary"
-                    style={{ fontSize: "14px" }}
-                  />
+                  <Col xs={12} sm={6} key={tab.id}>
+                    <div
+                      onClick={() => {
+                        setTabsModal(prev => {
+                          const updated = isChecked
+                            ? prev.selectedTabs.filter(id => id !== tab.id)
+                            : [...prev.selectedTabs, tab.id];
+                          return { ...prev, selectedTabs: updated };
+                        });
+                      }}
+                      className={`p-3 rounded-3 border h-100 d-flex align-items-start gap-2.5 transition-all ${isChecked
+                        ? "bg-primary-subtle border-primary shadow-xs"
+                        : "bg-white border-light-subtle hover:bg-light"
+                        }`}
+                      style={{ cursor: "pointer", transition: "all 0.15s ease-in-out" }}
+                    >
+                      <Form.Check
+                        type="checkbox"
+                        id={`tab-checkbox-${tab.id}`}
+                        checked={isChecked}
+                        onChange={() => { }} // Controlled by card click
+                        className="mt-0.5"
+                      />
+                      <div className="flex-grow-1" style={{ minWidth: 0 }}>
+                        <div className="d-flex justify-content-between align-items-center mb-0.5">
+                          <strong className={`small text-truncate ${isChecked ? "text-primary fw-bold" : "text-dark fw-semibold"}`}>
+                            {tab.name}
+                          </strong>
+                          <span className={`badge text-[10px] rounded-pill ${isChecked ? "bg-primary text-white" : "bg-light text-secondary border"}`}>
+                            {tab.badge}
+                          </span>
+                        </div>
+                        <p className="text-muted small m-0 text-[12px] line-clamp-1" style={{ lineHeight: "1.25" }}>
+                          {tab.desc}
+                        </p>
+                      </div>
+                    </div>
+                  </Col>
                 );
               })}
-            </div>
+            </Row>
           </Modal.Body>
-          <Modal.Footer className="p-2">
+          <Modal.Footer className="border-0 pt-0">
             <Button
-              variant="link"
-              className="text-muted text-decoration-none"
+              variant="light"
+              size="sm"
               onClick={() => setTabsModal({ show: false, employee: null, selectedTabs: [] })}
+              className="px-3"
             >
               Cancel
             </Button>
@@ -2119,8 +2212,9 @@ const ManageEmployees = () => {
               variant="success"
               size="sm"
               onClick={handleSaveTabs}
+              className="px-4 fw-semibold"
             >
-              Save Changes
+              Save Module Permissions
             </Button>
           </Modal.Footer>
         </Modal>
@@ -2184,7 +2278,7 @@ const ManageEmployees = () => {
                       <div className="d-flex flex-wrap gap-2 align-items-center">
                         <Badge bg="secondary" className="fw-normal">{emp.employee_code}</Badge>
                         <Badge bg="info" className="text-dark fw-semibold">{emp.designation || emp.job_role}</Badge>
-                        <Badge bg={isOnline ? "success" : "danger"}>{emp.status}</Badge>
+                        <Badge bg={emp.status === "Active" ? "success" : emp.status === "Resigned" ? "warning" : "danger"} text={emp.status === "Resigned" ? "dark" : "white"}>{emp.status}</Badge>
                       </div>
                     </div>
                     {(isAdmin || isHR) && (
@@ -2360,6 +2454,15 @@ const ManageEmployees = () => {
         }
         .emp-controls-card {
           box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+        }
+        .emp-controls-scroll-row {
+          overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+        }
+        .emp-controls-scroll-row::-webkit-scrollbar {
+          display: none;
         }
         .emp-card {
           background-color: #ffffff;

@@ -28,6 +28,7 @@ import {
 import { FaRegCircleCheck } from "react-icons/fa6";
 import { FaRegTimesCircle } from "react-icons/fa";
 import { getApiBaseUrl } from "../../api/axios";
+import { exportToExcel } from "../../utils/excelExport";
 
 const API = getApiBaseUrl();
 
@@ -241,24 +242,25 @@ const HODDashboard = () => {
     }, 600);
   };
 
-  // Export Department Report
+  // Export Department Report (Excel)
   const handleExportReport = () => {
-    const csvContent =
-      "data:text/csv;charset=utf-8," +
-      ["Employee ID,Name,Role,Department,Status,Work Mode"].join(",") +
-      "\n" +
-      dashData.directReports
-        .map((r) => `"${r.employee_id}","${r.name}","${r.role}","${r.dept}","${r.status}","${r.workMode}"`)
-        .join("\n");
+    const headers = ["Employee ID", "Name", "Role", "Department", "Status", "Work Mode"];
+    const rows = (dashData.directReports || []).map((r) => [
+      r.employee_id || "",
+      r.name || "",
+      r.role || "",
+      r.dept || "",
+      r.status || "",
+      r.workMode || ""
+    ]);
 
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `HOD_${dashData.departmentName}_Report_Q3_2026.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toast.success("Department Report exported successfully!");
+    exportToExcel({
+      data: [headers, ...rows],
+      fileName: `HOD_${dashData.departmentName || "Dept"}_Report_Q3_2026.xlsx`,
+      sheetName: `${dashData.departmentName || "Dept"} Report`,
+    });
+
+    toast.success("Department Report exported to Excel successfully!");
   };
 
   return (
@@ -329,6 +331,7 @@ const HODDashboard = () => {
             <button
               onClick={handleExportReport}
               className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold px-4 py-2.5 rounded-xl shadow-xs transition-all"
+              title="Export Department Report (Excel)"
             >
               <LuFileText className="h-4 w-4 text-slate-500" /> Department Report
             </button>

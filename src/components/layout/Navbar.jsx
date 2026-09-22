@@ -22,7 +22,8 @@ import {
   LuChartNoAxesColumn,
   LuAward,
   LuClipboardList,
-  LuSparkles
+  LuSparkles,
+  LuReceipt,
 } from "react-icons/lu";
 import { SiGoogledocs } from "react-icons/si";
 import { FaListCheck } from "react-icons/fa6";
@@ -30,50 +31,174 @@ import logo from "../../assets/zentelex-logo.png";
 import toast from 'react-hot-toast';
 import { TbPassword } from "react-icons/tb";
 import { getUploadUrl } from "../../api/axios";
+import ChangePasswordModal from "../common/ChangePasswordModal";
 
 
 const ALL_APPS = [
-  { id: "profile", title: "My Profile", icon: <LuUser className="text-blue-500" />, route: `/employee/profile`, roles: ["employee", "hr", "hod", "accounts"] },
-  { id: "progression", title: "Progression", icon: <LuTrendingUp className="text-emerald-500" />, route: "/appraisal", roles: ["employee", "hr", "hod"] },
-  { id: "warning", title: "Warning", icon: <CiCircleAlert className="text-amber-500" />, route: "/appraisal", roles: ["hr", "hod"] },
-  { id: "accounts_dashboard", title: "Accounts Dashboard", icon: <LuTrendingUp className="text-emerald-500" />, route: "/accounts/dashboard", roles: ["accounts", "payroll", "admin"] },
-  { id: "payroll_mgmt", title: "Payroll Management", icon: <LuWallet className="text-blue-600" />, route: "/payroll", roles: ["accounts", "payroll", "hr", "admin"] },
-  { id: "salary_slip", title: "Salary Slip", icon: <LuWallet className="text-emerald-600" />, route: "/payslip", roles: ["employee", "hr", "accounts"] },
-  { id: "kt", title: "Kat", icon: <LuFileText className="text-cyan-500" />, route: "/onboarding", roles: ["employee", "hr", "hod"] },
-  { id: "question_bank", title: "Question Bank", icon: <SiGoogledocs className="text-indigo-500" />, route: "/interview", roles: ["hr", "hod"] },
-
-  { id: "my_teams", title: "My Teams", icon: <LuUsers className="text-blue-600" />, route: "/admin/manage-employees", roles: ["hr", "hod", "accounts"] },
-  { id: "separation", title: "Separation", icon: <LuLogOut className="text-red-500" />, route: "/resignation", roles: ["employee", "hr", "hod", "accounts"] },
-  { id: "warning_latam", title: "Warning NA/LATAM", icon: <CiCircleAlert className="text-red-400" />, route: "/appraisal", roles: ["hr"] },
-  { id: "leave", title: "Leave Management", icon: <LuCalendar className="text-teal-500" />, route: "/leave", roles: ["employee", "hr", "hod", "accounts"] },
-  { id: "holidays", title: "Holiday Calendar", icon: <LuCalendar className="text-rose-500" />, route: "/holidays", roles: ["employee", "hr", "hod", "accounts"] },
-  { id: "it_declaration", title: "IT Declaration", icon: <LuFileText className="text-blue-500" />, route: "/payroll", roles: ["employee", "hr", "accounts"] },
-  { id: "process_updates", title: "Process Updates", icon: <LuActivity className="text-purple-600" />, route: "/onboarding", roles: ["employee", "hr", "hod"] },
-  { id: "pms", title: "PMS", icon: <LuAward className="text-amber-600" />, route: "/appraisal", roles: ["employee", "hr", "hod"] },
-
-  { id: "policies", title: "Policy", icon: <LuShieldCheck className="text-indigo-600" />, route: "/policies", roles: ["employee", "hr", "hod", "accounts"] },
-  { id: "confirmation", title: "Confirmation", icon: <LuBadgeCheck className="text-emerald-600" />, route: "/admin/manage-employees", roles: ["hr"] },
-  { id: "attendance", title: "Attendance Tracking", icon: <LuCalendar className="text-emerald-600" />, route: "/attendance", roles: ["hr", "employee", "accounts", "hod"] },
-  { id: "leave", title: "Leave Portal", icon: <LuFileText className="text-indigo-600" />, route: "/leave", roles: ["hr", "employee", "accounts", "hod"] },
-  { id: "payroll", title: "Payroll Management", icon: <LuWallet className="text-amber-600" />, route: "/payroll", roles: ["hr", "accounts"] },
-  { id: "payslip", title: "Salary Slips", icon: <LuFileCheck className="text-purple-600" />, route: "/payslip", roles: ["hr", "accounts", "employee"] },
-  { id: "onboarding", title: "Onboarding Portal", icon: <LuGraduationCap className="text-teal-600" />, route: "/onboarding", roles: ["hr"] },
-  { id: "recruitment", title: "Recruitment Desk", icon: <LuBriefcase className="text-cyan-600" />, route: "/recruitment", roles: ["hr"] },
-  { id: "interview", title: "Candidate Evaluation", icon: <LuUsers className="text-sky-600" />, route: "/interview", roles: ["hod", "hr"] },
-  { id: "manage_emp", title: "Employee Directory", icon: <LuBadgeCheck className="text-violet-600" />, route: "/manage-employee", roles: ["hr", "admin", "hod", "accounts"] },
-  { id: "holiday_mgr", title: "Holiday Calendar", icon: <LuCalendar className="text-pink-600" />, route: "/holidays", roles: ["hr", "employee", "accounts", "hod"] },
-  { id: "policies", title: "Company Policies", icon: <SiGoogledocs className="text-red-500" />, route: "/policies", roles: ["employee", "hr", "hod", "accounts"] },
-  { id: "schedule", title: "Duty Roaster", icon: <LuClock className="text-orange-500" />, route: "/schedule", roles: ["employee", "hr", "hod", "accounts"] },
-  { id: "separation", title: "Exit & Resignation", icon: <LuLogOut className="text-rose-500" />, route: "/resignation", roles: ["employee", "hr", "hod"] },
-  { id: "mediclaim", title: "Mediclaim Card", icon: <LuStethoscope className="text-rose-600" />, route: "/employee/profile", roles: ["employee", "hr"] },
-  { id: "id_card", title: "ID-Card", icon: <LuUser className="text-teal-600" />, route: "/employee/profile", roles: ["employee", "hr"] },
-  { id: "misc_report", title: "Monthly Reports", icon: <LuChartNoAxesColumn className="text-emerald-500" />, route: "/admin/dashboard", roles: ["hr", "hod"] },
-  { id: "level_up", title: "Level Up", icon: <LuSparkles className="text-yellow-500" />, route: "/appraisal", roles: ["employee", "hr"] },
-  { id: "quality_report", title: "Quality Report", icon: <LuClipboardList className="text-slate-700" />, route: "/admin/dashboard", roles: ["hr", "hod"] },
+  {
+    id: "app_dashboard",
+    title: "Dashboard",
+    icon: <LuTrendingUp className="text-blue-500" />,
+    route: "/employee/dashboard",
+    roles: ["employee", "hr", "accounts", "payroll", "hod", "admin"],
+    keywords: ["home", "dashboard", "overview", "analytics", "stats"],
+  },
+  {
+    id: "app_profile",
+    title: "My Profile",
+    icon: <LuUser className="text-indigo-500" />,
+    route: "/employee/profile",
+    roles: ["employee", "hr", "accounts", "payroll", "hod", "admin"],
+    keywords: ["profile", "user", "personal", "account", "details", "info"],
+  },
+  {
+    id: "app_attendance",
+    title: "Attendance Tracking",
+    icon: <LuCalendar className="text-emerald-500" />,
+    route: "/attendance",
+    roles: ["employee", "hr", "accounts", "payroll", "hod", "admin"],
+    keywords: ["attendance", "clock in", "check in", "roster", "logs", "timesheet", "checkin"],
+  },
+  {
+    id: "app_leave",
+    title: "Leave Management",
+    icon: <LuFileText className="text-teal-500" />,
+    route: "/leave",
+    roles: ["employee", "hr", "accounts", "payroll", "hod", "admin"],
+    keywords: ["leave", "apply leave", "vacation", "pto", "holiday leave", "time off", "absence"],
+  },
+  {
+    id: "app_holidays",
+    title: "Holiday Calendar",
+    icon: <LuCalendar className="text-rose-500" />,
+    route: "/holidays",
+    roles: ["employee", "hr", "accounts", "payroll", "hod", "admin"],
+    keywords: ["holiday", "calendar", "festival", "off days", "events"],
+  },
+  {
+    id: "app_policies",
+    title: "Company Policies",
+    icon: <LuShieldCheck className="text-blue-600" />,
+    route: "/policies",
+    roles: ["employee", "hr", "accounts", "payroll", "hod", "admin"],
+    keywords: ["policy", "policies", "rules", "compliance", "handbook", "guidelines", "terms"],
+  },
+  {
+    id: "app_schedule",
+    title: "Schedule",
+    icon: <LuClock className="text-orange-500" />,
+    route: "/schedule",
+    roles: ["employee", "hr", "accounts", "payroll", "hod", "admin"],
+    keywords: ["schedule", "duty", "roaster", "shift", "shift timings", "timetable"],
+  },
+  {
+    id: "app_payslip",
+    title: "Salary Slips",
+    icon: <LuFileCheck className="text-purple-600" />,
+    route: "/payslip",
+    roles: ["employee", "hr", "accounts", "payroll", "hod", "admin"],
+    keywords: ["salary", "slip", "payslip", "earnings", "wage", "pay", "slips"],
+  },
+  {
+    id: "app_payroll_mgmt",
+    title: "Payroll Management",
+    icon: <LuWallet className="text-emerald-600" />,
+    route: "/payroll",
+    roles: ["employee", "hr", "accounts", "payroll", "admin"],
+    keywords: ["payroll", "tax", "it declaration", "compensation", "salary structure", "ctc"],
+  },
+  {
+    id: "app_resignation",
+    title: "Separation",
+    icon: <LuLogOut className="text-red-500" />,
+    route: "/resignation",
+    roles: ["employee", "hr", "accounts", "payroll", "hod", "admin"],
+    keywords: ["resignation", "separation", "exit", "quit", "clearance"],
+  },
+  {
+    id: "app_id_card",
+    title: "ID-Card & Documents",
+    icon: <LuBadgeCheck className="text-cyan-600" />,
+    route: "/id-card",
+    roles: ["employee", "hr", "accounts", "payroll", "hod", "admin"],
+    keywords: ["id", "id card", "documents", "identity", "aadhaar", "pan", "badge", "corporate id"],
+  },
+  {
+    id: "app_mediclaim",
+    title: "Mediclaim & Insurance",
+    icon: <LuStethoscope className="text-rose-600" />,
+    route: "/mediclaim",
+    roles: ["employee", "hr", "accounts", "payroll", "hod", "admin", "manager", "teamlead"],
+    keywords: ["mediclaim", "medical", "insurance", "health", "hospital", "claims", "coverage", "card"],
+  },
+  {
+    id: "app_manage_emp",
+    title: "Employee Directory",
+    icon: <LuUsers className="text-blue-600" />,
+    route: "/admin/manage-employees",
+    roles: ["hr", "admin", "hod", "accounts"],
+    keywords: ["manage", "employees", "directory", "staff", "team", "people", "my teams"],
+  },
+  {
+    id: "app_onboarding",
+    title: "Onboarding Portal",
+    icon: <LuGraduationCap className="text-teal-600" />,
+    route: "/onboarding",
+    roles: ["hr", "admin"],
+    keywords: ["onboarding", "induction", "new hire", "joining", "training", "kt"],
+  },
+  {
+    id: "app_recruitment",
+    title: "Recruitment Desk",
+    icon: <LuBriefcase className="text-cyan-600" />,
+    route: "/recruitment",
+    roles: ["hr", "admin"],
+    keywords: ["recruitment", "hiring", "cv", "resume", "candidates", "jobs", "desk"],
+  },
+  {
+    id: "app_interview",
+    title: "Candidate Evaluation",
+    icon: <SiGoogledocs className="text-indigo-600" />,
+    route: "/interview",
+    roles: ["hr", "hod", "admin"],
+    keywords: ["interview", "candidate", "evaluation", "assessment", "question bank"],
+  },
+  {
+    id: "app_appraisal",
+    title: "Performance Appraisal",
+    icon: <LuAward className="text-amber-600" />,
+    route: "/appraisal",
+    roles: ["hr", "hod", "admin"],
+    keywords: ["appraisal", "performance", "pms", "progression", "review", "rating", "scorecard"],
+  },
+  {
+    id: "app_accounts_dash",
+    title: "Accounts Dashboard",
+    icon: <LuTrendingUp className="text-emerald-500" />,
+    route: "/accounts/dashboard",
+    roles: ["accounts", "payroll", "admin"],
+    keywords: ["accounts", "finance", "billing", "dashboard", "ledger"],
+  },
+  {
+    id: "app_hod_dash",
+    title: "HOD Dashboard",
+    icon: <LuTrendingUp className="text-purple-600" />,
+    route: "/hod/dashboard",
+    roles: ["hod"],
+    keywords: ["hod", "department", "head", "dashboard", "overview"],
+  },
+  {
+    id: "app_it_declaration",
+    title: "IT Declaration",
+    icon: <LuReceipt className="text-blue-600" />,
+    route: "/it-declaration",
+    roles: ["employee", "hr", "accounts", "payroll", "hod", "admin"],
+    keywords: ["it declaration", "income tax", "tds", "tax saving", "regime", "80c", "form 16", "investments", "tax"],
+  },
 ];
 
 const HONORIFICS = new Set([
-  "mr", "mr.", "mrs", "mrs.", "ms", "ms.", "miss", "dr", "dr.", 
+  "mr", "mr.", "mrs", "mrs.", "ms", "ms.", "miss", "dr", "dr.",
   "prof", "prof.", "er", "er.", "mx", "mx.", "shri", "smt", "sir", "madam"
 ]);
 
@@ -107,6 +232,7 @@ const AppNavbar = () => {
   const [imgError, setImgError] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
 
   // All Apps Mega Dropdown State
   const [isAppsOpen, setIsAppsOpen] = useState(false);
@@ -147,7 +273,9 @@ const AppNavbar = () => {
   };
 
   const handleChangePassword = () => {
-    navigate('/forgot-password');
+    setIsDropdownOpen(false);
+    setIsMobileMenuOpen(false);
+    setIsChangePasswordOpen(true);
   };
 
   useEffect(() => {
@@ -250,7 +378,7 @@ const AppNavbar = () => {
         return [
           { to: "/employee/dashboard", label: "Dashboard" },
           { to: "/attendance", label: "My Attendance" },
-          { to: "/employee/leave", label: "Apply Leave" },
+          { to: "/leave", label: "Apply Leave" },
           { to: "/resignation", label: "Resignation" },
           { to: profRoute, label: "My Profile" },
         ];
@@ -287,24 +415,38 @@ const AppNavbar = () => {
 
   const navLinks = getNavLinks();
 
-  // Filter All Apps by Role & Search Keyword
+  // Filter All Apps strictly by active Role & Search Keyword
+  const userRole = (role || "").toLowerCase();
+  const searchTrimmed = appSearch.trim().toLowerCase();
+
   const filteredApps = ALL_APPS.filter((app) => {
-    const matchesSearch = app.title.toLowerCase().includes(appSearch.toLowerCase());
-    const matchesRole = !role || app.roles.includes(role);
-    return matchesSearch && matchesRole;
+    const matchesRole = !userRole || app.roles.some((r) => r.toLowerCase() === userRole);
+    if (!matchesRole) return false;
+    if (!searchTrimmed) return true;
+    const matchesTitle = app.title.toLowerCase().includes(searchTrimmed);
+    const matchesKeywords = app.keywords ? app.keywords.some((k) => k.toLowerCase().includes(searchTrimmed)) : false;
+    return matchesTitle || matchesKeywords;
   });
 
   const handleAppClick = (app) => {
     setIsAppsOpen(false);
+    setIsMobileAppsOpen(false);
+    setAppSearch("");
+
     let route = app.route;
 
-    // Role-based dynamic route handling for modules
-    if (app.id === "profile" || app.id === "id_card" || app.id === "mediclaim") {
+    // Role-based dynamic route resolution
+    if (app.id === "app_dashboard") {
+      if (userRole === "hr" || userRole === "admin") route = "/admin/dashboard";
+      else if (userRole === "accounts" || userRole === "payroll") route = "/accounts/dashboard";
+      else if (userRole === "hod") route = "/hod/dashboard";
+      else route = "/employee/dashboard";
+    } else if (app.id === "app_profile") {
       route = `/employee/profile/${employeeCode || "me"}`;
-    } else if (app.id === "leave") {
-      route = role === "employee" ? "/employee/leave" : "/admin/leaves";
-    } else if (app.id === "misc_report" || app.id === "quality_report") {
-      route = role === "hr" ? "/admin/dashboard" : "/admin/dashboard";
+    } else if (app.id === "app_mediclaim") {
+      route = "/mediclaim";
+    } else if (app.id === "app_leave") {
+      route = userRole === "employee" ? "/employee/leave" : (userRole === "hod" ? "/leave" : "/admin/leaves");
     }
 
     navigate(route);
@@ -343,11 +485,10 @@ const AppNavbar = () => {
                 <button
                   type="button"
                   onClick={() => setIsAppsOpen(!isAppsOpen)}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold rounded-md transition-all duration-200 border ${
-                    isAppsOpen
-                      ? "bg-slate-100 text-blue-600 border-blue-300 dark:bg-slate-800 dark:text-blue-400 dark:border-blue-800 shadow-sm"
-                      : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 hover:text-slate-900 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700"
-                  }`}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold rounded-md transition-all duration-200 border ${isAppsOpen
+                    ? "bg-slate-100 text-blue-600 border-blue-300 dark:bg-slate-800 dark:text-blue-400 dark:border-blue-800 shadow-sm"
+                    : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 hover:text-slate-900 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700"
+                    }`}
                 >
                   <FiGrid className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                   <span>All Apps</span>
@@ -424,9 +565,11 @@ const AppNavbar = () => {
                     )}
                   </div>
 
-                  <div className="pt-2 border-t border-yellow-100 dark:border-slate-800">
-                    <button onClick={handleChangePassword}
-                      className="flex w-full items-center justify-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs font-medium text-yellow-600 transition-colors hover:bg-yellow-50 hover:text-yellow-700 dark:bg-slate-800 dark:text-yellow-400 dark:hover:bg-yellow-950/30 dark:hover:text-yellow-300"
+                  <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+                    <button
+                      type="button"
+                      onClick={handleChangePassword}
+                      className="flex w-full items-center justify-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700 hover:text-blue-600 transition-colors hover:bg-blue-50 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700/60 dark:hover:text-blue-400"
                     >
                       <TbPassword className="h-3.5 w-3.5" />
                       Change Password
@@ -468,25 +611,44 @@ const AppNavbar = () => {
       {/* ALL APPS MEGA PANEL (Desktop Only) */}
       {isAppsOpen && (
         <div className="hidden md:flex all-apps-container fixed top-[70px] left-1/2 -translate-x-1/2 w-[min(780px,94vw)] origin-top rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-2xl transition-all duration-300 dark:border-slate-800 dark:bg-slate-900 z-50 flex-col">
-          {/* Header Bar: Search Input & Close button */}
+          {/* Header Bar: Search Input, Role Badge & Close button */}
           <div className="flex items-center justify-between gap-3 mb-3 pb-2 border-b border-slate-100 dark:border-slate-800">
             <div className="relative flex-grow max-w-sm">
-              <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
               <input
                 type="text"
-                placeholder="Search App..."
+                placeholder="Search App or Module..."
                 value={appSearch}
                 onChange={(e) => setAppSearch(e.target.value)}
-                className="w-full rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-3 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500"
+                className="w-full rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-8 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500"
                 autoFocus
               />
+              {appSearch && (
+                <button
+                  type="button"
+                  onClick={() => setAppSearch("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-0.5"
+                  title="Clear search"
+                >
+                  <FiX className="h-3.5 w-3.5" />
+                </button>
+              )}
             </div>
-            <button
-              onClick={() => setIsAppsOpen(false)}
-              className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
-            >
-              <FiX className="h-5 w-5" />
-            </button>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-full border border-slate-200 dark:border-slate-700">
+                {getRoleLabel(role)} ({filteredApps.length})
+              </span>
+              <button
+                onClick={() => {
+                  setIsAppsOpen(false);
+                  setAppSearch("");
+                }}
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300 transition-colors"
+                title="Close"
+              >
+                <FiX className="h-5 w-5" />
+              </button>
+            </div>
           </div>
 
           {/* Apps Grid */}
@@ -495,17 +657,17 @@ const AppNavbar = () => {
               No modules found matching "{appSearch}"
             </div>
           ) : (
-            <div className="grid grid-cols-4 gap-y-2.5 gap-x-4 max-h-[380px] overflow-y-auto pr-1">
+            <div className="grid grid-cols-4 gap-y-2 gap-x-3 max-h-[380px] overflow-y-auto pr-1">
               {filteredApps.map((app) => (
                 <div
                   key={app.id}
                   onClick={() => handleAppClick(app)}
-                  className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer transition-all duration-150 hover:bg-slate-50 dark:hover:bg-slate-800/70 group"
+                  className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl cursor-pointer transition-all duration-150 hover:bg-slate-50 dark:hover:bg-slate-800/70 border border-transparent hover:border-slate-200 dark:hover:border-slate-700 group shadow-xs hover:shadow-xs"
                 >
-                  <span className="text-base flex-shrink-0 group-hover:scale-110 transition-transform">
+                  <span className="text-lg flex-shrink-0 group-hover:scale-110 transition-transform">
                     {app.icon}
                   </span>
-                  <span className="text-xs font-medium text-slate-700 group-hover:text-blue-600 dark:text-slate-200 dark:group-hover:text-blue-400 truncate">
+                  <span className="text-xs font-semibold text-slate-700 group-hover:text-blue-600 dark:text-slate-200 dark:group-hover:text-blue-400 truncate">
                     {app.title}
                   </span>
                 </div>
@@ -559,14 +721,24 @@ const AppNavbar = () => {
                   {isMobileAppsOpen && (
                     <div className="mt-2 p-3 bg-slate-50 rounded-xl dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
                       <div className="relative mb-2.5">
-                        <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                        <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
                         <input
                           type="text"
                           placeholder="Search App..."
                           value={appSearch}
                           onChange={(e) => setAppSearch(e.target.value)}
-                          className="w-full rounded-lg border border-slate-200 bg-white dark:bg-slate-900 pl-8 pr-3 py-1.5 text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          className="w-full rounded-lg border border-slate-200 bg-white dark:bg-slate-900 pl-8 pr-8 py-1.5 text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
                         />
+                        {appSearch && (
+                          <button
+                            type="button"
+                            onClick={() => setAppSearch("")}
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                            title="Clear search"
+                          >
+                            <FiX className="h-3.5 w-3.5" />
+                          </button>
+                        )}
                       </div>
                       <div className="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto pr-1">
                         {filteredApps.length === 0 ? (
@@ -633,7 +805,15 @@ const AppNavbar = () => {
                     </div>
                   )}
 
-                  <div className="mt-2 px-3">
+                  <div className="mt-2 px-3 space-y-1.5">
+                    <button
+                      type="button"
+                      onClick={handleChangePassword}
+                      className="flex w-full items-center justify-center gap-2 rounded-lg bg-slate-50 py-2 text-sm font-medium text-slate-700 hover:text-blue-600 transition-colors hover:bg-blue-50 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700/60 dark:hover:text-blue-400"
+                    >
+                      <TbPassword className="h-4 w-4" />
+                      Change Password
+                    </button>
                     <button onClick={handleLogout}
                       className="flex w-full items-center justify-center gap-2 rounded-lg bg-red-50 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-100 dark:bg-red-950/20 dark:text-red-400 dark:hover:bg-red-950/40"
                     >
@@ -655,6 +835,12 @@ const AppNavbar = () => {
           </div>
         </div>
       )}
+
+      {/* Change Password Modal */}
+      <ChangePasswordModal
+        isOpen={isChangePasswordOpen}
+        onClose={() => setIsChangePasswordOpen(false)}
+      />
     </nav>
   );
 };

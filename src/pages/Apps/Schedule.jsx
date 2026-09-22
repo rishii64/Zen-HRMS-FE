@@ -22,6 +22,7 @@ import {
 import { FaCheckCircle } from "react-icons/fa";
 import toast from "react-hot-toast";
 import { getApiBaseUrl } from "../../api/axios";
+import { exportToExcel } from "../../utils/excelExport";
 
 const API = getApiBaseUrl();
 
@@ -325,7 +326,7 @@ const Schedule = () => {
     }
   };
 
-  // Export Schedule Handler
+  // Export Schedule Handler (Excel)
   const handleExportSchedule = () => {
     let rowsToExport = filteredEmployees;
     if (isEmployee && employeeViewFilter === "own") {
@@ -334,25 +335,24 @@ const Schedule = () => {
       );
     }
 
-    const csvContent =
-      "data:text/csv;charset=utf-8," +
-      ["Employee,Department,Shift Name,Date"].join(",") +
-      "\n" +
-      rowsToExport
-        .map((emp) => {
-          const shift = getEmployeeShiftForDate(emp.employee_code || emp.employee_id, currentRosterDates[0].dateStr);
-          return `"${emp.name}","${emp.dept || "General"}","${shift.shift_name}","${currentRosterDates[0].dateStr}"`;
-        })
-        .join("\n");
+    const headers = ["Employee", "Department", "Shift Name", "Date"];
+    const rows = rowsToExport.map((emp) => {
+      const shift = getEmployeeShiftForDate(emp.employee_code || emp.employee_id, currentRosterDates[0].dateStr);
+      return [
+        emp.name || "",
+        emp.dept || "General",
+        shift.shift_name || "General Shift",
+        currentRosterDates[0].dateStr || ""
+      ];
+    });
 
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `Schedule_Export_${selectedDept}_2026.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toast.success("Schedule exported successfully!");
+    exportToExcel({
+      data: [headers, ...rows],
+      fileName: `Schedule_Export_${selectedDept}_2026.xlsx`,
+      sheetName: "Schedule",
+    });
+
+    toast.success("Schedule exported to Excel successfully!");
   };
 
   // Action Toast Helpers
@@ -506,7 +506,7 @@ const Schedule = () => {
             <button
               onClick={handleExportSchedule}
               className="flex items-center gap-1 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold px-3 py-2.5 rounded-xl shadow-xs transition-all"
-              title={isEmployee ? "Export Own Schedule" : "Export Roster CSV"}
+              title={isEmployee ? "Export Own Schedule (Excel)" : "Export Roster (Excel)"}
             >
               <LuDownload className="h-3.5 w-3.5" /> Export
             </button>

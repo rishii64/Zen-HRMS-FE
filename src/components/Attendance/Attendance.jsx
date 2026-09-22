@@ -25,11 +25,12 @@ import {
 } from "react-icons/lu";
 import { MdEdit } from "react-icons/md";
 import { getApiBaseUrl, getUploadUrl } from "../../api/axios";
+import { exportToExcel } from "../../utils/excelExport";
 
 const API = getApiBaseUrl();
 
 const HONORIFICS = new Set([
-  "mr", "mr.", "mrs", "mrs.", "ms", "ms.", "miss", "dr", "dr.", 
+  "mr", "mr.", "mrs", "mrs.", "ms", "ms.", "miss", "dr", "dr.",
   "prof", "prof.", "er", "er.", "mx", "mx.", "shri", "smt", "sir", "madam"
 ]);
 
@@ -237,36 +238,61 @@ const MyAttendance = () => {
     }
   };
 
-  // Export Attendance CSV Report
+  // Export Attendance Excel Report
   const handleExportReport = () => {
-    const headers = "Employee Name,Employee ID,Department,Designation,Shift,Check-In,Check-Out,Working Hours,Overtime,Status,Notes\n";
-    const rows = filteredRecords
-      .map((r) => {
-        const empCode = r.employee_id || "EMP";
-        const empName = r.name || "Employee";
-        const deptVal = r.dept || "General";
-        const checkIn = r.check_in || "—";
-        const checkOut = r.check_out || "—";
-        const workH = r.work_hours ? `${r.work_hours}h` : "—";
-        const status = r.status || "Present";
-        const notes = r.notes ? `"${r.notes}"` : "";
-        const matchedEmp = employees.find(
-          (e) => (e.employee_code || e.employee_id || "").toLowerCase() === empCode.toLowerCase()
-        );
-        const desigVal = r.designation || matchedEmp?.designation || "Staff";
-        return `"${empName}","${empCode}","${deptVal}","${desigVal}","General Shift","${checkIn}","${checkOut}","${workH}","-","${status}",${notes}`;
-      })
-      .join("\n");
+    const headers = [
+      "Employee Name",
+      "Employee ID",
+      "Date",
+      "Department",
+      "Designation",
+      "Shift",
+      "Check-In",
+      "Check-Out",
+      "Working Hours",
+      "Overtime",
+      "Status",
+      "Notes"
+    ];
 
-    const blob = new Blob([headers + rows], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute("download", `Attendance_Report_${selectedDateStr}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toast.success("Attendance Report exported successfully!");
+    const rows = filteredRecords.map((r) => {
+      const empCode = r.employee_id || "EMP";
+      const empName = r.name || "Employee";
+      const dateVal = r.date ? formatDateDisplay(r.date) : (selectedDateStr || "—");
+      const deptVal = r.dept || "General";
+      const checkIn = r.check_in || "—";
+      const checkOut = r.check_out || "—";
+      const workH = r.work_hours ? `${r.work_hours}h` : "—";
+      const status = r.status || "Present";
+      const notes = r.notes || "";
+      const matchedEmp = employees.find(
+        (e) => (e.employee_code || e.employee_id || "").toLowerCase() === empCode.toLowerCase()
+      );
+      const desigVal = r.designation || matchedEmp?.designation || "Staff";
+
+      return [
+        empName,
+        empCode,
+        dateVal,
+        deptVal,
+        desigVal,
+        "General Shift",
+        checkIn,
+        checkOut,
+        workH,
+        "-",
+        status,
+        notes
+      ];
+    });
+
+    exportToExcel({
+      data: [headers, ...rows],
+      fileName: `Attendance_Report_${selectedDateStr}.xlsx`,
+      sheetName: "Attendance",
+    });
+
+    toast.success("Attendance Report exported to Excel successfully!");
   };
 
   // Filter attendance records by RBAC & Filter Bar
@@ -440,6 +466,7 @@ const MyAttendance = () => {
           <button
             onClick={handleExportReport}
             className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold px-4 py-2.5 rounded-xl shadow-xs transition-all"
+            title="Export Attendance Report (Excel)"
           >
             <LuFileText className="h-4 w-4 text-slate-500" /> Attendance Report
           </button>
@@ -492,7 +519,7 @@ const MyAttendance = () => {
           </div>
         </Col>
 
-        {/* CARD 2: NOT PRESENT SUMMARY */}
+        {/* CARD 2: Absent SUMMARY */}
         <Col xs={12} lg={5}>
           <div className="att-summary-card h-full flex flex-col justify-between">
             <div>
@@ -501,7 +528,7 @@ const MyAttendance = () => {
                   <span className="p-1.5 rounded-lg bg-rose-50 text-rose-600">
                     <LuUserX className="h-4 w-4" />
                   </span>
-                  <span className="text-xs font-bold text-slate-800">Not Present Summary</span>
+                  <span className="text-xs font-bold text-slate-800">Absent Summary</span>
                 </div>
                 <span className="text-slate-400 text-xs font-bold">•••</span>
               </div>
@@ -781,10 +808,10 @@ const MyAttendance = () => {
                             (r.shift_name || "").includes("Morning")
                               ? { backgroundColor: "#ecfdf5", color: "#065f46", borderColor: "#a7f3d0" }
                               : (r.shift_name || "").includes("Evening")
-                              ? { backgroundColor: "#fffbeb", color: "#92400e", borderColor: "#fde68a" }
-                              : (r.shift_name || "").includes("Night")
-                              ? { backgroundColor: "#f5f3ff", color: "#5b21b6", borderColor: "#ddd6fe" }
-                              : { backgroundColor: "#eff6ff", color: "#1e40af", borderColor: "#bfdbfe" }
+                                ? { backgroundColor: "#fffbeb", color: "#92400e", borderColor: "#fde68a" }
+                                : (r.shift_name || "").includes("Night")
+                                  ? { backgroundColor: "#f5f3ff", color: "#5b21b6", borderColor: "#ddd6fe" }
+                                  : { backgroundColor: "#eff6ff", color: "#1e40af", borderColor: "#bfdbfe" }
                           }
                         >
                           {r.shift_name || "General Shift"}
@@ -894,9 +921,8 @@ const MyAttendance = () => {
             <button
               onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
               disabled={currentPage === 1}
-              className={`p-2 rounded-xl border border-slate-200 text-xs font-bold transition-colors ${
-                currentPage === 1 ? "opacity-40 cursor-not-allowed bg-slate-50" : "hover:bg-slate-100 cursor-pointer"
-              }`}
+              className={`p-2 rounded-xl border border-slate-200 text-xs font-bold transition-colors ${currentPage === 1 ? "opacity-40 cursor-not-allowed bg-slate-50" : "hover:bg-slate-100 cursor-pointer"
+                }`}
             >
               <LuChevronLeft className="h-4 w-4" />
             </button>
@@ -906,9 +932,8 @@ const MyAttendance = () => {
             <button
               onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
               disabled={currentPage === totalPages}
-              className={`p-2 rounded-xl border border-slate-200 text-xs font-bold transition-colors ${
-                currentPage === totalPages ? "opacity-40 cursor-not-allowed bg-slate-50" : "hover:bg-slate-100 cursor-pointer"
-              }`}
+              className={`p-2 rounded-xl border border-slate-200 text-xs font-bold transition-colors ${currentPage === totalPages ? "opacity-40 cursor-not-allowed bg-slate-50" : "hover:bg-slate-100 cursor-pointer"
+                }`}
             >
               <LuChevronRight className="h-4 w-4" />
             </button>

@@ -653,45 +653,69 @@ export default function Mediclaim() {
 
       {/* NAVIGATION TABS */}
       <Tab.Container activeKey={activeTab} onSelect={(k) => setActiveTab(k)}>
-        <div className="bg-white rounded-2xl p-2 shadow-sm text-sm border border-slate-200 mb-4">
-          <Nav variant="pills" className="d-flex flex-nowrap gap-1">
-            <Nav.Item>
-              <Nav.Link eventKey="card" className="d-flex align-items-center gap-2 rounded-xl py-2 px-3 text-xs font-semibold cursor-pointer">
-                <LuShieldCheck size={16} /> Digital E-Card & Policy
+        <div className="mediclaim-tabs-wrapper bg-white rounded-2xl p-1.5 text-xs shadow-sm border border-slate-200 mb-4">
+          <Nav variant="pills" className="mediclaim-tab-nav d-flex flex-nowrap align-items-center gap-1 justify-around">
+            <Nav.Item className="flex-shrink-0">
+              <Nav.Link
+                eventKey="card"
+                className="mediclaim-tab-btn d-flex align-items-center gap-2 rounded-xl py-2 px-2.1 text-xs font-semibold cursor-pointer text-nowrap"
+              >
+                <LuShieldCheck size={15} className="flex-shrink-0" />
+                <span>Digital E-Card & Policy</span>
               </Nav.Link>
             </Nav.Item>
-            <Nav.Item>
-              <Nav.Link eventKey="dependents" className="d-flex align-items-center gap-2 rounded-xl py-2 px-3 text-xs font-semibold cursor-pointer">
-                <LuUsers size={16} /> Covered Family ({1 + enrolledDeps.length})
+            <Nav.Item className="flex-shrink-0">
+              <Nav.Link
+                eventKey="dependents"
+                className="mediclaim-tab-btn d-flex align-items-center gap-2 rounded-xl py-2 px-2.1 text-xs font-semibold cursor-pointer text-nowrap"
+              >
+                <LuUsers size={15} className="flex-shrink-0" />
+                <span>Covered Family ({1 + enrolledDeps.length})</span>
               </Nav.Link>
             </Nav.Item>
-            <Nav.Item>
-              <Nav.Link eventKey="submit_claim" className="d-flex align-items-center gap-2 rounded-xl py-2 px-3 text-xs font-semibold cursor-pointer">
-                <LuPlus size={16} /> Submit New Claim
+            <Nav.Item className="flex-shrink-0">
+              <Nav.Link
+                eventKey="submit_claim"
+                className="mediclaim-tab-btn d-flex align-items-center gap-2 rounded-xl py-2 px-2.1 text-xs font-semibold cursor-pointer text-nowrap"
+              >
+                <LuPlus size={15} className="flex-shrink-0" />
+                <span>Submit New Claim</span>
               </Nav.Link>
             </Nav.Item>
-            <Nav.Item>
-              <Nav.Link eventKey="my_claims" className="d-flex align-items-center gap-2 rounded-xl py-2 px-3 text-xs font-semibold cursor-pointer">
-                <LuFileText size={16} /> My Claims & Timeline ({claims.length})
+            <Nav.Item className="flex-shrink-0">
+              <Nav.Link
+                eventKey="my_claims"
+                className="mediclaim-tab-btn d-flex align-items-center gap-2 rounded-xl py-2 px-2.1 text-xs font-semibold cursor-pointer text-nowrap"
+              >
+                <LuFileText size={15} className="flex-shrink-0" />
+                <span>My Claims & Timeline ({claims.length})</span>
               </Nav.Link>
             </Nav.Item>
-            <Nav.Item>
-              <Nav.Link eventKey="network_hospitals" className="d-flex align-items-center gap-2 rounded-xl py-2 px-3 text-xs font-semibold cursor-pointer">
-                <LuHospital size={16} /> Cashless Network Hospitals
+            <Nav.Item className="flex-shrink-0">
+              <Nav.Link
+                eventKey="network_hospitals"
+                className="mediclaim-tab-btn d-flex align-items-center gap-2 rounded-xl py-2 px-2.1 text-xs font-semibold cursor-pointer text-nowrap"
+              >
+                <LuHospital size={15} className="flex-shrink-0" />
+                <span>Cashless Network Hospitals</span>
               </Nav.Link>
             </Nav.Item>
 
             {/* HR / Admin Review Desk Tab (Only shown to HR/Admin roles) */}
             {isHRorAdmin && (
-              <Nav.Item className="ms-md-auto">
+              <Nav.Item className="flex-shrink-0 ms-auto">
                 <Nav.Link
                   eventKey="company_desk"
-                  className="d-flex align-items-center gap-2 rounded-xl py-2 px-3 text-xs font-semibold cursor-pointer bg-slate-900 text-white"
+                  className={`mediclaim-tab-btn d-flex align-items-center gap-2 rounded-xl py-2 px-2 text-xs font-semibold cursor-pointer text-nowrap ${
+                    activeTab === "company_desk"
+                      ? "mediclaim-desk-active"
+                      : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                  }`}
                 >
-                  <LuFileSpreadsheet size={16} className="text-emerald-400" />
-                  Company Claims Desk
+                  <LuFileSpreadsheet size={15} className="text-emerald-500 flex-shrink-0" />
+                  <span>Company Claims Desk</span>
                   {companyClaims.filter((c) => ["Submitted", "Under Review"].includes(c.status)).length > 0 && (
-                    <span className="badge bg-rose-500 rounded-pill text-[10px]">
+                    <span className="badge bg-rose-500 rounded-pill text-[10px] px-1.5 py-0.5 ms-0.5">
                       {companyClaims.filter((c) => ["Submitted", "Under Review"].includes(c.status)).length}
                     </span>
                   )}
@@ -924,7 +948,7 @@ export default function Mediclaim() {
                       <div className="flex-grow-1">
                         <div className="d-flex justify-content-between">
                           <strong className="text-xs text-slate-800">Maternity & Newborn Cover</strong>
-                          <span className="badge bg-rose-400 text-rose-800 text-[10px]">Up to ₹75,000</span>
+                          <span className="badge bg-rose-500 text-rose-800 text-[10px]">Up to ₹75,000</span>
                         </div>
                         <p className="text-slate-500 text-xs m-0 mt-0.5">
                           Normal delivery up to ₹50,000 and Caesarean (C-section) up to ₹75,000. Newborn baby covered from Day 1.
@@ -1569,7 +1593,7 @@ export default function Mediclaim() {
                       variant="outline-success"
                       size="sm"
                       onClick={handleExportClaimsExcel}
-                      className="d-flex align-items-center gap-1.5 rounded-xl text-xs py-2 px-3 font-semibold text-emerald-700 border-emerald-300 hover:bg-emerald-50"
+                      className="d-flex align-items-center gap-1.5 rounded-xl !text-xs py-2 px-3 font-semibold text-emerald-700 border-emerald-300 hover:bg-emerald-50"
                     >
                       <LuFileSpreadsheet size={16} /> Export to Excel (.xlsx)
                     </Button>
@@ -1577,7 +1601,7 @@ export default function Mediclaim() {
                       variant="outline-secondary"
                       size="sm"
                       onClick={fetchCompanyClaims}
-                      className="rounded-xl text-xs py-2 px-3"
+                      className="rounded-xl !text-xs py-2 px-3 d-inline-flex align-items-center gap-1.5"
                     >
                       <LuRefreshCw size={14} /> Refresh
                     </Button>
@@ -2126,6 +2150,48 @@ export default function Mediclaim() {
           )}
         </Modal.Body>
       </Modal>
+
+      <style>{`
+        .mediclaim-tabs-wrapper {
+          overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+        }
+        .mediclaim-tabs-wrapper::-webkit-scrollbar {
+          display: none;
+        }
+        .mediclaim-tab-nav {
+          display: flex;
+          flex-wrap: nowrap;
+          align-items: center;
+          width: 100%;
+          min-width: max-content;
+        }
+        .mediclaim-tab-btn {
+          white-space: nowrap !important;
+          text-decoration: none !important;
+          transition: all 0.15s ease-in-out;
+        }
+        .mediclaim-tab-btn:not(.active):not(.mediclaim-desk-active) {
+          color: #475569 !important;
+          background: transparent;
+        }
+        .mediclaim-tab-btn:not(.active):not(.mediclaim-desk-active):hover {
+          background-color: #f1f5f9 !important;
+          color: #0f172a !important;
+        }
+        .nav-pills .nav-link.active.mediclaim-tab-btn {
+          background-color: #2563eb !important;
+          color: #ffffff !important;
+          box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
+        }
+        .mediclaim-desk-active {
+          background-color: #0f172a !important;
+          color: #ffffff !important;
+          box-shadow: 0 2px 8px rgba(15, 23, 42, 0.35);
+        }
+      `}</style>
     </Container>
   );
 }

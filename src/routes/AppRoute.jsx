@@ -1,4 +1,6 @@
+import { useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
+import { isTokenExpired, clearAuthSession, initTokenExpiryWatcher } from "../utils/auth";
 
 // Auth Pages
 import UnifiedLogin from "../pages/auth/UnifiedLogin";
@@ -41,27 +43,37 @@ import PayslipPage from "../pages/Payroll/PayslipPage";
 // HOD Pages
 import HODDashboard from "../pages/HOD/HODDashboard";
 
+import UnifiedDashboard from "../pages/Dashboard/UnifiedDashboard";
+
 // Home Page
 import Home from "../pages/Home";
 
-// ✅ ProtectedRoute — checks both token presence and role authorization
+// ✅ ProtectedRoute — checks token presence, expiry validity, and role authorization
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const token = localStorage.getItem("token");
   const role = localStorage.getItem("role");
 
-  if (!token) {
-    return <Navigate to="/login" />;
+  // Check if token is absent or has expired
+  if (!token || isTokenExpired(token)) {
+    if (token) {
+      clearAuthSession();
+    }
+    return <Navigate to="/login" replace />;
   }
 
   if (allowedRoles && !allowedRoles.includes(role)) {
     // If not authorized for this role, redirect to Home page
-    return <Navigate to="/" />;
+    return <Navigate to="/" replace />;
   }
 
   return children;
 };
 
 export default function AppRoute() {
+  useEffect(() => {
+    initTokenExpiryWatcher();
+  }, []);
+
   return (
     <Routes>
       {/* Public Routes */}
@@ -70,15 +82,23 @@ export default function AppRoute() {
       <Route path="/register" element={<Navigate to="/login" replace />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
 
+      {/* Unified Role-Based Dashboard Routes */}
+      <Route path="/dashboard" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "accounts", "payroll", "hod", "manager"]}> <UnifiedDashboard /> </ProtectedRoute>} />
+      <Route path="/admin/dashboard" element={<ProtectedRoute allowedRoles={["hr", "admin"]}> <UnifiedDashboard /> </ProtectedRoute>} />
+      <Route path="/employee/dashboard" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "accounts", "payroll", "hod", "manager"]}> <UnifiedDashboard /> </ProtectedRoute>} />
+      <Route path="/accounts/dashboard" element={<ProtectedRoute allowedRoles={["accounts", "payroll", "admin"]}> <UnifiedDashboard /> </ProtectedRoute>} />
+      {/* <Route path="/accounts-dashboard" element={<Navigate to="/accounts/dashboard" replace />} /> */}
+      <Route path="/hod/dashboard" element={<ProtectedRoute allowedRoles={["hod", "manager", "hr", "admin"]}> <UnifiedDashboard /> </ProtectedRoute>} />
+      {/* <Route path="/hod-dashboard" element={<Navigate to="/hod/dashboard" replace />} /> */}
+
       {/* HR & Admin Restricted Routes */}
-      <Route path="/admin/dashboard" element={<ProtectedRoute allowedRoles={["hr"]}> <AdminDashboard /> </ProtectedRoute>} />
       <Route path="/attendance" element={<ProtectedRoute allowedRoles={["employee", "hr", "hod", "accounts"]}> <MyAttendance /> </ProtectedRoute>} />
       <Route path="/admin/attendance" element={<Navigate to="/attendance" replace />} />
       <Route path="/admin/leaves" element={<ProtectedRoute allowedRoles={["hr", "admin", "accounts", "payroll"]}> <LeavesPage /> </ProtectedRoute>} />
       <Route path="/admin/manage-employees" element={<ProtectedRoute allowedRoles={["hr", "admin", "hod", "accounts"]}> <ManageEmployees /> </ProtectedRoute>} />
       <Route path="/admin/register-employee" element={<ProtectedRoute allowedRoles={["hr"]}> <Register /> </ProtectedRoute>} />
 
-      <Route path="/hr-dashboard" element={<ProtectedRoute allowedRoles={["hr"]}> <HRDashboard /> </ProtectedRoute>} />
+      <Route path="/hr-dashboard" element={<Navigate to="/admin/dashboard" replace />} />
       <Route path="/onboarding" element={<ProtectedRoute allowedRoles={["hr"]}> <Onboarding /> </ProtectedRoute>} />
       <Route path="/recruitment" element={<ProtectedRoute allowedRoles={["hr"]}> <Recruitment /> </ProtectedRoute>} />
       <Route path="/manage-employee" element={<ProtectedRoute allowedRoles={["hr", "admin", "hod", "accounts"]}> <ManageEmployees /> </ProtectedRoute>} />
@@ -90,26 +110,8 @@ export default function AppRoute() {
       <Route path="/leave" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager"]}> <Leave /> </ProtectedRoute>} />
       <Route path="/employee/leave" element={<Navigate to="/leave" replace />} />
       
-      {/* Employee Protected Routes */}
-      <Route path="/employee/dashboard" element={<ProtectedRoute allowedRoles={["employee"]}> <EmployeeDashboard /> </ProtectedRoute>} />
       {/* Profile Routes (Mapped to Apps/Profile.jsx) */}
-      {/* <Route path="/profile" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager"]}><Profile /></ProtectedRoute>} />
-      <Route path="/profile/:employeeid" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager"]}><Profile /></ProtectedRoute>} /> */}
       <Route path="/employee/profile/:employeeid" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager"]}><Profile /></ProtectedRoute>} />
-
-      {/* Accounts Dashboard & Payroll Routes */}
-      <Route path="/accounts/dashboard" element={<ProtectedRoute allowedRoles={["accounts", "payroll", "admin"]}> <AccountsDashboard /> </ProtectedRoute>} />
-      <Route path="/accounts-dashboard" element={<Navigate to="/accounts/dashboard" replace />} />
-
-      {/* Accounts / Payroll Route (Accessible by Accounts, HR, Admin, and Employee) */}
-      <Route path="/payroll" element={<ProtectedRoute allowedRoles={["accounts", "hr", "admin", "payroll", "employee"]}> <PayrollManagement /> </ProtectedRoute>} />
-      
-      {/* Payslip Route (Accessible by Everyone: HR/Accounts see all slips, Employees see their own slips) */}
-      <Route path="/payslip" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "accounts", "payroll", "hod", "manager"]}> <PayslipPage /> </ProtectedRoute>} />
-
-      {/* Departmental Head (HOD) Protected Routes (HOD and HR can review) */}
-      <Route path="/hod/dashboard" element={<ProtectedRoute allowedRoles={["hod", "manager", "hr"]}> <HODDashboard /> </ProtectedRoute>} />
-      <Route path="/hod-dashboard" element={<Navigate to="/hod/dashboard" replace />} />
       <Route path="/appraisal" element={<ProtectedRoute allowedRoles={["hod", "hr"]}> <Apprasial /> </ProtectedRoute>} />
       <Route path="/interview" element={<ProtectedRoute allowedRoles={["hod", "hr"]}> <InterviewForm /> </ProtectedRoute>} />
 
@@ -126,7 +128,20 @@ export default function AppRoute() {
 
       {/* Corporate Mediclaim & Health Insurance for all employees and HR/Admin */}
       <Route path="/mediclaim" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager"]}> <Mediclaim /> </ProtectedRoute>} />
-      <Route path="/apps/mediclaim" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager"]}> <Mediclaim /> </ProtectedRoute>} />
+      {/* <Route path="/apps/mediclaim" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager"]}> <Mediclaim /> </ProtectedRoute>} /> */}
+
+      {/* Profile Routes Fallbacks */}
+      <Route path="/employee/profile" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager"]}><Profile /></ProtectedRoute>} />
+      <Route path="/profile" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager"]}><Profile /></ProtectedRoute>} />
+
+      {/* Payroll Management & Salary Slips (Payslips) */}
+      <Route path="/payroll" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager"]}> <PayrollManagement /> </ProtectedRoute>} />
+      <Route path="/Payroll" element={<Navigate to="/payroll" replace />} />
+      <Route path="/payslip" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager"]}> <PayslipPage /> </ProtectedRoute>} />
+      <Route path="/Payslip" element={<Navigate to="/payslip" replace />} />
+      <Route path="/payslips" element={<Navigate to="/payslip" replace />} />
+      <Route path="/salary-slips" element={<Navigate to="/payslip" replace />} />
+      <Route path="/salary-slip" element={<Navigate to="/payslip" replace />} />
 
       {/* 404 Page */}
       <Route path="*" element={<h2 className="text-center mt-4">Page Not Found</h2>} />

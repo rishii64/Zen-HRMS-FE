@@ -28,6 +28,7 @@ import {
 import { SiGoogledocs } from "react-icons/si";
 import { FaListCheck } from "react-icons/fa6";
 import logo from "../../assets/zentelex-logo.png";
+import { clearAuthSession } from "../../utils/auth";
 import toast from 'react-hot-toast';
 import { TbPassword } from "react-icons/tb";
 import { getUploadUrl } from "../../api/axios";
@@ -104,7 +105,7 @@ const ALL_APPS = [
     title: "Payroll Management",
     icon: <LuWallet className="text-emerald-600" />,
     route: "/payroll",
-    roles: ["employee", "hr", "accounts", "payroll", "admin"],
+    roles: ["employee", "hr", "accounts", "payroll", "hod", "admin"],
     keywords: ["payroll", "tax", "it declaration", "compensation", "salary structure", "ctc"],
   },
   {
@@ -249,14 +250,7 @@ const AppNavbar = () => {
     setTimeout(() => {
       navigate("/login");
     }, 500);
-    localStorage.removeItem("token");
-    localStorage.removeItem("role");
-    localStorage.removeItem("userId");
-    localStorage.removeItem("employeeId");
-    localStorage.removeItem("userName");
-    localStorage.removeItem("email");
-    localStorage.removeItem("empId");
-    localStorage.removeItem("profile_photo");
+    clearAuthSession();
 
     setRole(null);
     setIsLoggedIn(false);

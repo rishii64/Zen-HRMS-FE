@@ -1026,7 +1026,8 @@ const ManageEmployees = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setEmpForm((prev) => ({ ...prev, [name]: value }));
+    const formattedVal = name === "email" ? value.toLowerCase() : value;
+    setEmpForm((prev) => ({ ...prev, [name]: formattedVal }));
   };
 
   const handleSalaryFrequencyChange = (newType) => {
@@ -1154,6 +1155,7 @@ const ManageEmployees = () => {
       ...empForm,
       name: formattedFullName,
       salutation: titlePrefix,
+      email: (empForm.email || "").toLowerCase().trim(),
       current_salary: monthlySalary,
       salary_type: salary_type || "Monthly (In Hand)",
     };

@@ -328,7 +328,7 @@ export default function Separation() {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
       {/* <Navbar /> */}
 
-      <main className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-8">
+      <main className="mx-auto max-w-6xl px-2 sm:px-6 lg:px-8 py-8">
         {/* Top Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-slate-200 dark:border-slate-800">
           <div>

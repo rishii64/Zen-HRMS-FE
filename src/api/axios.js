@@ -1,4 +1,5 @@
 import axios from "axios";
+import { handleSessionExpired } from "../utils/auth";
 
 // ============================================================================
 // 1. API URL CONFIGURATION (Intelligent Dynamic Localhost, EC2 & Domain Detection)
@@ -127,7 +128,8 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      console.warn("Unauthorized request. Token may be expired.");
+      console.warn("Unauthorized request (401). Triggering session expiry logout.");
+      handleSessionExpired("Your session has expired. Please log in again.");
     }
     return Promise.reject(error);
   }

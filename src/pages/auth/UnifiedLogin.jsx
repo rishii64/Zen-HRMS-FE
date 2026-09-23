@@ -45,6 +45,12 @@ export default function UnifiedLogin() {
         localStorage.setItem("employeeCode", empCode);
         localStorage.setItem("empId", empCode);
         localStorage.setItem("user", JSON.stringify(data.user));
+        if (data.user.enabled_tabs !== undefined && data.user.enabled_tabs !== null) {
+          localStorage.setItem("enabled_tabs", String(data.user.enabled_tabs));
+        }
+        if (data.user.tabs_enabled !== undefined) {
+          localStorage.setItem("tabs_enabled", data.user.tabs_enabled ? "true" : "false");
+        }
 
         setTimeout(() => {
           setLoading(false);

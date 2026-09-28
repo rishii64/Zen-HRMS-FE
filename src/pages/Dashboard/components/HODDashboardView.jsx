@@ -119,7 +119,7 @@ export default function HODDashboardView() {
       <Row className="g-3 mb-4">
         {/* TOP LEFT: APPROVAL CENTER */}
         <Col xs={12} lg={6}>
-          <div className="dash-card p-4 h-100 border-indigo-100 bg-gradient-to-b from-indigo-50/20 to-white flex flex-col justify-between shadow-xs">
+          <div className="dash-card p-4 h-96 border-indigo-100 bg-gradient-to-b from-indigo-50/20 to-white flex flex-col justify-between shadow-xs">
             <div>
               <div className="flex items-center justify-between mb-4 border-b border-indigo-100/80 pb-3">
                 <div className="flex items-center gap-2">
@@ -159,7 +159,7 @@ export default function HODDashboardView() {
                   No leave requests found for {dashData.departmentName} Department.
                 </div>
               ) : (
-                <div className="space-y-3 max-h-[360px] overflow-y-auto pr-1">
+                <div className="space-y-3 max-h-[200px] overflow-y-auto pr-1">
                   {[...dashData.pendingLeaves]
                     .sort((a, b) => {
                       const aPending = a.status === "Pending" || a.status === "Processing";

@@ -870,12 +870,15 @@ const PayrollManagement = () => {
     const earnings = ss.earnings || {};
     const deductions = ss.deductions || {};
     const curSal = parseFloat(emp.current_salary) || 25000;
+    const initialBasic = earnings.basic != null ? parseFloat(earnings.basic) : Math.round(curSal * 0.45);
+    const initialEsi = deductions.esi != null ? parseFloat(deductions.esi) : 0;
+    const initialMedi = deductions.mediclaim != null ? parseFloat(deductions.mediclaim) : 0;
 
     // Initial populate from cached employee object
     setEditStructureData({
-      basic: earnings.basic != null ? parseFloat(earnings.basic) : Math.round(curSal * 0.4),
-      da: earnings.da != null ? parseFloat(earnings.da) : Math.round(curSal * 0.1),
-      hra: earnings.hra != null ? parseFloat(earnings.hra) : Math.round(curSal * 0.2),
+      basic: initialBasic,
+      da: 0,
+      hra: earnings.hra != null ? parseFloat(earnings.hra) : Math.round(curSal * 0.4),
       allowance: earnings.allowance != null ? parseFloat(earnings.allowance) : Math.round(curSal * 0.1),
       conveyance: earnings.conveyance != null ? parseFloat(earnings.conveyance) : 1600,
       medical: earnings.medical != null ? parseFloat(earnings.medical) : 1250,
@@ -884,8 +887,9 @@ const PayrollManagement = () => {
       pf:
         deductions.pf != null
           ? parseFloat(deductions.pf)
-          : Math.round((earnings.basic != null ? parseFloat(earnings.basic) : curSal * 0.4) * 0.12),
-      esi: deductions.esi != null ? parseFloat(deductions.esi) : 0,
+          : Math.round(initialBasic * 0.12),
+      esi: initialBasic <= 15000 ? (initialEsi || initialMedi) : 0,
+      mediclaim: initialBasic > 15000 ? (initialMedi || initialEsi) : 0,
       tds: deductions.tds != null ? parseFloat(deductions.tds) : 0,
       lop: deductions.lop != null ? parseFloat(deductions.lop) : 0,
     });
@@ -898,9 +902,12 @@ const PayrollManagement = () => {
       if (data.success && data.salary) {
         const liveEarnings = data.salary.earnings || {};
         const liveDeductions = data.salary.deductions || {};
+        const liveBasic = liveEarnings.basic != null ? parseFloat(liveEarnings.basic) : 0;
+        const liveEsi = liveDeductions.esi != null ? parseFloat(liveDeductions.esi) : 0;
+        const liveMedi = liveDeductions.mediclaim != null ? parseFloat(liveDeductions.mediclaim) : 0;
         setEditStructureData({
-          basic: liveEarnings.basic != null ? parseFloat(liveEarnings.basic) : 0,
-          da: liveEarnings.da != null ? parseFloat(liveEarnings.da) : 0,
+          basic: liveBasic,
+          da: 0,
           hra: liveEarnings.hra != null ? parseFloat(liveEarnings.hra) : 0,
           allowance: liveEarnings.allowance != null ? parseFloat(liveEarnings.allowance) : 0,
           conveyance: liveEarnings.conveyance != null ? parseFloat(liveEarnings.conveyance) : 0,
@@ -908,7 +915,8 @@ const PayrollManagement = () => {
           professional_tax: liveDeductions.professional_tax != null ? parseFloat(liveDeductions.professional_tax) : 0,
           income_tax: liveDeductions.income_tax != null ? parseFloat(liveDeductions.income_tax) : 0,
           pf: liveDeductions.pf != null ? parseFloat(liveDeductions.pf) : 0,
-          esi: liveDeductions.esi != null ? parseFloat(liveDeductions.esi) : 0,
+          esi: liveBasic <= 15000 ? (liveEsi || liveMedi) : 0,
+          mediclaim: liveBasic > 15000 ? (liveMedi || liveEsi) : 0,
           tds: liveDeductions.tds != null ? parseFloat(liveDeductions.tds) : 0,
           lop: liveDeductions.lop != null ? parseFloat(liveDeductions.lop) : 0,
         });
@@ -922,7 +930,6 @@ const PayrollManagement = () => {
   const computedEditGross = useMemo(() => {
     return (
       (parseFloat(editStructureData.basic) || 0) +
-      (parseFloat(editStructureData.da) || 0) +
       (parseFloat(editStructureData.hra) || 0) +
       (parseFloat(editStructureData.conveyance) || 0) +
       (parseFloat(editStructureData.medical) || 0) +
@@ -931,11 +938,13 @@ const PayrollManagement = () => {
   }, [editStructureData]);
 
   const computedEditDeductions = useMemo(() => {
+    const isEsi = (parseFloat(editStructureData.basic) || 0) <= 15000;
+    const healthDeduction = isEsi ? (parseFloat(editStructureData.esi) || 0) : (parseFloat(editStructureData.mediclaim) || 0);
     return (
       (parseFloat(editStructureData.professional_tax) || 0) +
       (parseFloat(editStructureData.income_tax) || 0) +
       (parseFloat(editStructureData.pf) || 0) +
-      (parseFloat(editStructureData.esi) || 0) +
+      healthDeduction +
       (parseFloat(editStructureData.tds) || 0) +
       (parseFloat(editStructureData.lop) || 0)
     );
@@ -953,6 +962,8 @@ const PayrollManagement = () => {
       const empId = editingEmp.employee_code || editingEmp.id;
       const userRole = (localStorage.getItem("role") || "admin").toLowerCase();
       const token = localStorage.getItem("token");
+      const curBasic = parseFloat(editStructureData.basic) || 0;
+      const isEsi = curBasic <= 15000;
 
       const res = await fetch(`${API}/employees/${empId}/salary`, {
         method: "POST",
@@ -963,6 +974,9 @@ const PayrollManagement = () => {
         },
         body: JSON.stringify({
           ...editStructureData,
+          da: 0,
+          esi: isEsi ? (parseFloat(editStructureData.esi) || 0) : 0,
+          mediclaim: !isEsi ? (parseFloat(editStructureData.mediclaim) || 0) : 0,
           role: userRole || "admin",
         }),
       });
@@ -2504,24 +2518,6 @@ const PayrollManagement = () => {
 
                 <div className="mb-2">
                   <label className="form-label small text-muted mb-1">
-                    Dearness Allowance (DA)
-                  </label>
-                  <Form.Control
-                    type="number"
-                    size="sm"
-                    className="fw-semibold"
-                    value={editStructureData.da === 0 ? 0 : (editStructureData.da ?? "")}
-                    onChange={(e) =>
-                      setEditStructureData({
-                        ...editStructureData,
-                        da: e.target.value === "" ? "" : (parseFloat(e.target.value) || 0),
-                      })
-                    }
-                  />
-                </div>
-
-                <div className="mb-2">
-                  <label className="form-label small text-muted mb-1">
                     House Rent Allowance (HRA)
                   </label>
                   <Form.Control
@@ -2625,23 +2621,55 @@ const PayrollManagement = () => {
                   />
                 </div>
 
-                <div className="mb-2">
-                  <label className="form-label small text-muted mb-1">
-                    Employee State Insurance (ESI)
-                  </label>
-                  <Form.Control
-                    type="number"
-                    size="sm"
-                    className="fw-semibold"
-                    value={editStructureData.esi === 0 ? 0 : (editStructureData.esi ?? "")}
-                    onChange={(e) =>
-                      setEditStructureData({
-                        ...editStructureData,
-                        esi: e.target.value === "" ? "" : (parseFloat(e.target.value) || 0),
-                      })
-                    }
-                  />
-                </div>
+                {(parseFloat(editStructureData.basic) || 0) <= 15000 ? (
+                  <div className="mb-2">
+                    <div className="d-flex justify-content-between align-items-center mb-1">
+                      <label className="form-label small text-muted mb-0">
+                        Employee State Insurance (ESI)
+                      </label>
+                      <Badge bg="info" className="fw-normal" style={{ fontSize: "9px" }}>
+                        Basic ≤ ₹15,000
+                      </Badge>
+                    </div>
+                    <Form.Control
+                      type="number"
+                      size="sm"
+                      className="fw-semibold"
+                      value={editStructureData.esi === 0 ? 0 : (editStructureData.esi ?? "")}
+                      onChange={(e) =>
+                        setEditStructureData({
+                          ...editStructureData,
+                          esi: e.target.value === "" ? "" : (parseFloat(e.target.value) || 0),
+                        })
+                      }
+                      placeholder="0.00"
+                    />
+                  </div>
+                ) : (
+                  <div className="mb-2">
+                    <div className="d-flex justify-content-between align-items-center mb-1">
+                      <label className="form-label small text-muted mb-0">
+                        Mediclaim
+                      </label>
+                      <Badge bg="primary" className="fw-normal" style={{ fontSize: "9px" }}>
+                        Basic &gt; ₹15,000
+                      </Badge>
+                    </div>
+                    <Form.Control
+                      type="number"
+                      size="sm"
+                      className="fw-semibold"
+                      value={editStructureData.mediclaim === 0 ? 0 : (editStructureData.mediclaim ?? "")}
+                      onChange={(e) =>
+                        setEditStructureData({
+                          ...editStructureData,
+                          mediclaim: e.target.value === "" ? "" : (parseFloat(e.target.value) || 0),
+                        })
+                      }
+                      placeholder="0.00"
+                    />
+                  </div>
+                )}
 
                 <div className="mb-2">
                   <label className="form-label small text-muted mb-1">

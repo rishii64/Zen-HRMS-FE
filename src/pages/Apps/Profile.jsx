@@ -17,11 +17,61 @@ import {
   FaCheckCircle,
   FaClock,
   FaCalculator,
-  FaCalendarAlt
+  FaCalendarAlt,
+  FaIdCard,
+  FaFileAlt,
+  FaPlus,
+  FaTrash,
+  FaExternalLinkAlt,
+  FaUpload,
+  FaFileInvoice,
+  FaIdBadge
 } from "react-icons/fa";
 import { getApiBaseUrl, getUploadUrl, UPLOADS_BASE } from "../../api/axios";
 
 const API = getApiBaseUrl();
+
+// --- Tenure & Age Calculation Utilities ---
+function calculateTenure(joiningDateStr, resignDateStr) {
+  if (!joiningDateStr || !resignDateStr) return "";
+  const start = new Date(joiningDateStr);
+  const end = new Date(resignDateStr);
+  if (isNaN(start.getTime()) || isNaN(end.getTime()) || end < start) return "";
+
+  let years = end.getFullYear() - start.getFullYear();
+  let months = end.getMonth() - start.getMonth();
+  let days = end.getDate() - start.getDate();
+
+  if (days < 0) {
+    months -= 1;
+    const prevMonthDays = new Date(end.getFullYear(), end.getMonth(), 0).getDate();
+    days += prevMonthDays;
+  }
+  if (months < 0) {
+    years -= 1;
+    months += 12;
+  }
+
+  const parts = [];
+  if (years > 0) parts.push(`${years} ${years === 1 ? "Year" : "Years"}`);
+  if (months > 0) parts.push(`${months} ${months === 1 ? "Month" : "Months"}`);
+  if (days > 0 || parts.length === 0) parts.push(`${days} ${days === 1 ? "Day" : "Days"}`);
+
+  return parts.join(" ");
+}
+
+function calculateAgeFromDob(dobStr) {
+  if (!dobStr) return "";
+  const birth = new Date(dobStr);
+  if (isNaN(birth.getTime())) return "";
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const m = today.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+    age--;
+  }
+  return age >= 0 ? String(age) : "0";
+}
 
 // --- Experience Calculation Utilities ---
 function parseExperienceToMonths(str) {
@@ -192,6 +242,7 @@ export default function Profile() {
     dob: "",
     gender: "Male",
     nationality: "",
+    personal_email: "",
     address_current: "",
     address_permanent: "",
     emergency_contact_name: "",
@@ -203,13 +254,20 @@ export default function Profile() {
     marital_status: "Single"
   });
 
+  const [previousExperienceList, setPreviousExperienceList] = useState([]);
   const [educationList, setEducationList] = useState([]);
   const [certificationList, setCertificationList] = useState([]);
 
   const [family, setFamily] = useState({
     father_name: "",
+    father_dob: "",
+    father_age: "",
     mother_name: "",
+    mother_dob: "",
+    mother_age: "",
     spouse_name: "",
+    spouse_dob: "",
+    spouse_age: "",
     contact: ""
   });
   const [childrenList, setChildrenList] = useState([]);
@@ -219,7 +277,9 @@ export default function Profile() {
     passport_issue: "",
     passport_expiry: "",
     visa_type: "N/A",
-    visa_expiry: ""
+    visa_expiry: "",
+    driving_license: "",
+    driving_license_expiry: ""
   });
 
   const [bankDetails, setBankDetails] = useState({
@@ -231,13 +291,29 @@ export default function Profile() {
     pan_number: ""
   });
 
-  // Files state
+  const [lastCompanyDetails, setLastCompanyDetails] = useState("");
+
+  // Files state (single files)
   const [files, setFiles] = useState({
     doc_resume: null,
     doc_id: null,
     doc_cert: null,
-    profile_photo: null
+    profile_photo: null,
+    doc_pan: null,
+    doc_aadhaar: null
   });
+
+  // Multiple files state
+  const [multiFiles, setMultiFiles] = useState({
+    doc_payslips: [],
+    doc_exp_cert: [],
+    doc_last_company: [],
+    uploaded_documents: []
+  });
+
+  const [existingPayslips, setExistingPayslips] = useState([]);
+  const [existingExpCerts, setExistingExpCerts] = useState([]);
+  const [existingLastCompanyDocs, setExistingLastCompanyDocs] = useState([]);
 
   // Load existing profile details
   useEffect(() => {
@@ -256,6 +332,7 @@ export default function Profile() {
             dob: emp.dob ? emp.dob.split("T")[0] : "",
             gender: emp.gender || "Male",
             nationality: emp.nationality || "",
+            personal_email: emp.personal_email || "",
             address_current: emp.address_current || "",
             address_permanent: emp.address_permanent || "",
             emergency_contact_name: emp.emergency_contact_name || "",
@@ -267,10 +344,46 @@ export default function Profile() {
             marital_status: emp.marital_status || "Single"
           });
 
-          // Parse education JSON
+          // Parse previous experience (structured JSON array or legacy string)
+          try {
+            if (emp.previous_experience && typeof emp.previous_experience === "string" && emp.previous_experience.trim().startsWith("[")) {
+              const parsed = JSON.parse(emp.previous_experience);
+              if (Array.isArray(parsed)) {
+                setPreviousExperienceList(parsed);
+              }
+            } else if (emp.previous_experience && emp.previous_experience.trim()) {
+              setPreviousExperienceList([
+                {
+                  company_name: "Previous Company",
+                  designation: emp.designation || "",
+                  joining_date: "",
+                  resign_date: "",
+                  total_experience: emp.previous_experience,
+                  reporting_manager: "",
+                  reporting_manager_designation: ""
+                }
+              ]);
+            } else {
+              setPreviousExperienceList([]);
+            }
+          } catch (_) {
+            setPreviousExperienceList([]);
+          }
+
+          // Parse education JSON (with college_university and joining_year)
           try {
             if (emp.education) {
-              setEducationList(typeof emp.education === "string" ? JSON.parse(emp.education) : emp.education);
+              const edu = typeof emp.education === "string" ? JSON.parse(emp.education) : emp.education;
+              if (Array.isArray(edu)) {
+                setEducationList(edu.map((e) => ({
+                  degree: e.degree || "",
+                  college_university: e.college_university || e.university || "",
+                  institution: e.institution || e.board || "",
+                  joining_year: e.joining_year || "",
+                  year: e.year || e.passing_year || "",
+                  gpa: e.gpa || e.percentage || ""
+                })));
+              }
             } else {
               setEducationList([]);
             }
@@ -289,14 +402,23 @@ export default function Profile() {
             setCertificationList([]);
           }
 
-          // Parse family JSON
+          // Parse family JSON (with father/mother DOB & age, spouse auto-calibration)
           try {
             if (emp.family_details) {
               const fam = typeof emp.family_details === "string" ? JSON.parse(emp.family_details) : emp.family_details;
+              const fDob = fam.father_dob ? fam.father_dob.split("T")[0] : "";
+              const mDob = fam.mother_dob ? fam.mother_dob.split("T")[0] : "";
+              const sDob = fam.spouse_dob ? fam.spouse_dob.split("T")[0] : "";
               setFamily({
                 father_name: fam.father_name || "",
+                father_dob: fDob,
+                father_age: fam.father_age || (fDob ? calculateAgeFromDob(fDob) : ""),
                 mother_name: fam.mother_name || "",
+                mother_dob: mDob,
+                mother_age: fam.mother_age || (mDob ? calculateAgeFromDob(mDob) : ""),
                 spouse_name: fam.spouse_name || "",
+                spouse_dob: sDob,
+                spouse_age: fam.spouse_age || (sDob ? calculateAgeFromDob(sDob) : ""),
                 contact: fam.contact || ""
               });
               if (fam.children) {
@@ -307,7 +429,7 @@ export default function Profile() {
             // keep defaults
           }
 
-          // Parse Passport & Visa JSON
+          // Parse Passport & Visa JSON (with driving license)
           try {
             if (emp.passport_visa) {
               const pv = typeof emp.passport_visa === "string" ? JSON.parse(emp.passport_visa) : emp.passport_visa;
@@ -316,8 +438,12 @@ export default function Profile() {
                 passport_issue: pv.passport_issue ? pv.passport_issue.split("T")[0] : "",
                 passport_expiry: pv.passport_expiry ? pv.passport_expiry.split("T")[0] : "",
                 visa_type: pv.visa_type || "N/A",
-                visa_expiry: pv.visa_expiry ? pv.visa_expiry.split("T")[0] : ""
+                visa_expiry: pv.visa_expiry ? pv.visa_expiry.split("T")[0] : "",
+                driving_license: pv.driving_license || emp.driving_license || "",
+                driving_license_expiry: pv.driving_license_expiry ? pv.driving_license_expiry.split("T")[0] : ""
               });
+            } else if (emp.driving_license) {
+              setPassportVisa((prev) => ({ ...prev, driving_license: emp.driving_license }));
             }
           } catch (e) {
             // keep defaults
@@ -333,12 +459,35 @@ export default function Profile() {
                 account_no: bd.account_no || "",
                 ifsc_code: bd.ifsc_code || "",
                 branch_name: bd.branch_name || "",
-                pan_number: bd.pan_number || bd.pan || emp.pan || emp.pan_number || ""
+                pan_number: bd.pan_number || bd.pan || emp.pan_no || emp.pan || ""
               });
+            } else if (emp.pan_no) {
+              setBankDetails((prev) => ({ ...prev, pan_number: emp.pan_no }));
             }
           } catch (e) {
             // keep defaults
           }
+
+          // Last company details and documents
+          setLastCompanyDetails(emp.last_company_details || "");
+          try {
+            if (emp.doc_payslips) {
+              const slips = typeof emp.doc_payslips === "string" ? JSON.parse(emp.doc_payslips) : emp.doc_payslips;
+              setExistingPayslips(Array.isArray(slips) ? slips : []);
+            }
+          } catch (_) {}
+          try {
+            if (emp.doc_exp_cert) {
+              const certs = typeof emp.doc_exp_cert === "string" ? JSON.parse(emp.doc_exp_cert) : emp.doc_exp_cert;
+              setExistingExpCerts(Array.isArray(certs) ? certs : []);
+            }
+          } catch (_) {}
+          try {
+            if (emp.doc_last_company) {
+              const docs = typeof emp.doc_last_company === "string" ? JSON.parse(emp.doc_last_company) : emp.doc_last_company;
+              setExistingLastCompanyDocs(Array.isArray(docs) ? docs : []);
+            }
+          } catch (_) {}
         } else {
           toast.error("Employee profile not found");
         }
@@ -354,15 +503,12 @@ export default function Profile() {
   const isResigned = useMemo(() => {
     if (!empData) return false;
     const statusLower = String(empData.status || "").toLowerCase().trim();
-    // If employee status is explicitly Resigned, Relieved, or Separated -> strictly Resigned
     if (statusLower === "resigned" || statusLower === "relieved" || statusLower === "separated") {
       return true;
     }
-    // If the employee's status is Active or account is active -> strictly Active
     if (statusLower === "active" || empData.is_active === true) {
       return false;
     }
-    // Deactivated account with resignation record
     return Boolean(empData.is_active === false && empData.is_resigned);
   }, [empData]);
 
@@ -375,17 +521,88 @@ export default function Profile() {
     return calculateCurrentExperience(empData?.joining_date, exitDate, isResigned);
   }, [empData?.joining_date, exitDate, isResigned]);
 
+  // Dynamically compute total previous experience string from previousExperienceList
+  const computedPreviousExperienceText = useMemo(() => {
+    if (previousExperienceList.length === 0) {
+      return personal.previous_experience || "0 Months";
+    }
+    let totalMonths = 0;
+    previousExperienceList.forEach((item) => {
+      if (item.joining_date && item.resign_date) {
+        const tenureStr = calculateTenure(item.joining_date, item.resign_date);
+        totalMonths += parseExperienceToMonths(tenureStr);
+      } else if (item.total_experience) {
+        totalMonths += parseExperienceToMonths(item.total_experience);
+      }
+    });
+    const years = Math.floor(totalMonths / 12);
+    const months = Math.round(totalMonths % 12);
+    const parts = [];
+    if (years > 0) parts.push(`${years} ${years === 1 ? "Year" : "Years"}`);
+    if (months > 0) parts.push(`${months} ${months === 1 ? "Month" : "Months"}`);
+    return parts.length ? parts.join(", ") : "0 Months";
+  }, [previousExperienceList, personal.previous_experience]);
+
   const totalExperience = useMemo(() => {
-    return calculateTotalCombinedExperience(personal.previous_experience, currentExperience);
-  }, [personal.previous_experience, currentExperience]);
+    return calculateTotalCombinedExperience(computedPreviousExperienceText, currentExperience);
+  }, [computedPreviousExperienceText, currentExperience]);
 
   const handlePersonalChange = (e) => {
     setPersonal({ ...personal, [e.target.name]: e.target.value });
   };
 
-  const handleFamilyChange = (e) => {
-    setFamily({ ...family, [e.target.name]: e.target.value });
+  // Previous work experience handlers
+  const handleAddPreviousExp = () => {
+    setPreviousExperienceList((prev) => [
+      ...prev,
+      {
+        company_name: "",
+        designation: "",
+        joining_date: "",
+        resign_date: "",
+        total_experience: "",
+        reporting_manager: "",
+        reporting_manager_designation: ""
+      }
+    ]);
   };
+
+  const handleRemovePreviousExp = (index) => {
+    setPreviousExperienceList((prev) => prev.filter((_, idx) => idx !== index));
+  };
+
+  const handlePreviousExpChange = (index, field, value) => {
+    setPreviousExperienceList((prev) => {
+      const updated = [...prev];
+      const item = { ...updated[index], [field]: value };
+      if (field === "joining_date" || field === "resign_date") {
+        const jDate = field === "joining_date" ? value : item.joining_date;
+        const rDate = field === "resign_date" ? value : item.resign_date;
+        if (jDate && rDate) {
+          item.total_experience = calculateTenure(jDate, rDate);
+        }
+      }
+      updated[index] = item;
+      return updated;
+    });
+  };
+
+  const handleFamilyChange = (e) => {
+    const { name, value } = e.target;
+    setFamily((prev) => {
+      const updated = { ...prev, [name]: value };
+      if (name === "father_dob") {
+        updated.father_age = calculateAgeFromDob(value);
+      } else if (name === "mother_dob") {
+        updated.mother_age = calculateAgeFromDob(value);
+      } else if (name === "spouse_dob") {
+        updated.spouse_age = calculateAgeFromDob(value);
+      }
+      return updated;
+    });
+  };
+
+  const isSingle = (personal.marital_status || "Single").toLowerCase() === "single";
 
   const handlePassportVisaChange = (e) => {
     setPassportVisa({ ...passportVisa, [e.target.name]: e.target.value });
@@ -399,7 +616,10 @@ export default function Profile() {
 
   // Education handlers
   const handleAddEducation = () => {
-    setEducationList([...educationList, { degree: "", institution: "", year: "", gpa: "" }]);
+    setEducationList([
+      ...educationList,
+      { degree: "", college_university: "", institution: "", joining_year: "", year: "", gpa: "" }
+    ]);
   };
 
   const handleRemoveEducation = (index) => {
@@ -452,6 +672,31 @@ export default function Profile() {
     setFiles({ ...files, [e.target.name]: e.target.files[0] });
   };
 
+  const handleMultiFileChange = (field, e) => {
+    const newFiles = Array.from(e.target.files || []);
+    setMultiFiles((prev) => ({
+      ...prev,
+      [field]: [...prev[field], ...newFiles]
+    }));
+  };
+
+  const handleRemoveMultiFile = (field, index) => {
+    setMultiFiles((prev) => ({
+      ...prev,
+      [field]: prev[field].filter((_, idx) => idx !== index)
+    }));
+  };
+
+  const handleRemoveExistingDoc = (type, index) => {
+    if (type === "payslips") {
+      setExistingPayslips((prev) => prev.filter((_, idx) => idx !== index));
+    } else if (type === "exp_certs") {
+      setExistingExpCerts((prev) => prev.filter((_, idx) => idx !== index));
+    } else if (type === "last_company") {
+      setExistingLastCompanyDocs((prev) => prev.filter((_, idx) => idx !== index));
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
@@ -460,14 +705,20 @@ export default function Profile() {
     formData.append("dob", personal.dob);
     formData.append("gender", personal.gender);
     formData.append("nationality", personal.nationality);
+    formData.append("personal_email", personal.personal_email || "");
     formData.append("address_current", personal.address_current);
     formData.append("address_permanent", personal.address_permanent);
     formData.append("emergency_contact_name", personal.emergency_contact_name);
     formData.append("emergency_contact_phone", personal.emergency_contact_phone);
     formData.append("blood_group", personal.blood_group);
     formData.append("religion", personal.religion);
-    formData.append("previous_experience", personal.previous_experience || "");
-    formData.append("total_experience", totalExperience || personal.previous_experience || "");
+
+    // Previous and total experience
+    const prevExpPayload = previousExperienceList.length > 0
+      ? JSON.stringify(previousExperienceList)
+      : (personal.previous_experience || "");
+    formData.append("previous_experience", prevExpPayload);
+    formData.append("total_experience", totalExperience || computedPreviousExperienceText || "");
     formData.append("marital_status", personal.marital_status);
     formData.append("education", JSON.stringify(educationList));
     formData.append("certifications", JSON.stringify(certificationList));
@@ -475,10 +726,39 @@ export default function Profile() {
     formData.append("passport_visa", JSON.stringify(passportVisa));
     formData.append("bank_details", JSON.stringify(bankDetails));
 
+    // Top-level identity and additional fields
+    if (passportVisa.driving_license) {
+      formData.append("driving_license", passportVisa.driving_license);
+    }
+    if (bankDetails.pan_number) {
+      formData.append("pan_no", bankDetails.pan_number);
+    }
+    formData.append("last_company_details", lastCompanyDetails || "");
+
+    // Single files
     if (files.doc_resume) formData.append("doc_resume", files.doc_resume);
     if (files.doc_id) formData.append("doc_id", files.doc_id);
     if (files.doc_cert) formData.append("doc_cert", files.doc_cert);
     if (files.profile_photo) formData.append("profile_photo", files.profile_photo);
+    if (files.doc_pan) formData.append("doc_pan", files.doc_pan);
+    if (files.doc_aadhaar) formData.append("doc_aadhaar", files.doc_aadhaar);
+
+    // Multiple file uploads
+    multiFiles.doc_payslips.forEach((f) => formData.append("doc_payslips", f));
+    multiFiles.doc_exp_cert.forEach((f) => formData.append("doc_exp_cert", f));
+    multiFiles.doc_last_company.forEach((f) => formData.append("doc_last_company", f));
+    multiFiles.uploaded_documents.forEach((f) => formData.append("uploaded_documents", f));
+
+    // Remaining existing files JSON
+    if (multiFiles.doc_payslips.length === 0) {
+      formData.append("doc_payslips", JSON.stringify(existingPayslips));
+    }
+    if (multiFiles.doc_exp_cert.length === 0) {
+      formData.append("doc_exp_cert", JSON.stringify(existingExpCerts));
+    }
+    if (multiFiles.doc_last_company.length === 0) {
+      formData.append("doc_last_company", JSON.stringify(existingLastCompanyDocs));
+    }
 
     try {
       const token = localStorage.getItem("token");
@@ -646,6 +926,43 @@ export default function Profile() {
               </div>
             </Col>
 
+            {/* Work Email (Official - Set by HR) */}
+            <Col md={6}>
+              <Form.Label className="small fw-bold text-muted d-flex align-items-center gap-1">
+                Work Email
+                <Badge bg="primary" style={{ fontSize: "10px", fontWeight: "normal" }}>Official / Login</Badge>
+              </Form.Label>
+              <Form.Control
+                type="email"
+                value={empData?.work_email || empData?.email || "—"}
+                disabled
+                readOnly
+                className="bg-light fw-semibold text-dark border-secondary-subtle"
+                style={{ cursor: "not-allowed" }}
+              />
+              <Form.Text className="text-muted" style={{ fontSize: "11px" }}>
+                Primary official email registered by HR
+              </Form.Text>
+            </Col>
+
+            {/* Personal Email */}
+            <Col md={6}>
+              <Form.Label className="small fw-bold d-flex align-items-center gap-1">
+                Personal Email
+                <Badge bg="secondary" style={{ fontSize: "10px", fontWeight: "normal" }}>Personal Contact</Badge>
+              </Form.Label>
+              <Form.Control
+                type="email"
+                name="personal_email"
+                placeholder="e.g. personal.name@gmail.com"
+                value={personal.personal_email || ""}
+                onChange={handlePersonalChange}
+              />
+              <Form.Text className="text-muted" style={{ fontSize: "11px" }}>
+                Used for personal correspondence and records
+              </Form.Text>
+            </Col>
+
             <Col md={6}>
               <Form.Label className="small fw-bold">Date of Birth</Form.Label>
               <Form.Control
@@ -777,54 +1094,148 @@ export default function Profile() {
             </div>
           </div>
 
-          <Row className="g-4">
-            {/* Left Box: Previous Experience (Editable Text Field) */}
-            <Col lg={6}>
-              <div className="p-3 rounded-4 border bg-white h-100 shadow-xs d-flex flex-column justify-content-between">
-                <div>
-                  <div className="d-flex justify-content-between align-items-center mb-2">
-                    <h6 className="fw-bold text-dark mb-0 d-flex align-items-center gap-2">
-                      <FaHistory className="text-secondary" /> Previous Experience
-                    </h6>
-                    <Badge bg="light" text="dark" className="border">
-                      Editable Text
-                    </Badge>
-                  </div>
-                  <p className="text-muted small mb-3">
-                    Total relevant professional experience acquired before joining this company.
-                  </p>
-
-                  <Form.Group className="mb-2">
-                    <Form.Label className="small fw-bold text-secondary">
-                      Previous Experience Details
-                    </Form.Label>
-                    <Form.Control
-                      type="text"
-                      name="previous_experience"
-                      placeholder="e.g. 2 Years 6 Months (or 3 Years)"
-                      value={personal.previous_experience}
-                      onChange={handlePersonalChange}
-                      className="border-primary-subtle py-2 fw-medium"
-                    />
-                    <Form.Text className="text-muted small">
-                      Enter format such as <code>2 Years 6 Months</code>, <code>3.5 Years</code>, or <code>0 / Fresher</code>.
-                    </Form.Text>
-                  </Form.Group>
-                </div>
-
-                <div className="mt-3 pt-2 border-top d-flex align-items-center justify-content-between">
-                  <span className="small text-muted">Recognized Tenure:</span>
-                  <Badge bg="info-subtle" className="text-info-emphasis border border-info-subtle px-2 py-1">
-                    {personal.previous_experience
-                      ? `${(parseExperienceToMonths(personal.previous_experience) / 12).toFixed(1)} Years (~${Math.round(parseExperienceToMonths(personal.previous_experience))} Months)`
-                      : "0 Months (Fresher)"}
-                  </Badge>
-                </div>
+          {/* Previous Work Experience Sub-section */}
+          <div className="p-3 mb-4 rounded-4 border bg-white shadow-xs">
+            <div className="d-flex flex-wrap justify-content-between align-items-center border-bottom pb-2 mb-3 gap-2">
+              <div>
+                <h6 className="fw-bold text-dark mb-0 d-flex align-items-center gap-2">
+                  <FaHistory className="text-secondary" /> Previous Work Experience
+                </h6>
+                <small className="text-muted">
+                  Add previous companies, designations, service duration, and reporting manager details.
+                </small>
               </div>
-            </Col>
+              <div className="d-flex align-items-center gap-2">
+                <Badge bg="info-subtle" className="text-info-emphasis border border-info-subtle px-2.5 py-1.5 fw-semibold">
+                  Recognized Previous Tenure: {computedPreviousExperienceText}
+                </Badge>
+                <Button
+                  variant="outline-primary"
+                  size="sm"
+                  onClick={handleAddPreviousExp}
+                  className="rounded-pill px-3 py-1 shadow-xs fw-semibold"
+                >
+                  <FaPlus className="me-1" size={11} /> Add Previous Company
+                </Button>
+              </div>
+            </div>
 
-            {/* Right Box: Current Experience (Auto Calculated) */}
-            <Col lg={6}>
+            {previousExperienceList.length === 0 ? (
+              <div className="text-center py-4 bg-light rounded-3 border border-dashed">
+                <div className="text-muted mb-2 fs-4">🏢</div>
+                <div className="fw-semibold text-secondary small">No previous company records added</div>
+                <p className="text-muted small mb-3" style={{ maxWidth: "480px", margin: "0 auto" }}>
+                  Record your prior employers, designation, joining & resign dates, and reporting manager designations.
+                </p>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={handleAddPreviousExp}
+                  className="rounded-pill px-3 shadow-xs"
+                >
+                  <FaPlus className="me-1" size={11} /> Add First Previous Company
+                </Button>
+              </div>
+            ) : (
+              <div className="d-flex flex-column gap-3">
+                {previousExperienceList.map((exp, idx) => (
+                  <div key={idx} className="p-3 rounded-3 border bg-light-subtle position-relative">
+                    <div className="d-flex justify-content-between align-items-center mb-2">
+                      <span className="badge bg-secondary-subtle text-secondary-emphasis border px-2 py-1 small fw-bold">
+                        Previous Company #{idx + 1}
+                      </span>
+                      <Button
+                        variant="outline-danger"
+                        size="sm"
+                        onClick={() => handleRemovePreviousExp(idx)}
+                        className="py-0 px-2 text-xs"
+                      >
+                        <FaTrash className="me-1" size={11} /> Remove
+                      </Button>
+                    </div>
+                    <Row className="g-2">
+                      <Col md={6}>
+                        <Form.Label className="small fw-semibold mb-1">Company Name</Form.Label>
+                        <Form.Control
+                          size="sm"
+                          type="text"
+                          placeholder="e.g. Infosys, TCS, Wipro"
+                          value={exp.company_name || ""}
+                          onChange={(e) => handlePreviousExpChange(idx, "company_name", e.target.value)}
+                        />
+                      </Col>
+                      <Col md={6}>
+                        <Form.Label className="small fw-semibold mb-1">Employee Designation</Form.Label>
+                        <Form.Control
+                          size="sm"
+                          type="text"
+                          placeholder="e.g. Software Engineer / Analyst"
+                          value={exp.designation || ""}
+                          onChange={(e) => handlePreviousExpChange(idx, "designation", e.target.value)}
+                        />
+                      </Col>
+                      <Col md={3}>
+                        <Form.Label className="small fw-semibold mb-1">Joining Date</Form.Label>
+                        <Form.Control
+                          size="sm"
+                          type="date"
+                          value={exp.joining_date || ""}
+                          onChange={(e) => handlePreviousExpChange(idx, "joining_date", e.target.value)}
+                        />
+                      </Col>
+                      <Col md={3}>
+                        <Form.Label className="small fw-semibold mb-1">Resign Date</Form.Label>
+                        <Form.Control
+                          size="sm"
+                          type="date"
+                          value={exp.resign_date || ""}
+                          onChange={(e) => handlePreviousExpChange(idx, "resign_date", e.target.value)}
+                        />
+                      </Col>
+                      <Col md={6}>
+                        <Form.Label className="small fw-semibold mb-1 d-flex justify-content-between">
+                          <span>Total Experience</span>
+                          <span className="text-muted" style={{ fontSize: "10.5px" }}>Auto-calculated upon dates</span>
+                        </Form.Label>
+                        <Form.Control
+                          size="sm"
+                          type="text"
+                          placeholder="Auto-calculated (e.g. 1 Year 6 Months)"
+                          value={exp.total_experience || ""}
+                          onChange={(e) => handlePreviousExpChange(idx, "total_experience", e.target.value)}
+                          className="bg-white fw-semibold text-primary"
+                        />
+                      </Col>
+                      <Col md={6}>
+                        <Form.Label className="small fw-semibold mb-1">Reporting Manager</Form.Label>
+                        <Form.Control
+                          size="sm"
+                          type="text"
+                          placeholder="Manager Name"
+                          value={exp.reporting_manager || ""}
+                          onChange={(e) => handlePreviousExpChange(idx, "reporting_manager", e.target.value)}
+                        />
+                      </Col>
+                      <Col md={6}>
+                        <Form.Label className="small fw-semibold mb-1">Reporting Manager Designation</Form.Label>
+                        <Form.Control
+                          size="sm"
+                          type="text"
+                          placeholder="e.g. Engineering Director / VP"
+                          value={exp.reporting_manager_designation || ""}
+                          onChange={(e) => handlePreviousExpChange(idx, "reporting_manager_designation", e.target.value)}
+                        />
+                      </Col>
+                    </Row>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <Row className="g-4">
+            {/* Current Experience Box */}
+            <Col lg={12}>
               <div
                 className="p-3 rounded-4 border h-100 shadow-xs d-flex flex-column justify-content-between"
                 style={{
@@ -909,7 +1320,7 @@ export default function Profile() {
                 <div className="d-flex flex-wrap align-items-center gap-2">
                   <span className="badge bg-white text-dark border px-3 py-2">
                     <span className="text-muted small me-1">Previous:</span>
-                    <strong>{personal.previous_experience || "0 Yrs"}</strong>
+                    <strong>{computedPreviousExperienceText || "0 Yrs"}</strong>
                   </span>
                   <span className="fw-bold text-muted">+</span>
                   <span className="badge bg-white text-dark border px-3 py-2">
@@ -943,10 +1354,12 @@ export default function Profile() {
             <Table responsive borderless className="align-middle">
               <thead>
                 <tr className="border-bottom text-muted small">
-                  <th>Degree / Certificate</th>
+                  <th>Degree / Course</th>
+                  <th>College / University</th>
                   <th>Institution / Board</th>
+                  <th>Joining Year</th>
                   <th>Passing Year</th>
-                  <th>GPA / Class</th>
+                  <th>GPA / %</th>
                   <th className="text-center">Action</th>
                 </tr>
               </thead>
@@ -967,7 +1380,16 @@ export default function Profile() {
                       <Form.Control
                         size="sm"
                         type="text"
-                        placeholder="e.g. University / Board"
+                        placeholder="e.g. Delhi University / IIT"
+                        value={edu.college_university || ""}
+                        onChange={(e) => handleEducationChange(idx, "college_university", e.target.value)}
+                      />
+                    </td>
+                    <td>
+                      <Form.Control
+                        size="sm"
+                        type="text"
+                        placeholder="e.g. School / Board"
                         value={edu.institution || ""}
                         onChange={(e) => handleEducationChange(idx, "institution", e.target.value)}
                         required
@@ -977,7 +1399,16 @@ export default function Profile() {
                       <Form.Control
                         size="sm"
                         type="number"
-                        placeholder="e.g. 2020"
+                        placeholder="e.g. 2018"
+                        value={edu.joining_year || ""}
+                        onChange={(e) => handleEducationChange(idx, "joining_year", e.target.value)}
+                      />
+                    </td>
+                    <td>
+                      <Form.Control
+                        size="sm"
+                        type="number"
+                        placeholder="e.g. 2022"
                         value={edu.year || ""}
                         onChange={(e) => handleEducationChange(idx, "year", e.target.value)}
                         required
@@ -987,7 +1418,7 @@ export default function Profile() {
                       <Form.Control
                         size="sm"
                         type="text"
-                        placeholder="e.g. 8.5 / 10 or First Class"
+                        placeholder="e.g. 8.5 or 85%"
                         value={edu.gpa || ""}
                         onChange={(e) => handleEducationChange(idx, "gpa", e.target.value)}
                         required
@@ -1085,40 +1516,134 @@ export default function Profile() {
             <FaUsers className="text-primary" /> Family Details
           </Card.Title>
           <Row className="g-3 mb-4">
+            {/* Father Details */}
             <Col md={6}>
               <Form.Label className="small fw-bold">Father's Name</Form.Label>
               <Form.Control
                 type="text"
                 name="father_name"
+                placeholder="Father's full name"
                 value={family.father_name}
                 onChange={handleFamilyChange}
                 required
               />
             </Col>
+            <Col md={3}>
+              <Form.Label className="small fw-bold">Father's D.O.B</Form.Label>
+              <Form.Control
+                type="date"
+                name="father_dob"
+                value={family.father_dob || ""}
+                onChange={handleFamilyChange}
+              />
+            </Col>
+            <Col md={3}>
+              <Form.Label className="small fw-bold d-flex justify-content-between">
+                <span>Father's Age</span>
+                <span className="text-muted" style={{ fontSize: "10.5px" }}>Auto-calculated</span>
+              </Form.Label>
+              <Form.Control
+                type="number"
+                name="father_age"
+                placeholder="Age in yrs"
+                value={family.father_age || ""}
+                onChange={handleFamilyChange}
+                className="bg-light fw-semibold"
+              />
+            </Col>
+
+            {/* Mother Details */}
             <Col md={6}>
               <Form.Label className="small fw-bold">Mother's Name</Form.Label>
               <Form.Control
                 type="text"
                 name="mother_name"
+                placeholder="Mother's full name"
                 value={family.mother_name}
                 onChange={handleFamilyChange}
                 required
               />
             </Col>
-            <Col md={6}>
-              <Form.Label className="small fw-bold">Spouse's Name (Optional)</Form.Label>
+            <Col md={3}>
+              <Form.Label className="small fw-bold">Mother's D.O.B</Form.Label>
               <Form.Control
-                type="text"
-                name="spouse_name"
-                value={family.spouse_name}
+                type="date"
+                name="mother_dob"
+                value={family.mother_dob || ""}
                 onChange={handleFamilyChange}
               />
             </Col>
+            <Col md={3}>
+              <Form.Label className="small fw-bold d-flex justify-content-between">
+                <span>Mother's Age</span>
+                <span className="text-muted" style={{ fontSize: "10.5px" }}>Auto-calculated</span>
+              </Form.Label>
+              <Form.Control
+                type="number"
+                name="mother_age"
+                placeholder="Age in yrs"
+                value={family.mother_age || ""}
+                onChange={handleFamilyChange}
+                className="bg-light fw-semibold"
+              />
+            </Col>
+
+            {/* Spouse Details (Auto-calibrated based on Marital Status) */}
             <Col md={6}>
+              <Form.Label className="small fw-bold d-flex align-items-center gap-1">
+                Spouse's Name
+                {isSingle ? (
+                  <Badge bg="secondary" style={{ fontSize: "10px" }}>🔒 Disabled (Single)</Badge>
+                ) : (
+                  <Badge bg="success-subtle" className="text-success border border-success-subtle" style={{ fontSize: "10px" }}>Enabled</Badge>
+                )}
+              </Form.Label>
+              <Form.Control
+                type="text"
+                name="spouse_name"
+                placeholder={isSingle ? "Disabled (Status: Single)" : "Spouse's full name"}
+                value={isSingle ? "" : (family.spouse_name || "")}
+                onChange={handleFamilyChange}
+                disabled={isSingle}
+                className={isSingle ? "bg-light text-muted" : ""}
+              />
+              {isSingle && (
+                <Form.Text className="text-muted" style={{ fontSize: "11px" }}>
+                  Disabled because Marital Status is Single. Change Marital Status in Personal Details above to enable.
+                </Form.Text>
+              )}
+            </Col>
+            <Col md={3}>
+              <Form.Label className="small fw-bold">Spouse's D.O.B</Form.Label>
+              <Form.Control
+                type="date"
+                name="spouse_dob"
+                value={isSingle ? "" : (family.spouse_dob || "")}
+                onChange={handleFamilyChange}
+                disabled={isSingle}
+                className={isSingle ? "bg-light text-muted" : ""}
+              />
+            </Col>
+            <Col md={3}>
+              <Form.Label className="small fw-bold">Spouse's Age</Form.Label>
+              <Form.Control
+                type="number"
+                name="spouse_age"
+                placeholder="Age in yrs"
+                value={isSingle ? "" : (family.spouse_age || "")}
+                onChange={handleFamilyChange}
+                disabled={isSingle}
+                className="bg-light fw-semibold"
+              />
+            </Col>
+
+            {/* Emergency Contact */}
+            <Col md={12}>
               <Form.Label className="small fw-bold">Family Emergency Contact Phone</Form.Label>
               <Form.Control
                 type="text"
                 name="contact"
+                placeholder="Primary family contact number"
                 value={family.contact}
                 onChange={handleFamilyChange}
                 required
@@ -1191,10 +1716,10 @@ export default function Profile() {
           </div>
         </Card>
 
-        {/* Section 6: Passport & Visa Details */}
+        {/* Section 6: Passport, Visa & Driving License Details */}
         <Card className="p-4 shadow-sm border-0 mb-4 rounded-4">
           <Card.Title className="fw-bold text-primary border-bottom pb-2 mb-3 d-flex align-items-center gap-2">
-            <FaPassport className="text-primary" /> Passport & Visa Details
+            <FaPassport className="text-primary" /> Passport, Visa & Driving License Details
           </Card.Title>
           <Row className="g-3">
             <Col md={4}>
@@ -1246,6 +1771,33 @@ export default function Profile() {
                 type="date"
                 name="visa_expiry"
                 value={passportVisa.visa_expiry}
+                onChange={handlePassportVisaChange}
+              />
+            </Col>
+
+            {/* Driving License Field */}
+            <Col md={6}>
+              <Form.Label className="small fw-bold d-flex align-items-center gap-1">
+                Driving License Number
+                <Badge bg="light" text="dark" className="border" style={{ fontSize: "10px" }}>DL Proof</Badge>
+              </Form.Label>
+              <Form.Control
+                type="text"
+                name="driving_license"
+                placeholder="e.g. DL-0420110123456"
+                value={passportVisa.driving_license || ""}
+                onChange={handlePassportVisaChange}
+              />
+              <Form.Text className="text-muted" style={{ fontSize: "11px" }}>
+                Valid Government issued motor driving license
+              </Form.Text>
+            </Col>
+            <Col md={6}>
+              <Form.Label className="small fw-bold">Driving License Expiry Date</Form.Label>
+              <Form.Control
+                type="date"
+                name="driving_license_expiry"
+                value={passportVisa.driving_license_expiry || ""}
                 onChange={handlePassportVisaChange}
               />
             </Col>
@@ -1338,6 +1890,8 @@ export default function Profile() {
                       return <Badge bg="success">Verified ✅</Badge>;
                     case "Pending Verification":
                       return <Badge bg="warning" text="dark">Pending HR Verification ⏳</Badge>;
+                    case "Pending Upload":
+                      return <Badge bg="danger">Pending Upload ⚠️</Badge>;
                     case "Rejected":
                       return <Badge bg="danger">Rejected ❌</Badge>;
                     default:
@@ -1347,11 +1901,349 @@ export default function Profile() {
               </div>
             )}
           </Card.Title>
+
+          {/* HR Request Banner */}
+          {empData?.document_status === "Pending Upload" && (
+            <div className="alert alert-warning border-warning d-flex align-items-center gap-3 p-3 rounded-4 mb-4 shadow-xs">
+              <div className="fs-3">⚠️</div>
+              <div>
+                <strong className="d-block text-dark">Action Required: Verification Documents Requested by HR</strong>
+                <span className="small text-muted">
+                  HR has requested you to upload your PAN, Aadhaar, previous work experience documents, last 3 months salary slips, and educational certificates below. Once uploaded and submitted, your documents will be submitted to HR for approval.
+                </span>
+              </div>
+            </div>
+          )}
+
           <Row className="g-4">
+            {/* Last Company Details & Documents */}
+            <Col md={12}>
+              <div className="p-3 border rounded-3 shadow-xs bg-light">
+                <div className="d-flex justify-content-between align-items-center mb-2">
+                  <Form.Label className="small fw-bold mb-0 text-dark d-flex align-items-center gap-1">
+                    🏢 Last Company Details & Separation Documents
+                    <Badge bg="primary" style={{ fontSize: "10px" }}>Previous Employer</Badge>
+                  </Form.Label>
+                  <Badge bg="light" text="dark" className="border small">
+                    Multiple Uploads Allowed
+                  </Badge>
+                </div>
+
+                <Form.Group className="mb-2">
+                  <Form.Label className="small text-muted mb-1">Last Company Summary / Details</Form.Label>
+                  <Form.Control
+                    as="textarea"
+                    rows={2}
+                    placeholder="Enter previous employer name, designation held, last working date, HR contact or relieving remarks"
+                    value={lastCompanyDetails}
+                    onChange={(e) => setLastCompanyDetails(e.target.value)}
+                    className="mb-2"
+                  />
+                </Form.Group>
+
+                <Form.Label className="small text-muted mb-1">
+                  Upload Relieving Letter, Service Certificate, or Exit Documents (PDF, Images, Docs)
+                </Form.Label>
+                <Form.Control
+                  type="file"
+                  multiple
+                  accept=".pdf,.doc,.docx,image/*"
+                  onChange={(e) => handleMultiFileChange("doc_last_company", e)}
+                  className="mb-2"
+                />
+
+                {/* Newly selected files */}
+                {multiFiles.doc_last_company.length > 0 && (
+                  <div className="mb-2 p-2 bg-white rounded border">
+                    <small className="fw-bold text-primary d-block mb-1">Newly Selected Files ({multiFiles.doc_last_company.length}):</small>
+                    <div className="d-flex flex-wrap gap-1">
+                      {multiFiles.doc_last_company.map((f, idx) => (
+                        <Badge key={idx} bg="light" text="dark" className="border d-flex align-items-center gap-1 p-1 px-2">
+                          <span className="text-truncate" style={{ maxWidth: "160px" }}>{f.name}</span>
+                          <span className="text-muted" style={{ fontSize: "9px" }}>({Math.round(f.size / 1024)} KB)</span>
+                          <span
+                            onClick={() => handleRemoveMultiFile("doc_last_company", idx)}
+                            style={{ cursor: "pointer", color: "red", fontWeight: "bold" }}
+                          >
+                            &times;
+                          </span>
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Existing uploaded files */}
+                {existingLastCompanyDocs.length > 0 && (
+                  <div>
+                    <small className="fw-semibold text-muted d-block mb-1">Currently Uploaded Documents:</small>
+                    <div className="d-flex flex-wrap gap-2">
+                      {existingLastCompanyDocs.map((doc, idx) => {
+                        const filename = doc.filename || doc;
+                        const originalname = doc.originalname || `Last Company Doc #${idx + 1}`;
+                        return (
+                          <div key={idx} className="btn-group btn-group-sm">
+                            <a
+                              href={`${UPLOADS_BASE}/${filename}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="btn btn-outline-secondary py-1 px-2 fw-semibold"
+                              style={{ fontSize: "11px" }}
+                            >
+                              🏢 {originalname} <FaExternalLinkAlt size={10} className="ms-1" />
+                            </a>
+                            <button
+                              type="button"
+                              className="btn btn-outline-danger py-1 px-2"
+                              title="Delete file"
+                              onClick={() => handleRemoveExistingDoc("last_company", idx)}
+                            >
+                              &times;
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </Col>
+
+            {/* Last 3 Months Salary Slips */}
+            <Col md={6}>
+              <div className="p-3 border rounded-3 shadow-xs bg-light h-100 d-flex flex-column justify-content-between">
+                <div>
+                  <div className="d-flex justify-content-between align-items-center mb-1">
+                    <Form.Label className="small fw-bold text-dark mb-0 d-flex align-items-center gap-1">
+                      💵 Last 3 Months Salary Slips
+                    </Form.Label>
+                    <Badge bg="success-subtle" className="text-success border border-success-subtle" style={{ fontSize: "10px" }}>
+                      Multiple Files
+                    </Badge>
+                  </div>
+                  <small className="text-muted d-block mb-2">
+                    Upload consecutive payslips from your most recent employer (PDF or images).
+                  </small>
+                  <Form.Control
+                    type="file"
+                    multiple
+                    accept=".pdf,image/*"
+                    onChange={(e) => handleMultiFileChange("doc_payslips", e)}
+                    className="mb-2"
+                  />
+
+                  {/* Newly selected payslips */}
+                  {multiFiles.doc_payslips.length > 0 && (
+                    <div className="mb-2 p-2 bg-white rounded border">
+                      <small className="fw-bold text-success d-block mb-1">Selected Slips ({multiFiles.doc_payslips.length}):</small>
+                      <div className="d-flex flex-wrap gap-1">
+                        {multiFiles.doc_payslips.map((f, idx) => (
+                          <Badge key={idx} bg="light" text="dark" className="border d-flex align-items-center gap-1 p-1 px-2">
+                            <span className="text-truncate" style={{ maxWidth: "140px" }}>{f.name}</span>
+                            <span className="text-muted" style={{ fontSize: "9px" }}>({Math.round(f.size / 1024)} KB)</span>
+                            <span
+                              onClick={() => handleRemoveMultiFile("doc_payslips", idx)}
+                              style={{ cursor: "pointer", color: "red", fontWeight: "bold" }}
+                            >
+                              &times;
+                            </span>
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Existing salary slips */}
+                  {existingPayslips.length > 0 && (
+                    <div>
+                      <small className="fw-semibold text-muted d-block mb-1">Existing Salary Slips ({existingPayslips.length}):</small>
+                      <div className="d-flex flex-wrap gap-1">
+                        {existingPayslips.map((s, idx) => {
+                          const filename = s.filename || s;
+                          const name = s.originalname || `Salary Slip #${idx + 1}`;
+                          return (
+                            <div key={idx} className="btn-group btn-group-sm mb-1">
+                              <a
+                                href={`${UPLOADS_BASE}/${filename}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="btn btn-outline-success py-1 px-2 fw-semibold"
+                                style={{ fontSize: "11px" }}
+                              >
+                                💵 {name} <FaExternalLinkAlt size={9} className="ms-1" />
+                              </a>
+                              <button
+                                type="button"
+                                className="btn btn-outline-danger py-1 px-2"
+                                onClick={() => handleRemoveExistingDoc("payslips", idx)}
+                              >
+                                &times;
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </Col>
+
+            {/* Experience Certificate */}
+            <Col md={6}>
+              <div className="p-3 border rounded-3 shadow-xs bg-light h-100 d-flex flex-column justify-content-between">
+                <div>
+                  <div className="d-flex justify-content-between align-items-center mb-1">
+                    <Form.Label className="small fw-bold text-dark mb-0 d-flex align-items-center gap-1">
+                      📜 Experience Certificate(s)
+                    </Form.Label>
+                    <Badge bg="info-subtle" className="text-info border border-info-subtle" style={{ fontSize: "10px" }}>
+                      Multiple Files
+                    </Badge>
+                  </div>
+                  <small className="text-muted d-block mb-2">
+                    Upload official experience letters, service letters, or certificates from prior companies.
+                  </small>
+                  <Form.Control
+                    type="file"
+                    multiple
+                    accept=".pdf,image/*"
+                    onChange={(e) => handleMultiFileChange("doc_exp_cert", e)}
+                    className="mb-2"
+                  />
+
+                  {/* Newly selected experience certs */}
+                  {multiFiles.doc_exp_cert.length > 0 && (
+                    <div className="mb-2 p-2 bg-white rounded border">
+                      <small className="fw-bold text-info d-block mb-1">Selected Certificates ({multiFiles.doc_exp_cert.length}):</small>
+                      <div className="d-flex flex-wrap gap-1">
+                        {multiFiles.doc_exp_cert.map((f, idx) => (
+                          <Badge key={idx} bg="light" text="dark" className="border d-flex align-items-center gap-1 p-1 px-2">
+                            <span className="text-truncate" style={{ maxWidth: "140px" }}>{f.name}</span>
+                            <span className="text-muted" style={{ fontSize: "9px" }}>({Math.round(f.size / 1024)} KB)</span>
+                            <span
+                              onClick={() => handleRemoveMultiFile("doc_exp_cert", idx)}
+                              style={{ cursor: "pointer", color: "red", fontWeight: "bold" }}
+                            >
+                              &times;
+                            </span>
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Existing experience certs */}
+                  {existingExpCerts.length > 0 && (
+                    <div>
+                      <small className="fw-semibold text-muted d-block mb-1">Existing Certificates ({existingExpCerts.length}):</small>
+                      <div className="d-flex flex-wrap gap-1">
+                        {existingExpCerts.map((c, idx) => {
+                          const filename = c.filename || c;
+                          const name = c.originalname || `Exp. Cert #${idx + 1}`;
+                          return (
+                            <div key={idx} className="btn-group btn-group-sm mb-1">
+                              <a
+                                href={`${UPLOADS_BASE}/${filename}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="btn btn-outline-info py-1 px-2 fw-semibold"
+                                style={{ fontSize: "11px" }}
+                              >
+                                📜 {name} <FaExternalLinkAlt size={9} className="ms-1" />
+                              </a>
+                              <button
+                                type="button"
+                                className="btn btn-outline-danger py-1 px-2"
+                                onClick={() => handleRemoveExistingDoc("exp_certs", idx)}
+                              >
+                                &times;
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </Col>
+
+            {/* PAN Card Upload */}
+            <Col md={6}>
+              <div className="p-3 border rounded-3 shadow-xs bg-light">
+                <div className="d-flex justify-content-between align-items-center mb-1">
+                  <Form.Label className="small fw-bold d-block text-dark mb-0">
+                    💳 PAN Card Proof (PDF / Image)
+                  </Form.Label>
+                  {(empData?.pan_no || bankDetails.pan_number) && (
+                    <Badge bg="light" text="dark" className="border" style={{ fontSize: "10px" }}>
+                      PAN: {empData?.pan_no || bankDetails.pan_number}
+                    </Badge>
+                  )}
+                </div>
+                <Form.Control
+                  type="file"
+                  name="doc_pan"
+                  accept=".pdf,image/*"
+                  onChange={handleFileChange}
+                  className="mb-2"
+                />
+                {empData?.doc_pan && (
+                  <Badge bg="success" className="p-2 text-decoration-none d-inline-block mt-1">
+                    <a
+                      href={`${UPLOADS_BASE}/${empData.doc_pan}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-white text-decoration-none"
+                    >
+                      💳 Download/View PAN Card Proof <FaExternalLinkAlt size={10} className="ms-1" />
+                    </a>
+                  </Badge>
+                )}
+              </div>
+            </Col>
+
+            {/* Aadhaar Card Upload */}
+            <Col md={6}>
+              <div className="p-3 border rounded-3 shadow-xs bg-light">
+                <div className="d-flex justify-content-between align-items-center mb-1">
+                  <Form.Label className="small fw-bold d-block text-dark mb-0">
+                    🪪 Aadhaar Card Proof (PDF / Image)
+                  </Form.Label>
+                  {empData?.aadhaar_no && (
+                    <Badge bg="light" text="dark" className="border" style={{ fontSize: "10px" }}>
+                      Aadhaar: {empData.aadhaar_no}
+                    </Badge>
+                  )}
+                </div>
+                <Form.Control
+                  type="file"
+                  name="doc_aadhaar"
+                  accept=".pdf,image/*"
+                  onChange={handleFileChange}
+                  className="mb-2"
+                />
+                {empData?.doc_aadhaar && (
+                  <Badge bg="success" className="p-2 text-decoration-none d-inline-block mt-1">
+                    <a
+                      href={`${UPLOADS_BASE}/${empData.doc_aadhaar}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-white text-decoration-none"
+                    >
+                      🪪 Download/View Aadhaar Card Proof <FaExternalLinkAlt size={10} className="ms-1" />
+                    </a>
+                  </Badge>
+                )}
+              </div>
+            </Col>
+
+            {/* CV / Resume */}
             <Col md={6}>
               <div className="p-3 border rounded-3 shadow-xs bg-light">
                 <Form.Label className="small fw-bold d-block text-dark">
-                  CV / Resume (PDF / Doc)
+                  📄 CV / Resume (PDF / Doc)
                 </Form.Label>
                 <Form.Control
                   type="file"
@@ -1368,17 +2260,18 @@ export default function Profile() {
                       rel="noopener noreferrer"
                       className="text-white text-decoration-none"
                     >
-                      📄 Download/View Current CV
+                      📄 Download/View Current CV <FaExternalLinkAlt size={10} className="ms-1" />
                     </a>
                   </Badge>
                 )}
               </div>
             </Col>
 
+            {/* National ID / Passport */}
             <Col md={6}>
               <div className="p-3 border rounded-3 shadow-xs bg-light">
                 <Form.Label className="small fw-bold d-block text-dark">
-                  National ID Card / Passport (PDF / Image)
+                  🛂 National ID Card / Passport (PDF / Image)
                 </Form.Label>
                 <Form.Control
                   type="file"
@@ -1395,17 +2288,18 @@ export default function Profile() {
                       rel="noopener noreferrer"
                       className="text-white text-decoration-none"
                     >
-                      📄 Download/View Current ID
+                      🛂 Download/View Current ID <FaExternalLinkAlt size={10} className="ms-1" />
                     </a>
                   </Badge>
                 )}
               </div>
             </Col>
 
-            <Col md={6}>
+            {/* Educational Certificates */}
+            <Col md={12}>
               <div className="p-3 border rounded-3 shadow-xs bg-light">
                 <Form.Label className="small fw-bold d-block text-dark">
-                  All Educational Certificates (ZIP / PDF)
+                  🎓 All Educational Certificates (ZIP / PDF)
                 </Form.Label>
                 <Form.Control
                   type="file"
@@ -1422,7 +2316,7 @@ export default function Profile() {
                       rel="noopener noreferrer"
                       className="text-white text-decoration-none"
                     >
-                      📄 Download/View Certificates
+                      🎓 Download/View Certificates <FaExternalLinkAlt size={10} className="ms-1" />
                     </a>
                   </Badge>
                 )}

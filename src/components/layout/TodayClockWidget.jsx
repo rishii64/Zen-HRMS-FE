@@ -1,16 +1,14 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, Button, Badge, Spinner } from "react-bootstrap";
 import { LuFingerprint, LuClock } from "react-icons/lu";
 import toast from "react-hot-toast";
 import api from "../../api";
-import { handleSessionExpired } from "../../utils/auth";
 
 export default function TodayClockWidget({ onStatusChange }) {
   const [todayRecord, setTodayRecord] = useState(null);
   const [schedule, setSchedule] = useState(null);
   const [checking, setChecking] = useState(false);
   const [now, setNow] = useState(new Date());
-  const autoClockOutTriggered = useRef(false);
 
   // Ticking clock for time remaining calculation
   useEffect(() => {
@@ -126,47 +124,6 @@ export default function TodayClockWidget({ onStatusChange }) {
     };
   };
 
-  // Auto clock-out & logout when 14-hour session threshold has completed and shift has ended
-  useEffect(() => {
-    if (
-      !todayRecord ||
-      !todayRecord.check_in ||
-      todayRecord.check_in === "—" ||
-      todayRecord.status === "Absent" ||
-      (todayRecord.check_out && todayRecord.check_out !== "—") ||
-      autoClockOutTriggered.current
-    ) {
-      return;
-    }
-
-    try {
-      const recordDate = todayRecord.date || new Date().toISOString().split("T")[0];
-      const checkInTime = todayRecord.check_in.substring(0, 8);
-      const checkInDateTime = new Date(`${recordDate}T${checkInTime}`);
-
-      const shiftEnd = todayRecord.shift_end || schedule?.end_time || "19:00";
-      const [endH, endM] = shiftEnd.split(":").map((v) => parseInt(v, 10) || 0);
-      const shiftEndDateTime = new Date(`${recordDate}T00:00:00`);
-      shiftEndDateTime.setHours(endH, endM, 0, 0);
-
-      const currentTime = new Date();
-      const elapsedHours = (currentTime - checkInDateTime) / (1000 * 60 * 60);
-
-      // Check if shift has ended and >= 14 hours have passed since check in (or past date)
-      const shiftEnded = currentTime >= shiftEndDateTime;
-      const isPast14Hours = elapsedHours >= 14 || recordDate < currentTime.toISOString().split("T")[0];
-
-      if (shiftEnded && isPast14Hours) {
-        autoClockOutTriggered.current = true;
-        handleSessionExpired(
-          "Your 14-hour session has ended. You have been automatically clocked out and logged out from the portal."
-        );
-      }
-    } catch (e) {
-      console.error("Auto clock-out verification error:", e);
-    }
-  }, [now, todayRecord, schedule]);
-
   const handleCheckIn = async () => {
     setChecking(true);
     try {
@@ -243,7 +200,7 @@ export default function TodayClockWidget({ onStatusChange }) {
             <div className="d-flex flex-column gap-1.5 mt-1">
               {todayRecord?.check_in && todayRecord.check_in !== "—" && (
                 <div className="d-flex align-items-center" style={{ borderLeft: "3px solid #10b981", paddingLeft: "8px" }}>
-                  <span className="text-dark font-semibold me-1 text-[11px]">Check-in :</span>
+                  <span className="text-dark font-semibold me-1 text-[11px]">Checked-in :</span>
                   <strong style={{ fontSize: "11px", color: "#059669", fontWeight: "700" }}>
                     {formatCheckInTime(todayRecord.check_in)}
                   </strong>

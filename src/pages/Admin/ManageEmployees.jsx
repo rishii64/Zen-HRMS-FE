@@ -79,6 +79,11 @@ const EMPTY_FORM = {
   dept: "",
   designation: "",
   email: "",
+  work_email: "",
+  personal_email: "",
+  pan_no: "",
+  aadhaar_no: "",
+  request_documents: true,
   job_role: "employee",
   status: "Active",
   current_salary: "",
@@ -110,7 +115,6 @@ const SalaryStructureModal = ({
 }) => {
   const [formData, setFormData] = useState({
     basic: 0,
-    da: 0,
     hra: 0,
     allowance: 0,
     conveyance: 0,
@@ -119,6 +123,7 @@ const SalaryStructureModal = ({
     income_tax: 0,
     pf: 0,
     esi: 0,
+    mediclaim: 0,
     tds: 0,
     lop: 0,
   });
@@ -150,9 +155,11 @@ const SalaryStructureModal = ({
           if (res.success && res.salary) {
             const e = res.salary.earnings || {};
             const d = res.salary.deductions || {};
+            const basicVal = parseFloat(e.basic) || 0;
+            const esiVal = parseFloat(d.esi) || 0;
+            const mediVal = parseFloat(d.mediclaim) || 0;
             const loaded = {
-              basic: parseFloat(e.basic) || 0,
-              da: parseFloat(e.da) || 0,
+              basic: basicVal,
               hra: parseFloat(e.hra) || 0,
               allowance: parseFloat(e.allowance) || 0,
               conveyance: parseFloat(e.conveyance) || 0,
@@ -160,7 +167,8 @@ const SalaryStructureModal = ({
               professional_tax: parseFloat(d.professional_tax) || 0,
               income_tax: parseFloat(d.income_tax) || 0,
               pf: parseFloat(d.pf) || 0,
-              esi: parseFloat(d.esi) || 0,
+              esi: basicVal <= 15000 ? (esiVal || mediVal) : 0,
+              mediclaim: basicVal > 15000 ? (mediVal || esiVal) : 0,
               tds: parseFloat(d.tds) || 0,
               lop: parseFloat(d.lop) || 0,
             };
@@ -180,29 +188,43 @@ const SalaryStructureModal = ({
 
   const handleChange = (field, val) => {
     const num = val === "" ? "" : Math.max(0, parseFloat(val) || 0);
-    setFormData((prev) => ({ ...prev, [field]: num }));
+    setFormData((prev) => {
+      const next = { ...prev, [field]: num };
+      if (field === "basic") {
+        const newBasic = parseFloat(num) || 0;
+        if (newBasic > 15000 && prev.esi > 0 && !prev.mediclaim) {
+          next.mediclaim = prev.esi;
+          next.esi = 0;
+        } else if (newBasic <= 15000 && prev.mediclaim > 0 && !prev.esi) {
+          next.esi = prev.mediclaim;
+          next.mediclaim = 0;
+        }
+      }
+      return next;
+    });
   };
 
   // Calculations
   const numBasic = parseFloat(formData.basic) || 0;
-  const numDa = parseFloat(formData.da) || 0;
   const numHra = parseFloat(formData.hra) || 0;
   const numAllowance = parseFloat(formData.allowance) || 0;
   const numConveyance = parseFloat(formData.conveyance) || 0;
   const numMedical = parseFloat(formData.medical) || 0;
 
   const grossSalary =
-    numBasic + numDa + numHra + numAllowance + numConveyance + numMedical;
+    numBasic + numHra + numAllowance + numConveyance + numMedical;
 
   const numPT = parseFloat(formData.professional_tax) || 0;
   const numIT = parseFloat(formData.income_tax) || 0;
   const numPf = parseFloat(formData.pf) || 0;
-  const numEsi = parseFloat(formData.esi) || 0;
+  const isEsiEligible = numBasic <= 15000;
+  const numEsi = isEsiEligible ? (parseFloat(formData.esi) || 0) : 0;
+  const numMediclaim = !isEsiEligible ? (parseFloat(formData.mediclaim) || 0) : 0;
   const numTds = parseFloat(formData.tds) || 0;
   const numLop = parseFloat(formData.lop) || 0;
 
   const totalDeductions =
-    numPT + numIT + numPf + numEsi + numTds + numLop;
+    numPT + numIT + numPf + (isEsiEligible ? numEsi : numMediclaim) + numTds + numLop;
   const netSalary = Math.max(0, grossSalary - totalDeductions);
 
   // Quick auto-distribution formula for HR
@@ -210,21 +232,21 @@ const SalaryStructureModal = ({
     const gross = parseFloat(amount);
     if (isNaN(gross) || gross <= 0) return;
 
-    const basic = Math.round(gross * 0.40);
-    const da = Math.round(gross * 0.10);
+    const basic = Math.round(gross * 0.45);
     const hra = Math.round(gross * 0.40);
     const conveyance = Math.round(gross * 0.05) || 1600;
     const medical = Math.round(gross * 0.05) || 1250;
-    const assigned = basic + da + hra + conveyance + medical;
+    const assigned = basic + hra + conveyance + medical;
     const allowance = Math.max(0, gross - assigned);
 
     const pf = Math.round(basic * 0.12);
-    const esi = gross <= 21000 ? Math.round(gross * 0.0075) : 0;
+    const isEligible = basic <= 15000;
+    const esi = isEligible ? Math.round(gross * 0.0075) : 0;
+    const mediclaim = !isEligible ? (gross > 25000 ? 750 : 500) : 0;
     const pt = gross > 15000 ? 200 : 0;
 
     setFormData({
       basic,
-      da,
       hra,
       allowance,
       conveyance,
@@ -233,6 +255,7 @@ const SalaryStructureModal = ({
       income_tax: 0,
       pf,
       esi,
+      mediclaim,
       tds: 0,
       lop: 0,
     });
@@ -257,7 +280,7 @@ const SalaryStructureModal = ({
         },
         body: JSON.stringify({
           basic: numBasic,
-          da: numDa,
+          da: 0,
           hra: numHra,
           allowance: numAllowance,
           conveyance: numConveyance,
@@ -265,7 +288,8 @@ const SalaryStructureModal = ({
           professional_tax: numPT,
           income_tax: numIT,
           pf: numPf,
-          esi: numEsi,
+          esi: isEsiEligible ? numEsi : 0,
+          mediclaim: !isEsiEligible ? numMediclaim : 0,
           tds: numTds,
           lop: numLop,
         }),
@@ -367,7 +391,7 @@ const SalaryStructureModal = ({
                     <div>
                       <strong className="text-primary small">⚡ Quick Formula Allocation:</strong>
                       <div className="text-muted" style={{ fontSize: "11px" }}>
-                        Enter target Gross Salary to auto-populate standard percentages (40% Basic, 10% DA, 40% HRA, 5% Conveyance, 5% Medical & PF).
+                        Enter target Gross Salary to auto-populate standard percentages (45% Basic, 40% HRA, 5% Conveyance, 5% Medical & PF/Deductions).
                       </div>
                     </div>
                     <div className="d-flex gap-2 align-items-center">
@@ -445,28 +469,6 @@ const SalaryStructureModal = ({
                           </InputGroup>
                         ) : (
                           <div className="fw-bold text-end p-1 border-bottom">{fmt(formData.basic)}</div>
-                        )}
-                      </div>
-
-                      {/* DA */}
-                      <div>
-                        <div className="d-flex justify-content-between">
-                          <Form.Label className="small fw-semibold mb-1">Dearness Allowance (DA)</Form.Label>
-                          <small className="text-muted" style={{ fontSize: "10px" }}>Cost of Living</small>
-                        </div>
-                        {isHRUser ? (
-                          <InputGroup size="sm">
-                            <InputGroup.Text>₹</InputGroup.Text>
-                            <Form.Control
-                              type="number"
-                              min="0"
-                              step="any"
-                              value={formData.da}
-                              onChange={(e) => handleChange("da", e.target.value)}
-                            />
-                          </InputGroup>
-                        ) : (
-                          <div className="fw-bold text-end p-1 border-bottom">{fmt(formData.da)}</div>
                         )}
                       </div>
 
@@ -642,27 +644,62 @@ const SalaryStructureModal = ({
                         )}
                       </div>
 
-                      {/* ESI */}
-                      <div>
-                        <div className="d-flex justify-content-between">
-                          <Form.Label className="small fw-semibold mb-1">Employee State Insurance (ESI)</Form.Label>
-                          <small className="text-muted" style={{ fontSize: "10px" }}>State Insurance</small>
+                      {/* Conditional ESI (Basic <= 15000) or Mediclaim (Basic > 15000) */}
+                      {isEsiEligible ? (
+                        <div>
+                          <div className="d-flex justify-content-between align-items-center">
+                            <Form.Label className="small fw-semibold mb-1">Employee State Insurance (ESI)</Form.Label>
+                            <Badge bg="info" className="fw-normal" style={{ fontSize: "9.5px" }}>
+                              Basic ≤ ₹15,000
+                            </Badge>
+                          </div>
+                          {isHRUser ? (
+                            <InputGroup size="sm">
+                              <InputGroup.Text>₹</InputGroup.Text>
+                              <Form.Control
+                                type="number"
+                                min="0"
+                                step="any"
+                                value={formData.esi}
+                                onChange={(e) => handleChange("esi", e.target.value)}
+                                placeholder="0.00"
+                              />
+                            </InputGroup>
+                          ) : (
+                            <div className="fw-bold text-end p-1 border-bottom">{fmt(formData.esi)}</div>
+                          )}
+                          <small className="text-muted d-block mt-0.5" style={{ fontSize: "10px" }}>
+                            State insurance scheme for basic pay ₹15,000 or less
+                          </small>
                         </div>
-                        {isHRUser ? (
-                          <InputGroup size="sm">
-                            <InputGroup.Text>₹</InputGroup.Text>
-                            <Form.Control
-                              type="number"
-                              min="0"
-                              step="any"
-                              value={formData.esi}
-                              onChange={(e) => handleChange("esi", e.target.value)}
-                            />
-                          </InputGroup>
-                        ) : (
-                          <div className="fw-bold text-end p-1 border-bottom">{fmt(formData.esi)}</div>
-                        )}
-                      </div>
+                      ) : (
+                        <div>
+                          <div className="d-flex justify-content-between align-items-center">
+                            <Form.Label className="small fw-semibold mb-1">Mediclaim</Form.Label>
+                            <Badge bg="primary" className="fw-normal" style={{ fontSize: "9.5px" }}>
+                              Basic &gt; ₹15,000
+                            </Badge>
+                          </div>
+                          {isHRUser ? (
+                            <InputGroup size="sm">
+                              <InputGroup.Text>₹</InputGroup.Text>
+                              <Form.Control
+                                type="number"
+                                min="0"
+                                step="any"
+                                value={formData.mediclaim}
+                                onChange={(e) => handleChange("mediclaim", e.target.value)}
+                                placeholder="0.00"
+                              />
+                            </InputGroup>
+                          ) : (
+                            <div className="fw-bold text-end p-1 border-bottom">{fmt(formData.mediclaim)}</div>
+                          )}
+                          <small className="text-muted d-block mt-0.5" style={{ fontSize: "10px" }}>
+                            Corporate health mediclaim policy deduction for basic pay above ₹15,000
+                          </small>
+                        </div>
+                      )}
 
                       {/* TDS */}
                       <div>
@@ -1026,8 +1063,13 @@ const ManageEmployees = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    const formattedVal = name === "email" ? value.toLowerCase() : value;
-    setEmpForm((prev) => ({ ...prev, [name]: formattedVal }));
+    const isEmailField = name === "email" || name === "work_email" || name === "personal_email";
+    const formattedVal = isEmailField ? value.toLowerCase() : value;
+    setEmpForm((prev) => ({
+      ...prev,
+      [name]: formattedVal,
+      ...(name === "work_email" ? { email: formattedVal } : {})
+    }));
   };
 
   const handleSalaryFrequencyChange = (newType) => {
@@ -1095,6 +1137,12 @@ const ManageEmployees = () => {
       ...emp,
       salutation,
       name: cleanName,
+      work_email: emp.work_email || emp.email || "",
+      personal_email: emp.personal_email || "",
+      email: emp.work_email || emp.email || "",
+      pan_no: emp.pan_no || "",
+      aadhaar_no: emp.aadhaar_no || "",
+      request_documents: emp.document_status === "Pending Upload",
       salary_type: emp.salary_type || "Monthly (In Hand)",
       joining_date: emp.joining_date ? emp.joining_date.split("T")[0] : "",
       password: "User@123",
@@ -1116,24 +1164,40 @@ const ManageEmployees = () => {
       dept,
       designation,
       email,
+      work_email,
+      personal_email,
       current_salary,
       salary_type,
       joining_date,
       reporting_manager,
       phone_no,
     } = empForm;
+
+    const primaryWorkEmail = (work_email || email || "").toLowerCase().trim();
+    const primaryPersonalEmail = (personal_email || "").toLowerCase().trim();
+
     if (
       !employee_code ||
       !name ||
       !dept ||
       !designation ||
-      !email ||
+      !primaryWorkEmail ||
       !current_salary ||
       !joining_date ||
       !reporting_manager ||
       !phone_no
     ) {
-      toast.error("Please fill all required fields!");
+      toast.error("Please fill all required fields (including Work Email)!");
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(primaryWorkEmail)) {
+      toast.error("Please enter a valid work email address!");
+      return;
+    }
+    if (primaryPersonalEmail && !emailRegex.test(primaryPersonalEmail)) {
+      toast.error("Please enter a valid personal email address!");
       return;
     }
 
@@ -1153,9 +1217,14 @@ const ManageEmployees = () => {
 
     const payload = {
       ...empForm,
+      pan_no: empForm.pan_no ? empForm.pan_no.toUpperCase().trim() : "",
+      aadhaar_no: empForm.aadhaar_no ? empForm.aadhaar_no.trim() : "",
+      request_documents: empForm.request_documents,
       name: formattedFullName,
       salutation: titlePrefix,
-      email: (empForm.email || "").toLowerCase().trim(),
+      email: primaryWorkEmail,
+      work_email: primaryWorkEmail,
+      personal_email: primaryPersonalEmail,
       current_salary: monthlySalary,
       salary_type: salary_type || "Monthly (In Hand)",
     };
@@ -1673,10 +1742,14 @@ const ManageEmployees = () => {
                     {/* 3 Circular Action Icon Buttons */}
                     <div className="emp-actions-row mb-3">
                       <a
-                        href={emp.email ? `mailto:${emp.email}` : "#"}
+                        href={(emp.work_email || emp.email) ? `mailto:${emp.work_email || emp.email}` : "#"}
                         className="emp-action-btn"
-                        title={emp.email ? `Email: ${emp.email}` : "No Email Provided"}
-                        onClick={(e) => !emp.email && e.preventDefault()}
+                        title={
+                          (emp.work_email || emp.email)
+                            ? `Work: ${emp.work_email || emp.email}${emp.personal_email ? ` | Personal: ${emp.personal_email}` : ""}`
+                            : "No Email Provided"
+                        }
+                        onClick={(e) => !(emp.work_email || emp.email) && e.preventDefault()}
                       >
                         <LuMail size={16} />
                       </a>
@@ -1808,8 +1881,12 @@ const ManageEmployees = () => {
                       </td>
                       <td className="py-3">
                         <div className="d-flex align-items-center gap-2">
-                          {emp.email && (
-                            <a href={`mailto:${emp.email}`} className="text-secondary" title={emp.email}>
+                          {(emp.work_email || emp.email) && (
+                            <a
+                              href={`mailto:${emp.work_email || emp.email}`}
+                              className="text-secondary"
+                              title={`Work: ${emp.work_email || emp.email}${emp.personal_email ? ` | Personal: ${emp.personal_email}` : ""}`}
+                            >
                               <LuMail size={15} />
                             </a>
                           )}
@@ -1818,7 +1895,7 @@ const ManageEmployees = () => {
                               <LuPhone size={15} />
                             </a>
                           )}
-                          <span className="text-muted small">{emp.email || emp.phone_no || "—"}</span>
+                          <span className="text-muted small">{emp.work_email || emp.email || emp.phone_no || "—"}</span>
                         </div>
                       </td>
                       <td className="py-3">
@@ -1972,16 +2049,49 @@ const ManageEmployees = () => {
                 </InputGroup>
               </Col>
               <Col xs={12} md={4}>
-                <Form.Label className="small fw-bold">Email</Form.Label>
-                <Form.Control size="sm" name="email" value={empForm.email} onChange={handleChange} />
-              </Col>
-              <Col xs={6} md={4}>
                 <Form.Label className="small fw-bold">Status</Form.Label>
                 <Form.Select size="sm" name="status" value={empForm.status || "Active"} onChange={handleChange}>
                   <option value="Active">Active</option>
                   <option value="Inactive">Inactive</option>
                   <option value="Resigned">Resigned</option>
                 </Form.Select>
+              </Col>
+
+              {/* Work Email & Personal Email */}
+              <Col xs={12} md={6}>
+                <Form.Label className="small fw-bold d-flex align-items-center gap-1">
+                  Work Email {!editMode && <span className="text-danger">*</span>}
+                  <Badge bg="primary" style={{ fontSize: "10px", fontWeight: "normal" }}>Official / Login</Badge>
+                </Form.Label>
+                <Form.Control
+                  size="sm"
+                  type="email"
+                  name="work_email"
+                  placeholder="e.g. employee@company.com"
+                  value={empForm.work_email !== undefined ? empForm.work_email : (empForm.email || "")}
+                  onChange={handleChange}
+                  required
+                />
+                <div className="text-muted mt-1" style={{ fontSize: "11px" }}>
+                  Used for portal login credentials & system communication
+                </div>
+              </Col>
+              <Col xs={12} md={6}>
+                <Form.Label className="small fw-bold d-flex align-items-center gap-1">
+                  Personal Email
+                  <Badge bg="secondary" style={{ fontSize: "10px", fontWeight: "normal" }}>Personal Contact</Badge>
+                </Form.Label>
+                <Form.Control
+                  size="sm"
+                  type="email"
+                  name="personal_email"
+                  placeholder="e.g. employee.personal@gmail.com"
+                  value={empForm.personal_email || ""}
+                  onChange={handleChange}
+                />
+                <div className="text-muted mt-1" style={{ fontSize: "11px" }}>
+                  Used for personal communications & employee verification
+                </div>
               </Col>
               <Col xs={6} md={4}>
                 <Form.Label className="small fw-bold text-primary">
@@ -2061,6 +2171,75 @@ const ManageEmployees = () => {
               <Col xs={12} md={4}>
                 <Form.Label className="small fw-bold">Phone</Form.Label>
                 <Form.Control size="sm" name="phone_no" value={empForm.phone_no} onChange={handleChange} />
+              </Col>
+
+              {/* PAN Number & Aadhaar Number */}
+              <Col xs={12} md={6}>
+                <Form.Label className="small fw-bold d-flex align-items-center gap-1">
+                  PAN Number
+                  <Badge bg="light" text="dark" className="border" style={{ fontSize: "10px" }}>Tax ID</Badge>
+                </Form.Label>
+                <Form.Control
+                  size="sm"
+                  type="text"
+                  name="pan_no"
+                  placeholder="e.g. ABCDE1234F"
+                  maxLength={10}
+                  value={empForm.pan_no || ""}
+                  onChange={(e) => {
+                    const val = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+                    setEmpForm((prev) => ({ ...prev, pan_no: val }));
+                  }}
+                  style={{ textTransform: "uppercase", letterSpacing: "1px" }}
+                />
+                <div className="text-muted mt-1" style={{ fontSize: "11px" }}>
+                  10-character Permanent Account Number
+                </div>
+              </Col>
+              <Col xs={12} md={6}>
+                <Form.Label className="small fw-bold d-flex align-items-center gap-1">
+                  Aadhaar Number
+                  <Badge bg="light" text="dark" className="border" style={{ fontSize: "10px" }}>UIDAI</Badge>
+                </Form.Label>
+                <Form.Control
+                  size="sm"
+                  type="text"
+                  name="aadhaar_no"
+                  placeholder="e.g. 1234 5678 9012"
+                  maxLength={14}
+                  value={empForm.aadhaar_no || ""}
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/\D/g, "").slice(0, 12);
+                    const formatted = raw.replace(/(\d{4})(?=\d)/g, "$1 ");
+                    setEmpForm((prev) => ({ ...prev, aadhaar_no: formatted }));
+                  }}
+                  style={{ letterSpacing: "1px" }}
+                />
+                <div className="text-muted mt-1" style={{ fontSize: "11px" }}>
+                  12-digit Indian National Identity Number
+                </div>
+              </Col>
+
+              {/* Request Employee to Submit / Upload Documents */}
+              <Col xs={12}>
+                <div className="p-2.5 rounded-3 border bg-light-subtle d-flex align-items-center justify-content-between">
+                  <div className="d-flex align-items-start gap-2">
+                    <div className="text-primary mt-0.5">📄</div>
+                    <div>
+                      <div className="fw-semibold small">Request Employee to Submit / Upload Verification Documents</div>
+                      <div className="text-muted" style={{ fontSize: "11.5px" }}>
+                        Employee will be alerted in their profile to submit PAN, Aadhaar, previous work experience, last company salary slips, and educational certificates.
+                      </div>
+                    </div>
+                  </div>
+                  <Form.Check
+                    type="switch"
+                    id="request-docs-switch"
+                    checked={empForm.request_documents !== false}
+                    onChange={(e) => setEmpForm((prev) => ({ ...prev, request_documents: e.target.checked }))}
+                    className="fs-5 ms-3"
+                  />
+                </div>
               </Col>
 
               <Col xs={12}>
@@ -2305,8 +2484,11 @@ const ManageEmployees = () => {
                         <h6 className="fw-bold text-muted small mb-2 text-uppercase" style={{ letterSpacing: "0.5px" }}>
                           Contact & Placement
                         </h6>
-                        <InfoRow label="Email" value={emp.email} />
+                        <InfoRow label="Work Email" value={emp.work_email || emp.email} />
+                        <InfoRow label="Personal Email" value={emp.personal_email || "—"} />
                         <InfoRow label="Phone" value={emp.phone_no} />
+                        <InfoRow label="PAN Number" value={emp.pan_no} />
+                        <InfoRow label="Aadhaar Number" value={emp.aadhaar_no} />
                         <InfoRow label="Department" value={emp.dept} />
                         <InfoRow label="Reporting Manager" value={emp.reporting_manager} />
                         <InfoRow label="Joining Date" value={emp.joining_date ? emp.joining_date.split("T")[0] : "—"} />
@@ -2391,6 +2573,28 @@ const ManageEmployees = () => {
                           📄 CV / Resume <LuExternalLink size={12} className="ms-1" />
                         </a>
                       )}
+                      {emp.doc_pan && (
+                        <a
+                          href={`${UPLOADS_BASE}/${emp.doc_pan}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="btn btn-outline-secondary btn-sm py-1 px-2 fw-semibold"
+                          style={{ fontSize: "12px" }}
+                        >
+                          💳 PAN Card <LuExternalLink size={12} className="ms-1" />
+                        </a>
+                      )}
+                      {emp.doc_aadhaar && (
+                        <a
+                          href={`${UPLOADS_BASE}/${emp.doc_aadhaar}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="btn btn-outline-secondary btn-sm py-1 px-2 fw-semibold"
+                          style={{ fontSize: "12px" }}
+                        >
+                          🪪 Aadhaar Card <LuExternalLink size={12} className="ms-1" />
+                        </a>
+                      )}
                       {emp.doc_id && (
                         <a
                           href={`${UPLOADS_BASE}/${emp.doc_id}`}
@@ -2413,7 +2617,67 @@ const ManageEmployees = () => {
                           🎓 Degree / Certificate <LuExternalLink size={12} className="ms-1" />
                         </a>
                       )}
-                      {!emp.cv_file && !emp.doc_id && !emp.doc_cert && (
+                      {emp.doc_payslips && (() => {
+                        try {
+                          const slips = JSON.parse(emp.doc_payslips);
+                          if (Array.isArray(slips) && slips.length > 0) {
+                            return slips.map((s, idx) => (
+                              <a
+                                key={idx}
+                                href={`${UPLOADS_BASE}/${s.filename || s}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="btn btn-outline-success btn-sm py-1 px-2 fw-semibold"
+                                style={{ fontSize: "12px" }}
+                              >
+                                💵 Salary Slip #{idx + 1} <LuExternalLink size={12} className="ms-1" />
+                              </a>
+                            ));
+                          }
+                        } catch {}
+                        return null;
+                      })()}
+                      {emp.doc_exp_cert && (() => {
+                        try {
+                          const certs = JSON.parse(emp.doc_exp_cert);
+                          if (Array.isArray(certs) && certs.length > 0) {
+                            return certs.map((c, idx) => (
+                              <a
+                                key={idx}
+                                href={`${UPLOADS_BASE}/${c.filename || c}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="btn btn-outline-info btn-sm py-1 px-2 fw-semibold"
+                                style={{ fontSize: "12px" }}
+                              >
+                                📜 Exp. Cert #{idx + 1} <LuExternalLink size={12} className="ms-1" />
+                              </a>
+                            ));
+                          }
+                        } catch {}
+                        return null;
+                      })()}
+                      {emp.doc_last_company && (() => {
+                        try {
+                          const docs = JSON.parse(emp.doc_last_company);
+                          if (Array.isArray(docs) && docs.length > 0) {
+                            return docs.map((d, idx) => (
+                              <a
+                                key={idx}
+                                href={`${UPLOADS_BASE}/${d.filename || d}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="btn btn-outline-warning btn-sm py-1 px-2 fw-semibold"
+                                style={{ fontSize: "12px" }}
+                              >
+                                🏢 Relieving/Company Doc #{idx + 1} <LuExternalLink size={12} className="ms-1" />
+                              </a>
+                            ));
+                          }
+                        } catch {}
+                        return null;
+                      })()}
+                      {!emp.cv_file && !emp.doc_resume && !emp.doc_id && !emp.doc_cert && !emp.doc_pan && !emp.doc_aadhaar && !emp.doc_payslips && !emp.doc_exp_cert && !emp.doc_last_company && (
                         <span className="text-muted small">No documents uploaded yet.</span>
                       )}
                     </div>

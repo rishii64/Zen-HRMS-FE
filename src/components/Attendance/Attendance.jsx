@@ -21,7 +21,9 @@ import {
   LuCircleCheck,
   LuCircleAlert,
   LuEllipsisVertical,
-  LuPencil
+  LuPencil,
+  LuShieldCheck,
+  LuUser
 } from "react-icons/lu";
 import { MdEdit } from "react-icons/md";
 import { getApiBaseUrl, getUploadUrl } from "../../api/axios";
@@ -121,7 +123,9 @@ const MyAttendance = () => {
 
   // Modals
   const [showMarkModal, setShowMarkModal] = useState(false);
+  const [selectedNoteRecord, setSelectedNoteRecord] = useState(null);
   const [markForm, setMarkForm] = useState({
+    id: null,
     employee_id: "",
     name: "",
     dept: "Design",
@@ -148,6 +152,27 @@ const MyAttendance = () => {
   const handleToday = () => {
     setCurrentDateObj(new Date());
   };
+
+  const handlePrevMonth = () => {
+    const d = new Date(currentDateObj);
+    d.setMonth(d.getMonth() - 1);
+    setCurrentDateObj(d);
+  };
+
+  const handleNextMonth = () => {
+    const d = new Date(currentDateObj);
+    d.setMonth(d.getMonth() + 1);
+    setCurrentDateObj(d);
+  };
+
+  // Monthly Attendance Records & Target Employee for KPI Widgets
+  const [monthlyAttendanceRecords, setMonthlyAttendanceRecords] = useState([]);
+  const [monthlyLoading, setMonthlyLoading] = useState(false);
+  const [selectedKpiEmpId, setSelectedKpiEmpId] = useState("");
+
+  const currentYear = currentDateObj.getFullYear();
+  const currentMonth = currentDateObj.getMonth() + 1;
+  const monthYearTitle = currentDateObj.toLocaleDateString("en-US", { month: "long", year: "numeric" });
 
   // Fetch employees for dropdown & RBAC mapping
   useEffect(() => {
@@ -199,6 +224,38 @@ const MyAttendance = () => {
     fetchAttendanceList();
   }, [selectedDateStr, selectedRange, selectedDept]);
 
+  // Fetch full month attendance for KPI metrics
+  const fetchMonthlyRecords = async () => {
+    setMonthlyLoading(true);
+    try {
+      const monthQueryDate = `${currentYear}-${String(currentMonth).padStart(2, "0")}-01`;
+      let url = `${API}/attendance?range=month&date=${monthQueryDate}`;
+      if (isEmployeeOnly) {
+        url += `&scope=my`;
+      }
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success) {
+        setMonthlyAttendanceRecords(data.data || []);
+      }
+    } catch (err) {
+      console.error("Error fetching monthly attendance records:", err);
+    } finally {
+      setMonthlyLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchMonthlyRecords();
+  }, [currentYear, currentMonth, token, isEmployeeOnly]);
+
+  const handleRefreshAll = () => {
+    fetchAttendanceList();
+    fetchMonthlyRecords();
+  };
+
   // Handle Mark Attendance Form Submit
   const handleMarkSubmit = async (e) => {
     e.preventDefault();
@@ -208,9 +265,10 @@ const MyAttendance = () => {
       const selectedEmpObj = employees.find((e) => e.employee_code === markForm.employee_id || e.employee_id === markForm.employee_id);
       const payload = {
         ...markForm,
+        id: markForm.id || undefined,
         name: selectedEmpObj ? selectedEmpObj.name : markForm.name,
         dept: selectedEmpObj ? (selectedEmpObj.dept || markForm.dept) : markForm.dept,
-        date: selectedDateStr
+        date: markForm.date || selectedDateStr
       };
 
       const res = await fetch(`${API}/attendance/mark`, {
@@ -227,6 +285,7 @@ const MyAttendance = () => {
         toast.success("Attendance record saved successfully!");
         setShowMarkModal(false);
         fetchAttendanceList();
+        fetchMonthlyRecords();
       } else {
         toast.error(data.error || "Failed to mark attendance");
       }
@@ -336,21 +395,121 @@ const MyAttendance = () => {
     return true;
   });
 
-  // Calculate Metrics for Summary Cards (Inspired by Attached UI)
-  const onTimeCount = filteredRecords.filter((r) => (r.status === "Present" || r.status === "On Time") && !r.late_count).length;
-  const lateCount = filteredRecords.filter((r) => r.status === "Late Present" || r.status === "Late" || r.late_count > 0).length;
-  const earlyCount = filteredRecords.filter((r) => {
-    if ((r.status !== "Present" && r.status !== "On Time") || !r.check_in || r.check_in === "—") return false;
-    const shiftStart = r.shift_start ? (r.shift_start.length === 5 ? `${r.shift_start}:00` : r.shift_start) : "10:00:00";
-    return r.check_in < shiftStart;
-  }).length;
+  // 1. Total Working Days Month-Wise (Current Month Leaving Sundays)
+  const daysInCurrentMonth = new Date(currentYear, currentMonth, 0).getDate();
+  let totalWorkingDaysMonth = 0;
+  let monthSundaysCount = 0;
+  for (let d = 1; d <= daysInCurrentMonth; d++) {
+    const dayDate = new Date(currentYear, currentMonth - 1, d);
+    if (dayDate.getDay() === 0) {
+      monthSundaysCount++;
+    } else {
+      totalWorkingDaysMonth++;
+    }
+  }
 
-  const absentCount = filteredRecords.filter((r) => r.status === "Absent").length;
-  const noClockInCount = filteredRecords.filter((r) => !r.check_in && r.status !== "Absent" && r.status !== "Leave").length;
-  const noClockOutCount = filteredRecords.filter((r) => r.check_in && !r.check_out).length;
+  // 2. Target Employee Resolution for Personal/Employee KPI Widgets
+  const effectiveEmpId = (
+    selectedKpiEmpId ||
+    (isEmployeeOnly ? userEmpId : (employees.some((e) => (e.employee_code || e.employee_id) === userEmpId) ? userEmpId : (employees[0]?.employee_code || employees[0]?.employee_id || userEmpId)))
+  );
 
-  const dayOffCount = filteredRecords.filter((r) => r.status === "Holiday" || r.status === "Week Off").length;
-  const timeOffCount = filteredRecords.filter((r) => r.status === "Leave" || r.status === "Half Day").length;
+  const targetEmpObj = employees.find((e) => {
+    const code = (e.employee_code || e.employee_id || "").toLowerCase();
+    const name = (e.name || "").toLowerCase();
+    return (
+      (effectiveEmpId && code === effectiveEmpId.toLowerCase()) ||
+      (effectiveEmpId && name === effectiveEmpId.toLowerCase()) ||
+      (!effectiveEmpId && name === userName.toLowerCase())
+    );
+  }) || (employees.length > 0 && !isEmployeeOnly ? employees[0] : null);
+
+  const displayTargetName = targetEmpObj?.name || (effectiveEmpId === userEmpId ? userName : (effectiveEmpId || "Employee"));
+  const displayTargetCode = targetEmpObj?.employee_code || targetEmpObj?.employee_id || effectiveEmpId || userEmpId;
+
+  // 3. Reporting Manager Resolution
+  const rawReportingManager = 
+    targetEmpObj?.reporting_manager?.trim() ||
+    (effectiveEmpId === userEmpId ? storedUser?.reporting_manager?.trim() : "") ||
+    localStorage.getItem("reporting_manager") ||
+    "";
+    
+  const reportingManager = 
+    rawReportingManager && rawReportingManager !== "N/A" && rawReportingManager !== "null" && rawReportingManager !== "undefined"
+      ? rawReportingManager
+      : "Management / HR";
+
+  const managerEmpObj = employees.find(
+    (e) => (e.name || "").toLowerCase().trim() === reportingManager.toLowerCase().trim()
+  );
+  const managerSubtitle = managerEmpObj?.designation
+    ? `${managerEmpObj.designation}${managerEmpObj.dept ? ` (${managerEmpObj.dept})` : ""}`
+    : (targetEmpObj?.dept ? `${targetEmpObj.dept} Lead / Supervisor` : "Direct Supervisor");
+
+  // 4. Monthly Present & Leaves Calculation for Target Employee
+  const targetMonthlyRecords = monthlyAttendanceRecords.filter((r) => {
+    const code = (r.employee_id || "").toLowerCase().trim();
+    const name = (r.name || "").toLowerCase().trim();
+    const matchCode = (displayTargetCode || "").toLowerCase().trim();
+    const matchName = (displayTargetName || "").toLowerCase().trim();
+
+    if (matchCode && code === matchCode) return true;
+    if (matchName && name === matchName) return true;
+    return false;
+  });
+
+  // Group by date to prevent duplicate counts if there are multiple punch logs on same date
+  const monthlyDayMap = {};
+  targetMonthlyRecords.forEach((r) => {
+    if (!r.date) return;
+    const dateKey = String(r.date).split("T")[0];
+    const curStatus = r.status || "Present";
+    const prevStatus = monthlyDayMap[dateKey];
+    
+    if (!prevStatus) {
+      monthlyDayMap[dateKey] = curStatus;
+    } else {
+      const pLow = prevStatus.toLowerCase();
+      const cLow = curStatus.toLowerCase();
+      if (["present", "on time", "late present", "late", "wfh", "work from home"].includes(cLow)) {
+        monthlyDayMap[dateKey] = curStatus;
+      }
+    }
+  });
+
+  let monthlyPresentDays = 0;
+  let monthlyOnTimeCount = 0;
+  let monthlyLateCount = 0;
+  let monthlyWfhCount = 0;
+
+  let monthlyLeaveDays = 0;
+  let monthlyApprovedLeaves = 0;
+  let monthlyAbsentCount = 0;
+  let monthlyHalfDayCount = 0;
+
+  Object.values(monthlyDayMap).forEach((status) => {
+    const s = (status || "").toLowerCase().trim();
+    if (s === "present" || s === "on time") {
+      monthlyPresentDays += 1;
+      monthlyOnTimeCount += 1;
+    } else if (s === "late" || s === "late present") {
+      monthlyPresentDays += 1;
+      monthlyLateCount += 1;
+    } else if (s === "wfh" || s === "work from home") {
+      monthlyPresentDays += 1;
+      monthlyWfhCount += 1;
+    } else if (s === "half day") {
+      monthlyPresentDays += 0.5;
+      monthlyLeaveDays += 0.5;
+      monthlyHalfDayCount += 1;
+    } else if (s === "leave") {
+      monthlyLeaveDays += 1;
+      monthlyApprovedLeaves += 1;
+    } else if (s === "absent") {
+      monthlyLeaveDays += 1;
+      monthlyAbsentCount += 1;
+    }
+  });
 
   // Pagination Logic
   const totalPages = Math.ceil(filteredRecords.length / rowsPerPage) || 1;
@@ -365,20 +524,21 @@ const MyAttendance = () => {
   });
 
   return (
-    <div style={{ backgroundColor: "#f8fafc", minHeight: "100vh", fontFamily: "'Plus Jakarta Sans', system-ui, -apple-system, sans-serif" }} className="max-w-6xl mx-auto pb-12 pt-6">
+    <div style={{ backgroundColor: "#f8fafc", minHeight: "100vh", fontFamily: "'Plus Jakarta Sans', system-ui, -apple-system, sans-serif" }} className="max-w-7xl mx-auto px-4 pb-12 pt-6">
       {/* Custom CSS for enterprise UI matching attached screenshot */}
       <style>{`
-        .att-summary-card {
+        .att-summary-card, .att-kpi-card {
           background: #ffffff;
           border: 1px solid #e2e8f0;
           border-radius: 20px;
           padding: 20px;
           box-shadow: 0 4px 15px -3px rgba(0, 0, 0, 0.03);
-          transition: all 0.2s ease;
+          transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
         }
-        .att-summary-card:hover {
+        .att-summary-card:hover, .att-kpi-card:hover {
           box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.06);
           border-color: #cbd5e1;
+          transform: translateY(-1px);
         }
         .table-att th {
           font-size: 11px;
@@ -482,113 +642,232 @@ const MyAttendance = () => {
         </div>
       </div>
 
-      {/* TOP SUMMARY CARDS GRID (3 CARDS INSPIRED BY ATTACHED UI) */}
-      <Row className="g-4 mb-6 px-2">
-        {/* CARD 1: PRESENT SUMMARY */}
-        <Col xs={12} lg={4}>
-          <div className="att-summary-card h-full flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <span className="p-1.5 rounded-lg bg-blue-50 text-blue-600">
-                    <LuUserCheck className="h-4 w-4" />
-                  </span>
-                  <span className="text-xs font-bold text-slate-800">Present Summary</span>
-                </div>
-                <span className="text-slate-400 text-xs font-bold">•••</span>
-              </div>
-
-              <Row className="g-2 text-left pt-2">
-                <Col xs={4}>
-                  <div className="text-[11px] font-semibold text-slate-400">On time</div>
-                  <div className="text-xl font-extrabold text-slate-900 mt-1">{onTimeCount}</div>
-                  <div className="text-[10px] font-bold text-emerald-600 mt-1">+12 vs yesterday</div>
-                </Col>
-                <Col xs={4}>
-                  <div className="text-[11px] font-semibold text-slate-400">Late clock-in</div>
-                  <div className="text-xl font-extrabold text-amber-600 mt-1">{lateCount}</div>
-                  <div className="text-[10px] font-bold text-rose-500 mt-1">-6 vs yesterday</div>
-                </Col>
-                <Col xs={4}>
-                  <div className="text-[11px] font-semibold text-slate-400">Early clock-in</div>
-                  <div className="text-xl font-extrabold text-blue-600 mt-1">{earlyCount}</div>
-                  <div className="text-[10px] font-bold text-rose-500 mt-1">-6 vs yesterday</div>
-                </Col>
-              </Row>
+      {/* 4 KPI WIDGETS SECTION */}
+      <div className="mb-6 px-2">
+        {/* KPI Section Control Header */}
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+              Monthly Attendance KPI Summary
+            </span>
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-blue-50 text-blue-700 border border-blue-100">
+              {monthYearTitle}
+            </span>
+            <div className="flex items-center gap-1 ml-1">
+              <button
+                onClick={handlePrevMonth}
+                title="Previous Month"
+                className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors"
+              >
+                <LuChevronLeft className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={handleNextMonth}
+                title="Next Month"
+                className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors"
+              >
+                <LuChevronRight className="h-3.5 w-3.5" />
+              </button>
             </div>
           </div>
-        </Col>
 
-        {/* CARD 2: Absent SUMMARY */}
-        <Col xs={12} lg={5}>
-          <div className="att-summary-card h-full flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <span className="p-1.5 rounded-lg bg-rose-50 text-rose-600">
-                    <LuUserX className="h-4 w-4" />
-                  </span>
-                  <span className="text-xs font-bold text-slate-800">Absent Summary</span>
+          {/* Employee Selector for Admins/HR/HOD */}
+          {!isEmployeeOnly && employees.length > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-500 font-semibold flex items-center gap-1">
+                <LuUser className="h-3.5 w-3.5 text-slate-400" />
+                Viewing KPI for:
+              </span>
+              <select
+                value={effectiveEmpId}
+                onChange={(e) => setSelectedKpiEmpId(e.target.value)}
+                className="text-xs font-bold bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-slate-800 shadow-xs focus:outline-none focus:border-blue-500 hover:border-slate-300 transition-colors cursor-pointer max-w-[260px] truncate"
+              >
+                {employees.map((emp) => {
+                  const code = emp.employee_code || emp.employee_id || emp.id;
+                  const isCurrent = code === userEmpId;
+                  return (
+                    <option key={code} value={code}>
+                      {emp.name} ({code}){isCurrent ? " • Me" : ""}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+          )}
+        </div>
+
+        {/* 4 KPI CARDS GRID */}
+        <Row className="g-3">
+          {/* WIDGET 1: TOTAL WORKING DAYS (MONTH-WISE LEAVING SUNDAYS) */}
+          <Col xs={12} sm={6} lg={3}>
+            <div className="att-kpi-card relative overflow-hidden bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs hover:shadow-md hover:border-blue-300 transition-all flex flex-col justify-between h-full group">
+              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-indigo-500" />
+              <div>
+                <div className="flex items-center justify-between mb-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className="p-2 rounded-xl bg-blue-50 text-blue-600 group-hover:scale-105 transition-transform">
+                      <LuCalendar className="h-4 w-4" />
+                    </span>
+                    <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
+                      Total Working Days
+                    </span>
+                  </div>
+                  {/* <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
+                    Month-wise
+                  </span> */}
                 </div>
-                <span className="text-slate-400 text-xs font-bold">•••</span>
+
+                <div className="flex justify-center items-baseline gap-2 mt-1">
+                  <span className="text-3xl font-black text-slate-900 tracking-tight">
+                    {totalWorkingDaysMonth}
+                  </span>
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wide">
+                    Days
+                  </span>
+                </div>
               </div>
 
-              <Row className="g-2 text-left pt-2">
-                <Col xs={3}>
-                  <div className="text-[11px] font-semibold text-slate-400">Absent</div>
-                  <div className="text-xl font-extrabold text-slate-900 mt-1">{absentCount}</div>
-                  <div className="text-[10px] font-bold text-emerald-600 mt-1">+12 vs yesterday</div>
-                </Col>
-                <Col xs={3}>
-                  <div className="text-[11px] font-semibold text-slate-400">No clock-in</div>
-                  <div className="text-xl font-extrabold text-slate-700 mt-1">{noClockInCount}</div>
-                  <div className="text-[10px] font-bold text-rose-500 mt-1">-6 vs yesterday</div>
-                </Col>
-                <Col xs={3}>
-                  <div className="text-[11px] font-semibold text-slate-400">No clock-out</div>
-                  <div className="text-xl font-extrabold text-slate-700 mt-1">{noClockOutCount}</div>
-                  <div className="text-[10px] font-semibold text-slate-400 mt-1">0 vs yesterday</div>
-                </Col>
-                <Col xs={3}>
-                  <div className="text-[11px] font-semibold text-slate-400">Invalid</div>
-                  <div className="text-xl font-extrabold text-slate-700 mt-1">0</div>
-                  <div className="text-[10px] font-semibold text-slate-400 mt-1">0 vs yesterday</div>
-                </Col>
-              </Row>
+              <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between text-[11px]">
+                <span className="font-semibold text-slate-600 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                  {currentDateObj.toLocaleDateString("en-US", { month: "short" })}: {daysInCurrentMonth} Total Days
+                </span>
+                <span className="font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
+                  Excl. {monthSundaysCount} Sundays
+                </span>
+              </div>
             </div>
-          </div>
-        </Col>
+          </Col>
 
-        {/* CARD 3: AWAY SUMMARY */}
-        <Col xs={12} lg={3}>
-          <div className="att-summary-card h-full flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <span className="p-1.5 rounded-lg bg-purple-50 text-purple-600">
-                    <LuUserMinus className="h-4 w-4" />
-                  </span>
-                  <span className="text-xs font-bold text-slate-800">Away Summary</span>
+          {/* WIDGET 2: PRESENT (EMPLOYEE WORKING DAYS) */}
+          <Col xs={12} sm={6} lg={3}>
+            <div className="att-kpi-card relative overflow-hidden bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs hover:shadow-md hover:border-emerald-300 transition-all flex flex-col justify-between h-full group">
+              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-500" />
+              <div>
+                <div className="flex items-center justify-between mb-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className="p-2 rounded-xl bg-emerald-50 text-emerald-600 group-hover:scale-105 transition-transform">
+                      <LuUserCheck className="h-4 w-4" />
+                    </span>
+                    <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
+                      Present Days
+                    </span>
+                  </div>
+                  {/* <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100">
+                    Employee Working
+                  </span> */}
                 </div>
-                <span className="text-slate-400 text-xs font-bold">•••</span>
+
+                <div className="flex justify-center items-baseline gap-2 mt-1">
+                  <span className="text-3xl font-black text-emerald-600 tracking-tight">
+                    {monthlyPresentDays}
+                  </span>
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wide">
+                    / {totalWorkingDaysMonth} Days
+                  </span>
+                </div>
               </div>
 
-              <Row className="g-2 text-left pt-2">
-                <Col xs={6}>
-                  <div className="text-[11px] font-semibold text-slate-400">Day off</div>
-                  <div className="text-xl font-extrabold text-slate-900 mt-1">{dayOffCount}</div>
-                  <div className="text-[10px] font-bold text-emerald-600 mt-1">-2 vs yesterday</div>
-                </Col>
-                <Col xs={6}>
-                  <div className="text-[11px] font-semibold text-slate-400">Time off</div>
-                  <div className="text-xl font-extrabold text-slate-900 mt-1">{timeOffCount}</div>
-                  <div className="text-[10px] font-bold text-rose-500 mt-1">-6 vs yesterday</div>
-                </Col>
-              </Row>
+              <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between text-[11px]">
+                <span className="font-bold text-emerald-700 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  {Math.round((monthlyPresentDays / (totalWorkingDaysMonth || 1)) * 100)}% Monthly Rate
+                </span>
+                <span className="text-slate-500 text-[10px] font-semibold truncate max-w-[130px]" title={`${monthlyOnTimeCount} on time, ${monthlyLateCount} late, ${monthlyWfhCount} WFH`}>
+                  {monthlyOnTimeCount} on-time{monthlyLateCount ? `, ${monthlyLateCount} late` : ""}{monthlyWfhCount ? `, ${monthlyWfhCount} WFH` : ""}
+                </span>
+              </div>
             </div>
-          </div>
-        </Col>
-      </Row>
+          </Col>
+
+          {/* WIDGET 3: LEAVES (ABSENT OR LEAVE TAKEN) */}
+          <Col xs={12} sm={6} lg={3}>
+            <div className="att-kpi-card relative overflow-hidden bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs hover:shadow-md hover:border-amber-300 transition-all flex flex-col justify-between h-full group">
+              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 to-rose-500" />
+              <div>
+                <div className="flex items-center justify-between mb-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className="p-2 rounded-xl bg-amber-50 text-amber-600 group-hover:scale-105 transition-transform">
+                      <LuUserX className="h-4 w-4" />
+                    </span>
+                    <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
+                      Leaves
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-100">
+                    Absent / Taken
+                  </span>
+                </div>
+
+                <div className="flex justify-center items-baseline gap-2 mt-1">
+                  <span className="text-3xl font-black text-amber-600 tracking-tight">
+                    {monthlyLeaveDays}
+                  </span>
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wide">
+                    Days
+                  </span>
+                </div>
+              </div>
+
+              <div className="pt-3 mt-3 border-t border-slate-300 flex items-center justify-between text-[11px]">
+                <span className="font-bold text-amber-700 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                  {monthlyApprovedLeaves} Leave{monthlyApprovedLeaves === 1 ? "" : "s"} Taken
+                </span>
+                <span className="font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-md text-[10px]">
+                  {monthlyAbsentCount} Absent{monthlyHalfDayCount ? ` · ${monthlyHalfDayCount} Half` : ""}
+                </span>
+              </div>
+            </div>
+          </Col>
+
+          {/* WIDGET 4: REPORTING MANAGER NAME */}
+          <Col xs={12} sm={6} lg={3}>
+            <div className="att-kpi-card relative overflow-hidden bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs hover:shadow-md hover:border-purple-300 transition-all flex flex-col justify-between h-full group">
+              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 to-indigo-500" />
+              <div>
+                <div className="flex items-center justify-between mb-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className="p-2 rounded-xl bg-purple-50 text-purple-600 group-hover:scale-105 transition-transform">
+                      <LuBriefcase className="h-4 w-4" />
+                    </span>
+                    <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
+                      Reporting Manager
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-100 flex items-center gap-1">
+                    <LuShieldCheck className="h-3 w-3" /> Assigned
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2.5 mt-1.5">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-600 to-indigo-600 text-white font-extrabold text-xs flex items-center justify-center shadow-xs shrink-0">
+                    {getAttendanceInitials(reportingManager)}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-base font-extrabold text-slate-900 truncate" title={reportingManager}>
+                      {reportingManager}
+                    </div>
+                    <div className="text-[10px] font-semibold text-slate-400 truncate">
+                      {targetEmpObj?.dept ? `${targetEmpObj.dept} Dept` : "Designated Supervisor"}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between text-[11px]">
+                <span className="font-semibold text-purple-700 truncate max-w-[170px]" title={managerSubtitle}>
+                  {managerSubtitle}
+                </span>
+                <span className="text-slate-400 text-[10px] font-bold">
+                  {targetEmpObj?.name ? targetEmpObj.name.split(" ")[0] + "'s Lead" : "Direct Lead"}
+                </span>
+              </div>
+            </div>
+          </Col>
+        </Row>
+      </div>
 
       {/* FILTER BAR SECTION */}
       <div className="bg-white border border-slate-200 rounded-2xl p-4 mb-6 shadow-xs flex flex-wrap items-center justify-between gap-3">
@@ -691,9 +970,9 @@ const MyAttendance = () => {
 
         <div className="flex items-center gap-2">
           <button
-            onClick={fetchAttendanceList}
+            onClick={handleRefreshAll}
             className="p-2 border border-slate-200 rounded-xl bg-slate-50 text-slate-600 hover:bg-slate-100 transition-colors"
-            title="Refresh Attendance List"
+            title="Refresh Attendance List & KPIs"
           >
             <LuRefreshCw className="h-4 w-4" />
           </button>
@@ -706,11 +985,11 @@ const MyAttendance = () => {
           <Table className="table-att mb-0 align-middle">
             <thead>
               <tr>
-                <th style={{ minWidth: "180px" }}>Employee Name</th>
+                <th style={{ minWidth: "220px" }}>Employee Name</th>
                 <th style={{ minWidth: "110px" }}>Employee ID</th>
                 <th style={{ minWidth: "125px" }}>Date</th>
                 <th style={{ minWidth: "120px" }}>Department</th>
-                <th style={{ minWidth: "120px" }}>Designation</th>
+                <th style={{ minWidth: "150px" }}>Designation</th>
                 <th style={{ minWidth: "110px" }}>Shift</th>
                 <th style={{ minWidth: "100px" }}>Check-In</th>
                 <th style={{ minWidth: "110px" }}>Check-Out</th>
@@ -857,8 +1136,25 @@ const MyAttendance = () => {
                       </td>
 
                       {/* Notes */}
-                      <td className="text-xs text-slate-500 italic max-w-[140px] truncate">
-                        {r.notes || "—"}
+                      <td className="text-xs max-w-[170px]">
+                        {r.notes ? (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedNoteRecord(r)}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-amber-50 text-amber-900 border border-amber-200/80 hover:bg-amber-100 hover:border-amber-300 transition-all max-w-[160px] text-left group shadow-xs cursor-pointer"
+                            title="Click to view full note details"
+                          >
+                            <span className="shrink-0 text-[12px]">📝</span>
+                            <span className="truncate">{r.notes}</span>
+                            {r.notes.length > 20 && (
+                              <span className="text-[10px] text-amber-600 font-bold shrink-0 opacity-70 group-hover:opacity-100">
+                                ▾
+                              </span>
+                            )}
+                          </button>
+                        ) : (
+                          <span className="text-slate-300 text-xs">—</span>
+                        )}
                       </td>
 
                       {/* Actions */}
@@ -867,6 +1163,7 @@ const MyAttendance = () => {
                           <button
                             onClick={() => {
                               setMarkForm({
+                                id: r.id || null,
                                 employee_id: r.employee_id,
                                 name: r.name,
                                 dept: r.dept,
@@ -879,7 +1176,7 @@ const MyAttendance = () => {
                               setShowMarkModal(true);
                             }}
                             className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors"
-                            title="Edit Attendance"
+                            title="Edit Attendance & Notes"
                           >
                             <MdEdit className="h-4 w-4" />
                           </button>
@@ -945,7 +1242,7 @@ const MyAttendance = () => {
       <Modal show={showMarkModal} onHide={() => setShowMarkModal(false)} centered className="rounded-4">
         <Modal.Header closeButton className="border-0 pb-0">
           <Modal.Title className="fw-bold text-slate-900 fs-5 flex items-center gap-2">
-            <LuClock className="text-emerald-600" /> Mark / Update Attendance
+            <LuClock className="text-emerald-600" /> {markForm.id ? "Edit Attendance & Notes" : "Mark / Update Attendance"}
           </Modal.Title>
         </Modal.Header>
         <Modal.Body className="pt-3">
@@ -1006,10 +1303,13 @@ const MyAttendance = () => {
             </Row>
 
             <Form.Group className="mb-4">
-              <Form.Label className="small fw-bold text-slate-700">Notes / Remarks</Form.Label>
+              <Form.Label className="small fw-bold text-slate-700 flex items-center gap-1.5">
+                Notes / Remarks <span className="text-slate-400 font-normal text-[11px]">(Visible to Employee)</span>
+              </Form.Label>
               <Form.Control
-                type="text"
-                placeholder="Reason for late/leave or general remarks..."
+                as="textarea"
+                rows={2}
+                placeholder="Reason for late/leave or remarks visible to employee..."
                 value={markForm.notes}
                 onChange={(e) => setMarkForm({ ...markForm, notes: e.target.value })}
                 className="text-xs py-2 rounded-xl"
@@ -1026,6 +1326,81 @@ const MyAttendance = () => {
             </div>
           </Form>
         </Modal.Body>
+      </Modal>
+
+      {/* ATTENDANCE NOTE DETAILS POPUP MODAL */}
+      <Modal
+        show={!!selectedNoteRecord}
+        onHide={() => setSelectedNoteRecord(null)}
+        centered
+        className="rounded-4"
+      >
+        <Modal.Header closeButton className="border-0 pb-0">
+          <Modal.Title className="fw-bold text-slate-900 fs-5 flex items-center gap-2">
+            <span className="text-amber-500 text-xl">📝</span> Attendance Note & Remarks
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="pt-3">
+          {selectedNoteRecord && (
+            <div>
+              {/* Record Summary Header */}
+              <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200 mb-3 flex items-center justify-between flex-wrap gap-2 text-xs">
+                <div>
+                  <div className="font-bold text-slate-800 text-sm">
+                    {selectedNoteRecord.name || "Employee"}
+                  </div>
+                  <div className="text-slate-400 font-mono text-[11px]">
+                    {selectedNoteRecord.employee_id} • {selectedNoteRecord.dept || "General"}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="font-bold text-slate-700">
+                    {formatDateDisplay(selectedNoteRecord.date)}
+                  </div>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-200 text-slate-700">
+                    {selectedNoteRecord.status}
+                  </span>
+                </div>
+              </div>
+
+              {/* Note Content Box */}
+              <div className="mb-3">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1.5">
+                  HR / Supervisor Note
+                </label>
+                <div className="p-3.5 bg-amber-50/70 border border-amber-200/80 rounded-2xl text-slate-800 text-xs leading-relaxed whitespace-pre-wrap break-words shadow-xs">
+                  {selectedNoteRecord.notes}
+                </div>
+              </div>
+
+              {/* Attendance Context Info */}
+              <div className="grid grid-cols-3 gap-2 bg-slate-50/80 p-2.5 rounded-xl border border-slate-100 text-center text-xs">
+                <div>
+                  <span className="text-slate-400 text-[10px] block">Check-In</span>
+                  <span className="font-bold text-slate-700">{selectedNoteRecord.check_in || "—"}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 text-[10px] block">Check-Out</span>
+                  <span className="font-bold text-slate-700">{selectedNoteRecord.check_out || "—"}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 text-[10px] block">Shift</span>
+                  <span className="font-bold text-slate-700">{selectedNoteRecord.shift_name || "General Shift"}</span>
+                </div>
+              </div>
+            </div>
+          )}
+        </Modal.Body>
+        <Modal.Footer className="border-0 pt-0">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setSelectedNoteRecord(null)}
+            className="rounded-xl px-4 py-1.5 text-xs font-semibold"
+          >
+            Close
+          </Button>
+        </Modal.Footer>
       </Modal>
     </div>
   );

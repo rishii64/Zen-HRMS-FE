@@ -86,7 +86,7 @@ export const handleSessionExpired = async (
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`,
         },
-        body: JSON.stringify({ forceIfShiftEnded: true }),
+        body: JSON.stringify({ forceIfSessionExpired: true, token }),
         keepalive: true,
       });
     } catch (err) {

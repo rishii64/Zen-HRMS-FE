@@ -31,7 +31,7 @@ import logo from "../../assets/zentelex-logo.png";
 import { clearAuthSession } from "../../utils/auth";
 import toast from 'react-hot-toast';
 import { TbPassword } from "react-icons/tb";
-import { getUploadUrl } from "../../api/axios";
+import api, { getUploadUrl } from "../../api/axios";
 import ChangePasswordModal from "../common/ChangePasswordModal";
 
 
@@ -165,12 +165,12 @@ const ALL_APPS = [
     keywords: ["interview", "candidate", "evaluation", "assessment", "question bank"],
   },
   {
-    id: "app_appraisal",
-    title: "Performance Appraisal",
+    id: "app_kpi_hub",
+    title: "KPI",
     icon: <LuAward className="text-amber-600" />,
-    route: "/appraisal",
-    roles: ["hr", "hod", "admin"],
-    keywords: ["appraisal", "performance", "pms", "progression", "review", "rating", "scorecard"],
+    route: "/kpi",
+    roles: ["employee", "hr", "accounts", "payroll", "hod", "admin", "manager", "teamlead"],
+    keywords: ["kpi", "goals", "appraisal", "performance", "pms", "progression", "review", "rating", "scorecard", "evaluation"],
   },
   {
     id: "app_accounts_dash",
@@ -220,8 +220,7 @@ const AppNavbar = () => {
   const [userName, setUserName] = useState(localStorage.getItem("userName") || "");
   const [email, setEmail] = useState(localStorage.getItem("email") || "");
   const [employeeCode, setEmployeeCode] = useState(localStorage.getItem("empId") || "");
-  const [profilePhoto, setProfilePhoto] = useState(
-    localStorage.getItem("profile_photo") ||
+  const [profilePhoto, setProfilePhoto] = useState(localStorage.getItem("profile_photo") ||
     (() => {
       try {
         return JSON.parse(localStorage.getItem("user") || "{}").profile_photo || "";
@@ -245,25 +244,48 @@ const AppNavbar = () => {
     setImgError(false);
   }, [profilePhoto]);
 
-  const handleLogout = () => {
-    toast.success("Logged out!");
-    setTimeout(() => {
+  const formatTime12h = (timeStr) => {
+    if (!timeStr) return "";
+    try {
+      const parts = timeStr.split(":");
+      let hrs = parseInt(parts[0], 10);
+      const mins = parts[1] || "00";
+      const ampm = hrs >= 12 ? "PM" : "AM";
+      hrs = hrs % 12 || 12;
+      return `${hrs}:${mins} ${ampm}`;
+    } catch {
+      return timeStr;
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      const res = await api.post("/attendance/portal-logout");
+      if (res.data?.clockedOut && res.data?.check_out) {
+        const timeFormatted = formatTime12h(res.data.check_out);
+        toast.success(`Clocked out at ${timeFormatted}. Logged out!`, { duration: 3500 });
+      } else {
+        toast.success("Logged out!");
+      }
+    } catch (err) {
+      console.warn("Portal logout clock-out note:", err.message);
+      toast.success("Logged out!");
+    } finally {
+      clearAuthSession();
+
+      setRole(null);
+      setIsLoggedIn(false);
+      setUserName("");
+      setEmail("");
+      setEmployeeCode("");
+      setProfilePhoto("");
+      setIsMobileMenuOpen(false);
+      setIsDropdownOpen(false);
+      setIsAppsOpen(false);
+      setIsMobileAppsOpen(false);
+
       navigate("/login");
-    }, 500);
-    clearAuthSession();
-
-    setRole(null);
-    setIsLoggedIn(false);
-    setUserName("");
-    setEmail("");
-    setEmployeeCode("");
-    setProfilePhoto("");
-    setIsMobileMenuOpen(false);
-    setIsDropdownOpen(false);
-    setIsAppsOpen(false);
-    setIsMobileAppsOpen(false);
-
-    navigate("/login");
+    }
   };
 
   const handleChangePassword = () => {
@@ -372,34 +394,34 @@ const AppNavbar = () => {
         return [
           { to: "/employee/dashboard", label: "Dashboard" },
           { to: "/attendance", label: "My Attendance" },
-          { to: "/leave", label: "Apply Leave" },
-          { to: "/resignation", label: "Resignation" },
+          { to: "/leave", label: "Leaves" },
+          // { to: "/resignation", label: "Resignation" },
           { to: profRoute, label: "My Profile" },
         ];
       case "hr":
         return [
-          { to: "/admin/dashboard", label: "HR Dashboard" },
+          { to: "/admin/dashboard", label: "Dashboard" },
+          { to: "/attendance", label: "Attendance" },
           { to: "/holidays", label: "Holidays" },
           { to: "/onboarding", label: "Onboarding" },
-          { to: "/attendance", label: "Attendance" },
-          { to: "/admin/leaves", label: "Leaves" },
+          // { to: "/admin/leaves", label: "Leaves" },
         ];
       case "accounts":
       case "payroll":
         return [
           { to: "/accounts/dashboard", label: "Dashboard" },
+          { to: "/attendance", label: "Attendance" },
           { to: "/payroll", label: "Payroll" },
           { to: "/payslip", label: "Salary Slips" },
-          { to: "/attendance", label: "Attendance" },
-          { to: "/admin/leaves", label: "Leaves" },
+          // { to: "/admin/leaves", label: "Leaves" },
         ];
       case "hod":
         return [
           { to: "/hod/dashboard", label: "Dashboard" },
-          { to: "/interview", label: "Candidate Evaluation" },
-          { to: "/appraisal", label: "Team Appraisal" },
-          { to: "/resignation", label: "Resignation" },
           { to: "/attendance", label: "Attendance" },
+          { to: "/interview", label: "Candidate Evaluation" },
+          // { to: "/appraisal", label: "Team Appraisal" },
+          // { to: "/resignation", label: "Resignation" },
           { to: profRoute, label: "My Profile" },
         ];
       default:

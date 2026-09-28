@@ -377,7 +377,7 @@ const Leave = () => {
   const pastLeaves = filteredLeaves.filter((l) => l.start_date < todayStr && l.status !== "Pending" && l.status !== "Processing");
 
   return (
-    <div style={{ backgroundColor: "#f8fafc", minHeight: "100vh", fontFamily: "'Plus Jakarta Sans', system-ui, -apple-system, sans-serif" }} className="max-w-6xl mx-auto pb-16 pt-6">
+    <div style={{ backgroundColor: "#f8fafc", minHeight: "100vh", fontFamily: "'Plus Jakarta Sans', system-ui, -apple-system, sans-serif" }} className="max-w-7xl  mx-auto px-3 pb-16 pt-6">
       {/* Custom CSS matching attached UI screenshot */}
       <style>{`
         .pill-nav-btn {

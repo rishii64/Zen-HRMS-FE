@@ -129,7 +129,7 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       console.warn("Unauthorized request (401). Triggering session expiry logout.");
-      handleSessionExpired("Your session has expired. Please log in again.");
+      handleSessionExpired("Your 14-hour session has ended. You have been automatically clocked out and logged out from the portal.");
     }
     return Promise.reject(error);
   }

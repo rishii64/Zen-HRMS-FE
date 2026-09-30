@@ -1,1042 +1,1600 @@
-import { useState, useRef, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
+import {
+  Container,
+  Row,
+  Col,
+  Card,
+  Button,
+  Table,
+  Badge,
+  Spinner,
+  Form,
+  Modal,
+  Alert,
+  Nav,
+  ProgressBar,
+} from "react-bootstrap";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import toast from "react-hot-toast";
-import OnboardingForm from "./onboarding";
+import {
+  LuUser,
+  LuCalendar,
+  LuClock,
+  LuVideo,
+  LuBriefcase,
+  LuBuilding2,
+  LuGraduationCap,
+  LuStar,
+  LuCircleCheck,
+  LuTriangleAlert,
+  LuFileText,
+  LuArrowLeft,
+  LuSearch,
+  LuPrinter,
+  LuBadgeCheck,
+  LuAward,
+  LuSparkles,
+  LuThumbsUp,
+  LuThumbsDown,
+  LuCirclePause,
+  LuSend,
+  LuExternalLink,
+  LuDownload,
+  LuUsers,
+  LuCheck,
+} from "react-icons/lu";
+import api, { getUploadUrl } from "../../api";
 
-// ─── CONSTANTS ────────────────────────────────────────────────────────────────
-
-const roundDefs = [
+// ── ROUND METADATA & CONSTANTS ──────────────────────────────────────────────────
+const ROUNDS = [
   {
-    label: "Round 1 — HR Round", key: "hr", owner: "hr",
-    criteria: [
-      { name: "Personality test",    key: "personality" },
-      { name: "English knowledge",   key: "english" },
-      { name: "Behavior / attitude",key: "behavior" },
-      { name: "Communication skills",key: "communication" },
-      { name: "Cultural fitment",    key: "cultural" },
-    ],
+    key: "ROUND_1_HR",
+    label: "Round 1 — HR Screening",
+    shortLabel: "Round 1 (HR)",
+    ownerRole: "hr",
+    description: "Initial screening on communication, personal conduct, background & role fitment.",
   },
   {
-    label: "Round 2 — Technical Round", key: "tech", owner: "hod",
-    criteria: [
-      { name: "Domain knowledge",        key: "domain" },
-      { name: "Analytical knowledge",    key: "analytical" },
-      { name: "Technical / job skill",   key: "technical" },
-      { name: "Problem solving ability", key: "problem" },
-      { name: "Aptitude & reasoning",    key: "aptitude" },
-    ],
+    key: "ROUND_2_TECH",
+    label: "Round 2 — Technical (HOD)",
+    shortLabel: "Round 2 (Tech)",
+    ownerRole: "hod",
+    description: "Deep dive technical evaluation, domain mastery, analytical capability & problem solving.",
   },
   {
-    label: "Round 3 — Final Round", key: "final", owner: "hod",
-    criteria: [
-      { name: "Leadership ability",  key: "leadership" },
-      { name: "Team collaboration",  key: "teamwork" },
-      { name: "Strategic thinking",  key: "strategic" },
-      { name: "Motivation & drive",  key: "motivation" },
-      { name: "Overall impression",  key: "overall_imp" },
-    ],
+    key: "ROUND_3_FINAL",
+    label: "Round 3 — Final Round",
+    shortLabel: "Round 3 (Final)",
+    ownerRole: "all",
+    description: "Leadership fitment, strategic contribution, cultural alignment & final offer recommendation.",
   },
 ];
 
-const gradeColors = {
-  A: { bg: "#EAF3DE", color: "#3B6D11" },
-  B: { bg: "#E6F1FB", color: "#185FA5" },
-  C: { bg: "#FAEEDA", color: "#854F0B" },
-  D: { bg: "#FBEAF0", color: "#993556" },
-  F: { bg: "#FCEBEB", color: "#A32D2D" },
-};
+const JOB_ROLE_OPTIONS = [
+  { value: "high", label: "High — Exceeds Job Expectations & Core Competencies", badgeColor: "success" },
+  { value: "satisfactory", label: "Satisfactory — Meets Role Requirements & Standards", badgeColor: "primary" },
+  { value: "poor", label: "Poor — Below Expected Level / Notable Skill Gap", badgeColor: "danger" },
+];
 
-const verdictColors = {
-  Selected:  { bg: "#EAF3DE", color: "#3B6D11" },
-  "On Hold": { bg: "#FAEEDA", color: "#854F0B" },
-  Rejected:  { bg: "#FCEBEB", color: "#A32D2D" },
-};
+const RECOMMENDATION_OPTIONS = [
+  { value: "NEXT_ROUND", label: "Advance to Next Round", icon: <LuSend />, color: "primary" },
+  { value: "SELECTED", label: "Shortlist / Recommend Offer", icon: <LuThumbsUp />, color: "success" },
+  { value: "HOLD", label: "Keep on Hold", icon: <LuCirclePause />, color: "warning" },
+  { value: "REJECTED", label: "Reject Candidate", icon: <LuThumbsDown />, color: "danger" },
+];
 
-const API_BASE = "http://localhost:3001/api";
+export default function InterviewForm() {
+  const navigate = useNavigate();
+  const { candidateId: routeCandidateId } = useParams();
+  const location = useLocation();
 
-function gradeToNum(g) { return { A: 5, B: 4, C: 3, D: 2, F: 1 }[g] || 0; }
-function numToGrade(n) {
-  if (n >= 4.5) return "A"; if (n >= 3.5) return "B";
-  if (n >= 2.5) return "C"; if (n >= 1.5) return "D"; return "F";
-}
-function getInitials(name) {
-  const w = (name || "").trim().split(" ").filter(Boolean);
-  if (w.length >= 2) return (w[0][0] + w[1][0]).toUpperCase();
-  if (w.length === 1) return w[0][0].toUpperCase();
-  return "?";
-}
-function today() {
-  return new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" });
-}
-
-// ─── SHARED UI ────────────────────────────────────────────────────────────────
-
-function Badge({ grade }) {
-  const s = gradeColors[grade] || { bg: "#f0f0f0", color: "#888" };
-  return (
-    <span style={{
-      display: "inline-flex", alignItems: "center", justifyContent: "center",
-      minWidth: 28, padding: "2px 8px", borderRadius: 100,
-      fontSize: 12, fontWeight: 500, background: s.bg, color: s.color,
-    }}>{grade || "—"}</span>
-  );
-}
-
-function SectionLabel({ children }) {
-  return (
-    <div style={{
-      fontSize: 11, fontWeight: 600, color: "#534AB7", textTransform: "uppercase",
-      letterSpacing: "0.08em", marginBottom: "1rem",
-      display: "flex", alignItems: "center", gap: 8,
-    }}>
-      {children}
-      <span style={{ flex: 1, height: "0.5px", background: "#e5e5e5" }} />
-    </div>
-  );
-}
-
-function Card({ children, style = {} }) {
-  return (
-    <div style={{
-      background: "white", border: "0.5px solid #e5e5e5", borderRadius: 12,
-      padding: "1.5rem", marginBottom: "1rem", ...style,
-    }}>{children}</div>
-  );
-}
-
-function Field({ label, children }) {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      <label style={{ fontSize: 12, color: "#888", fontWeight: 500 }}>{label}</label>
-      {children}
-    </div>
-  );
-}
-
-const inputStyle = {
-  background: "#f8f8f8", border: "0.5px solid #e0e0e0", borderRadius: 8,
-  padding: "9px 12px", fontSize: 14, color: "#222", outline: "none",
-  width: "100%", boxSizing: "border-box", fontFamily: "inherit",
-};
-const thStyle = {
-  fontSize: 12, fontWeight: 500, color: "#888", textAlign: "left",
-  padding: "8px 10px", background: "#f8f8f8", borderBottom: "1px solid #e5e5e5",
-};
-const tdStyle = {
-  padding: "8px 10px", borderBottom: "0.5px solid #f0f0f0",
-  verticalAlign: "middle", fontSize: 14, color: "#222",
-};
-
-// ─── LOGIN SCREEN ─────────────────────────────────────────────────────────────
-
-function LoginScreen({ onLogin }) {
-  const [email, setEmail]       = useState("");
-  const [password, setPassword] = useState("");
-  const [showPwd, setShowPwd]   = useState(false);
-  const [error, setError]       = useState("");
-  const [loading, setLoading]   = useState(false);
-
-  const handleSubmit = async () => {
-    if (!email || !password) { setError("Please enter email and password."); return; }
-    setLoading(true); setError("");
+  // Active Evaluator Role & Identity
+  const storedUser = useMemo(() => {
     try {
-      const res = await fetch(`${API_BASE}/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-      const data = await res.json();
-      if (!res.ok) { setError(data.error || "Invalid email or password."); }
-      else { onLogin(data); }
+      return JSON.parse(localStorage.getItem("user") || "{}");
     } catch {
-      setError("Cannot connect to server. Make sure backend is running.");
-    } finally { setLoading(false); }
-  };
+      return {};
+    }
+  }, []);
 
-  const handleKeyDown = (e) => { if (e.key === "Enter") handleSubmit(); };
+  const rawRole = (localStorage.getItem("role") || storedUser.role || "").toLowerCase();
+  const designation = (storedUser.designation || "").toLowerCase();
+  const isHodRole =
+    ["hod", "manager", "department head"].includes(rawRole) ||
+    designation.includes("hod") ||
+    designation.includes("head") ||
+    designation.includes("manager");
+  const isHR = ["hr", "admin", "hrmanager"].includes(rawRole);
+  const isHOD = isHodRole && !isHR;
 
-  return (
-    <div style={{
-      minHeight: "100vh", display: "flex", alignItems: "center",
-      justifyContent: "center", padding: "2rem 1rem",
-      background: "#f4f4f7", fontFamily: "'Segoe UI', Arial, sans-serif",
-    }}>
-      <div style={{ width: "100%", maxWidth: 420 }}>
-        <div style={{
-          background: "linear-gradient(135deg,#534AB7,#7F77DD)", borderRadius: 12,
-          padding: "2rem", marginBottom: "1.5rem", textAlign: "center",
-        }}>
-          <div style={{
-            width: 56, height: 56, background: "rgba(255,255,255,0.2)",
-            borderRadius: "50%", display: "flex", alignItems: "center",
-            justifyContent: "center", margin: "0 auto 1rem",
-          }}>
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none"
-              stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-          </div>
-          <div style={{ color: "white", fontSize: 20, fontWeight: 500, marginBottom: 4 }}>
-            Interview Assessment System
-          </div>
-          <div style={{ color: "rgba(255,255,255,0.75)", fontSize: 13 }}>Sign in to continue</div>
-        </div>
+  // Active Tabs: "evaluation" or "reports"
+  const [activeTab, setActiveTab] = useState("evaluation");
 
-        <div style={{ background: "white", border: "0.5px solid #e5e5e5", borderRadius: 12, padding: "1.75rem" }}>
-          <Field label="Email address">
-            <input style={inputStyle} type="email" placeholder="Enter your email"
-              value={email} onChange={e => { setEmail(e.target.value); setError(""); }}
-              onKeyDown={handleKeyDown} />
-          </Field>
-          <div style={{ height: 12 }} />
-          <Field label="Password">
-            <div style={{ position: "relative" }}>
-              <input
-                style={{ ...inputStyle, paddingRight: 56 }}
-                type={showPwd ? "text" : "password"}
-                placeholder="Enter your password"
-                value={password}
-                onChange={e => { setPassword(e.target.value); setError(""); }}
-                onKeyDown={handleKeyDown}
-              />
-              <button onClick={() => setShowPwd(v => !v)} style={{
-                position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
-                background: "none", border: "none", color: "#888", fontSize: 12,
-                cursor: "pointer", fontFamily: "inherit", padding: "4px 6px",
-              }}>{showPwd ? "Hide" : "Show"}</button>
-            </div>
-          </Field>
-          {error && (
-            <div style={{ background: "#FCEBEB", border: "0.5px solid #F09595", borderRadius: 8, padding: "10px 12px", color: "#A32D2D", fontSize: 13, marginTop: 12 }}>{error}</div>
-          )}
-          <button onClick={handleSubmit} disabled={loading} style={{
-            width: "100%", padding: 12, marginTop: 16,
-            background: loading ? "#9990d6" : "#534AB7",
-            color: "white", border: "none", borderRadius: 8, fontSize: 15, fontWeight: 500,
-            cursor: loading ? "not-allowed" : "pointer", fontFamily: "inherit",
-          }}>{loading ? "Signing in..." : "Sign in"}</button>
-          <div style={{ marginTop: "1rem", fontSize: 12, color: "#aaa", textAlign: "center" }}>
-            Credentials are stored securely in the database
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+  // Candidates list & selection
+  const [candidates, setCandidates] = useState([]);
+  const [loadingCandidates, setLoadingCandidates] = useState(false);
+  const [selectedCandidate, setSelectedCandidate] = useState(null);
+  const [loadingCandidateDetails, setLoadingCandidateDetails] = useState(false);
+  const [candidateSearch, setCandidateSearch] = useState("");
 
-// ─── USER MANAGEMENT ─────────────────────────────────────────────────────────
+  // Resume Modal
+  const [showResumeModal, setShowResumeModal] = useState(false);
 
-function UserManagement() {
-  const [users, setUsers]             = useState([]);
-  const [loading, setLoading]         = useState(true);
-  const [showAdd, setShowAdd]         = useState(false);
-  const [form, setForm]               = useState({ email: "", password: "", name: "", role: "hr", label: "" });
-  const [formError, setFormError]     = useState("");
-  const [formLoading, setFormLoading] = useState(false);
-  const [pwdModal, setPwdModal]       = useState(null);
-  const [newPwd, setNewPwd]           = useState("");
-  const [pwdError, setPwdError]       = useState("");
-  const [successMsg, setSuccessMsg]   = useState("");
+  // Form State: 4 Core Evaluation Criteria + Feedback
+  const [evalRound, setEvalRound] = useState("ROUND_1_HR");
+  const [formData, setFormData] = useState({
+    personal_appearance_and_behaviour: "",
+    personal_appearance_rating: 4,
+    domain_knowledge: "",
+    domain_knowledge_rating: 4,
+    education: "",
+    education_rating: 4,
+    job_role: "satisfactory", // "satisfactory" | "high" | "poor"
+    detailed_feedback: "",
+    recommendation: "NEXT_ROUND",
+    next_interview_date: "",
+    next_interview_time: "11:00 AM",
+    next_interview_mode: "Online (Google Meet)",
+    next_interview_link: "",
+  });
+  const [submittingEvaluation, setSubmittingEvaluation] = useState(false);
 
-  const flash = (msg) => { setSuccessMsg(msg); setTimeout(() => setSuccessMsg(""), 3000); };
-
-  const fetchUsers = async () => {
-    setLoading(true);
-    try { const res = await fetch(`${API_BASE}/auth/users`); setUsers(await res.json()); } catch {}
-    setLoading(false);
-  };
-  useEffect(() => { fetchUsers(); }, []);
-
-  const handleAdd = async () => {
-    if (!form.email || !form.password || !form.name) { setFormError("Email, password and name are required."); return; }
-    setFormLoading(true); setFormError("");
+  // Load candidate list from backend
+  const fetchCandidates = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE}/auth/register`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
-      const data = await res.json();
-      if (!res.ok) { setFormError(data.error || "Failed"); }
-      else { setForm({ email: "", password: "", name: "", role: "hr", label: "" }); setShowAdd(false); fetchUsers(); flash("✅ User added successfully!"); }
-    } catch { setFormError("Network error"); }
-    setFormLoading(false);
-  };
-
-  const handleToggle = async (id, current) => {
-    await fetch(`${API_BASE}/auth/users/${id}/status`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ is_active: !current }) });
-    fetchUsers(); flash(current ? "User deactivated" : "User activated");
-  };
-
-  const handleDelete = async (id, name) => {
-    if (!window.confirm(`Delete user "${name}"? This cannot be undone.`)) return;
-    await fetch(`${API_BASE}/auth/users/${id}`, { method: "DELETE" });
-    fetchUsers(); flash("User deleted.");
-  };
-
-  const handlePwdChange = async () => {
-    if (!newPwd || newPwd.length < 4) { setPwdError("Minimum 4 characters."); return; }
-    const res = await fetch(`${API_BASE}/auth/users/${pwdModal.id}/password`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ newPassword: newPwd }) });
-    if (res.ok) { setPwdModal(null); setNewPwd(""); setPwdError(""); flash("✅ Password updated!"); }
-    else { setPwdError("Failed to update password."); }
-  };
-
-  const roleColors = { admin: { bg: "#EEEDFE", color: "#534AB7" }, hr: { bg: "#E6F1FB", color: "#185FA5" }, hod: { bg: "#FAEEDA", color: "#854F0B" } };
-
-  return (
-    <>
-      {pwdModal && (
-        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.5)", zIndex: 999, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-          <div style={{ background: "white", borderRadius: 12, padding: "1.5rem", maxWidth: 380, width: "100%" }}>
-            <div style={{ fontWeight: 500, fontSize: 15, marginBottom: 12 }}>Change password — {pwdModal.name}</div>
-            <Field label="New password"><input style={inputStyle} type="password" placeholder="Enter new password" value={newPwd} onChange={e => { setNewPwd(e.target.value); setPwdError(""); }} /></Field>
-            {pwdError && <div style={{ color: "#A32D2D", fontSize: 13, marginTop: 8 }}>{pwdError}</div>}
-            <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
-              <button onClick={handlePwdChange} style={{ flex: 1, padding: "9px", background: "#534AB7", color: "white", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>Update password</button>
-              <button onClick={() => { setPwdModal(null); setNewPwd(""); setPwdError(""); }} style={{ padding: "9px 16px", background: "#f0f0f0", color: "#444", border: "none", borderRadius: 8, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
-            </div>
-          </div>
-        </div>
-      )}
-      <Card>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
-          <SectionLabel>👥 User Management</SectionLabel>
-          <button onClick={() => setShowAdd(v => !v)} style={{ padding: "7px 16px", background: "#534AB7", color: "white", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>+ Add User</button>
-        </div>
-        {successMsg && <div style={{ background: "#EAF3DE", border: "0.5px solid #97C459", borderRadius: 8, padding: "10px 14px", color: "#3B6D11", fontSize: 13, marginBottom: 12 }}>{successMsg}</div>}
-        {showAdd && (
-          <div style={{ background: "#f8f8f8", border: "0.5px solid #e0e0e0", borderRadius: 10, padding: "1rem", marginBottom: "1rem" }}>
-            <div style={{ fontWeight: 500, fontSize: 14, color: "#534AB7", marginBottom: 12 }}>New User Details</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-              <Field label="Full name"><input style={inputStyle} placeholder="e.g. Rahul Sharma" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} /></Field>
-              <Field label="Email"><input style={inputStyle} type="email" placeholder="user@company.com" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} /></Field>
-              <Field label="Password"><input style={inputStyle} type="password" placeholder="Min 4 characters" value={form.password} onChange={e => setForm(p => ({ ...p, password: e.target.value }))} /></Field>
-              <Field label="Role">
-                <select style={{ ...inputStyle, cursor: "pointer" }} value={form.role} onChange={e => setForm(p => ({ ...p, role: e.target.value }))}>
-                  <option value="admin">Admin</option><option value="hr">HR Manager</option><option value="hod">HOD</option>
-                </select>
-              </Field>
-              <Field label="Label (optional)"><input style={inputStyle} placeholder="e.g. Senior HR Manager" value={form.label} onChange={e => setForm(p => ({ ...p, label: e.target.value }))} /></Field>
-            </div>
-            {formError && <div style={{ color: "#A32D2D", fontSize: 13, marginTop: 8 }}>{formError}</div>}
-            <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-              <button onClick={handleAdd} disabled={formLoading} style={{ padding: "9px 20px", background: formLoading ? "#9990d6" : "#534AB7", color: "white", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>{formLoading ? "Saving..." : "Add user"}</button>
-              <button onClick={() => { setShowAdd(false); setFormError(""); }} style={{ padding: "9px 14px", background: "#f0f0f0", color: "#444", border: "none", borderRadius: 8, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
-            </div>
-          </div>
-        )}
-        {loading ? (
-          <div style={{ textAlign: "center", color: "#888", padding: "1.5rem", fontSize: 14 }}>Loading users...</div>
-        ) : (
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead><tr>
-              <th style={thStyle}>Name</th><th style={thStyle}>Email</th><th style={thStyle}>Role</th>
-              <th style={thStyle}>Status</th><th style={thStyle}>Last login</th>
-              <th style={{ ...thStyle, textAlign: "center" }}>Actions</th>
-            </tr></thead>
-            <tbody>
-              {users.map(u => {
-                const rc = roleColors[u.role] || { bg: "#f0f0f0", color: "#888" };
-                return (
-                  <tr key={u.id}>
-                    <td style={tdStyle}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <div style={{ width: 32, height: 32, borderRadius: "50%", background: rc.color, color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 600, flexShrink: 0 }}>{getInitials(u.name)}</div>
-                        <span style={{ fontWeight: 500 }}>{u.name}</span>
-                      </div>
-                    </td>
-                    <td style={{ ...tdStyle, fontSize: 13, color: "#555" }}>{u.email}</td>
-                    <td style={tdStyle}><span style={{ background: rc.bg, color: rc.color, padding: "2px 10px", borderRadius: 100, fontSize: 11, fontWeight: 500 }}>{u.label || u.role}</span></td>
-                    <td style={tdStyle}><span style={{ background: u.is_active ? "#EAF3DE" : "#f0f0f0", color: u.is_active ? "#3B6D11" : "#888", padding: "2px 10px", borderRadius: 100, fontSize: 11, fontWeight: 500 }}>{u.is_active ? "Active" : "Inactive"}</span></td>
-                    <td style={{ ...tdStyle, fontSize: 12, color: "#888" }}>{u.last_login ? new Date(u.last_login).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "Never"}</td>
-                    <td style={{ ...tdStyle, textAlign: "center" }}>
-                      <div style={{ display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap" }}>
-                        <button onClick={() => { setPwdModal({ id: u.id, name: u.name }); setNewPwd(""); }} style={{ padding: "5px 10px", background: "#E6F1FB", color: "#185FA5", border: "none", borderRadius: 6, fontSize: 11, cursor: "pointer", fontFamily: "inherit" }}>🔑 Password</button>
-                        <button onClick={() => handleToggle(u.id, u.is_active)} style={{ padding: "5px 10px", background: u.is_active ? "#FAEEDA" : "#EAF3DE", color: u.is_active ? "#854F0B" : "#3B6D11", border: "none", borderRadius: 6, fontSize: 11, cursor: "pointer", fontFamily: "inherit" }}>{u.is_active ? "Deactivate" : "Activate"}</button>
-                        <button onClick={() => handleDelete(u.id, u.name)} style={{ padding: "5px 10px", background: "#FCEBEB", color: "#A32D2D", border: "none", borderRadius: 6, fontSize: 11, cursor: "pointer", fontFamily: "inherit" }}>🗑 Delete</button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </Card>
-    </>
-  );
-}
-
-// ─── PDF VIEWER MODAL ─────────────────────────────────────────────────────────
-
-function PdfViewerModal({ pdfUrl, fileName, onClose }) {
-  return (
-    <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.65)", zIndex: 999, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-      <div style={{ background: "white", borderRadius: 16, maxWidth: 820, width: "100%", height: "88vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "1rem 1.5rem", borderBottom: "0.5px solid #e5e5e5", background: "#f8f8f8", borderRadius: "16px 16px 0 0" }}>
-          <div style={{ fontWeight: 500, fontSize: 14, color: "#222" }}>Offer Letter — {fileName}</div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <a href={pdfUrl} download={fileName} style={{ padding: "7px 14px", background: "#534AB7", color: "white", borderRadius: 8, fontSize: 13, fontWeight: 500, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 5 }}>⬇ Download</a>
-            <button onClick={onClose} style={{ padding: "7px 14px", background: "#f0f0f0", color: "#444", border: "none", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>Close</button>
-          </div>
-        </div>
-        <iframe src={pdfUrl} title="Offer Letter PDF" style={{ flex: 1, border: "none", width: "100%" }} />
-      </div>
-    </div>
-  );
-}
-
-// ─── PRINT REPORT ─────────────────────────────────────────────────────────────
-
-function buildPrintHTML(report) {
-  const vc = verdictColors[report.verdict]    || { bg: "#eee",    color: "#888" };
-  const gc = gradeColors[report.overallGrade] || { bg: "#f0f0f0", color: "#888" };
-
-  const roundRows = roundDefs.map((rd, ri) => {
-    const rows = rd.criteria.map((c, ci) => {
-      const g   = report.roundGrades?.[ri]?.[c.key] || "";
-      const gc2 = gradeColors[g] || { bg: "#f0f0f0", color: "#888" };
-      return `<tr>
-        <td style="padding:7px 10px;border-bottom:0.5px solid #f0f0f0;color:#aaa;font-size:12px;width:32px">${ci + 1}</td>
-        <td style="padding:7px 10px;border-bottom:0.5px solid #f0f0f0;font-size:13px;color:#222">${c.name}</td>
-        <td style="padding:7px 10px;border-bottom:0.5px solid #f0f0f0;text-align:center">
-          <span style="display:inline-block;padding:2px 10px;border-radius:100px;font-size:11px;font-weight:500;background:${gc2.bg};color:${gc2.color}">${g || "—"}</span>
-        </td></tr>`;
-    }).join("");
-    const isHr = ri === 0;
-    const roundComment = report.roundComments?.[ri]
-      ? `<div style="background:#f8f8f8;border-radius:8px;padding:10px 12px;margin-top:8px;font-size:12px;color:#444;line-height:1.6">
-           <span style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:4px">Round ${ri + 1} comments</span>
-           ${report.roundComments[ri]}</div>` : "";
-    return `<div style="margin-bottom:18px">
-      <div style="font-weight:500;font-size:12px;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em;color:${isHr ? "#185FA5" : "#854F0B"}">${rd.label}</div>
-      <table style="width:100%;border-collapse:collapse">
-        <thead><tr>
-          <th style="font-size:11px;font-weight:500;color:#888;text-align:left;padding:6px 10px;background:#f8f8f8;border-bottom:1px solid #e5e5e5;width:32px">#</th>
-          <th style="font-size:11px;font-weight:500;color:#888;text-align:left;padding:6px 10px;background:#f8f8f8;border-bottom:1px solid #e5e5e5">Criteria</th>
-          <th style="font-size:11px;font-weight:500;color:#888;text-align:center;padding:6px 10px;background:#f8f8f8;border-bottom:1px solid #e5e5e5;width:80px">Grade</th>
-        </tr></thead>
-        <tbody>${rows}</tbody>
-      </table>${roundComment}</div>`;
-  }).join("");
-
-  const negotiationRows = [
-    ["Candidate", report.name], ["Qualification", report.qualification],
-    ["Current designation", report.designation], ["Expected salary", report.expectedSalary],
-    ["Final salary offered", report.finalSalary],
-    ["Date & Time", `${report.iDate || ""} ${report.iTime || ""}`],
-    ["HR", `${report.hrName || "—"} (${report.hrDesignation || "—"})`],
-    ["HOD", `${report.hodName || "—"} (${report.hodDepartment || "—"})`],
-  ].map(([k, v]) => `<div style="display:flex;gap:12px;border-bottom:0.5px solid #f0f0f0;padding:6px 0">
-    <span style="color:#888;min-width:160px;font-size:12px">${k}</span>
-    <span style="color:#222;font-weight:${k === "Final salary offered" ? 600 : 400};font-size:13px">${v || "—"}</span>
-  </div>`).join("");
-
-  const hrBadge = report.hrName ? `<div style="background:#EEEDFE;border:0.5px solid #AFA9EC;border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:12px;margin-bottom:10px">
-    <div style="width:38px;height:38px;border-radius:50%;background:#534AB7;display:flex;align-items:center;justify-content:center;color:white;font-weight:500;font-size:14px;flex-shrink:0">${getInitials(report.hrName)}</div>
-    <div><div style="font-weight:500;font-size:13px;color:#26215C">${report.hrName}</div>
-    <div style="font-size:11px;color:#534AB7">${[report.hrDesignation, "HR Round 1"].filter(Boolean).join(" · ")}</div></div>
-    <span style="margin-left:auto;font-size:10px;background:#E6F1FB;color:#185FA5;padding:2px 8px;border-radius:4px">HR</span></div>` : "";
-
-  const hodBadge = report.hodName ? `<div style="background:#FAEEDA;border:0.5px solid #FAC775;border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:12px">
-    <div style="width:38px;height:38px;border-radius:50%;background:#854F0B;display:flex;align-items:center;justify-content:center;color:white;font-weight:500;font-size:14px;flex-shrink:0">${getInitials(report.hodName)}</div>
-    <div><div style="font-weight:500;font-size:13px;color:#412402">${report.hodName}</div>
-    <div style="font-size:11px;color:#854F0B">${[report.hodDesignation, report.hodDepartment].filter(Boolean).join(" · ")} — Round 2 & 3</div></div>
-    <span style="margin-left:auto;font-size:10px;background:#FAEEDA;color:#854F0B;padding:2px 8px;border-radius:4px">HOD</span></div>` : "";
-
-  return `<!DOCTYPE html><html><head><meta charset="UTF-8"/>
-<title>Interview Report — ${report.name}</title>
-<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Segoe UI',Arial,sans-serif;background:#f4f4f7;padding:24px;color:#222}.page{max-width:720px;margin:0 auto;background:white;border-radius:12px;overflow:hidden;border:0.5px solid #e0e0e0}.card{background:white;border:0.5px solid #e5e5e5;border-radius:12px;padding:1.5rem;margin-bottom:1rem}.section-label{font-size:11px;font-weight:600;color:#534AB7;text-transform:uppercase;letter-spacing:.08em;margin-bottom:1rem;display:flex;align-items:center;gap:8px}.section-label::after{content:'';flex:1;height:0.5px;background:#e5e5e5}.no-print{margin-top:20px;text-align:center}@media print{body{background:white;padding:0}.page{border:none;border-radius:0}.no-print{display:none}}</style>
-</head><body><div class="page">
-<div style="background:linear-gradient(135deg,#534AB7,#7F77DD);padding:1.5rem 2rem;display:flex;align-items:center;justify-content:space-between">
-  <div><div style="color:white;font-size:18px;font-weight:500;margin-bottom:2px">Candidate Interview Report</div>
-  <div style="color:rgba(255,255,255,0.75);font-size:12px">HR (Round 1) · HOD (Round 2 & 3) · Multi-round panel</div></div>
-  <div style="text-align:right"><div style="color:rgba(255,255,255,0.75);font-size:11px">Generated</div>
-  <div style="color:white;font-size:12px;font-weight:500">${today()}</div></div>
-</div>
-<div style="padding:1.5rem">
-  <div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:1rem">
-      <div><div style="font-size:20px;font-weight:500;color:#222">${report.name || "—"}</div>
-      <div style="font-size:13px;color:#888;margin-top:2px">${report.designation || ""} → Applied: ${report.appliedRole || "—"} · ${report.jobRole || ""}</div>
-      <div style="font-size:13px;color:#888;margin-top:2px">${report.iDate || ""} ${report.iTime || ""}</div></div>
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        ${report.overallGrade ? `<span style="background:${gc.bg};color:${gc.color};padding:4px 14px;border-radius:100px;font-size:15px;font-weight:500">Overall: ${report.overallGrade}</span>` : ""}
-        ${report.verdict ? `<span style="background:${vc.bg};color:${vc.color};padding:5px 14px;border-radius:100px;font-size:13px;font-weight:500">${report.verdict}</span>` : ""}
-      </div>
-    </div>
-    ${hrBadge}${hodBadge}
-  </div>
-  <div class="card"><div class="section-label">Round-wise assessment</div>${roundRows}</div>
-  <div class="card"><div class="section-label">HR Negotiation details</div><div style="font-size:14px;line-height:1.9">${negotiationRows}</div></div>
-  ${report.hrComments ? `<div class="card"><div class="section-label">HR comments</div><div style="font-size:13px;color:#333;line-height:1.7">${report.hrComments}</div></div>` : ""}
-  <div style="text-align:center;font-size:11px;color:#aaa;padding:8px 0 4px">Interview Assessment System · ${today()}</div>
-</div></div>
-<div class="no-print"><button onclick="window.print()" style="padding:11px 28px;background:#534AB7;color:white;border:none;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;font-family:inherit">🖨️ Print / Save as PDF</button></div>
-</body></html>`;
-}
-
-// ─── ASSESSMENT FORM ──────────────────────────────────────────────────────────
-
-function AssessmentForm({ onSubmit, userRole }) {
-  const [candidate, setCandidate] = useState({ name: "", designation: "", appliedRole: "", jobRole: "", qualification: "", expectedSalary: "", finalSalary: "", iDate: "", iTime: "" });
-  const [hod, setHod]           = useState({ name: "", designation: "", department: "" });
-  const [hrPerson, setHrPerson] = useState({ name: "", designation: "", panel: "" });
-  const [currentRound, setCurrentRound]   = useState(1);
-  const [roundGrades, setRoundGrades]     = useState([{}, {}, {}]);
-  const [roundComments, setRoundComments] = useState(["", "", ""]);
-  const [verdict, setVerdict]     = useState("");
-  const [hrComments, setHrComments] = useState("");
-  const [submitted, setSubmitted] = useState(false);
-  const [loading, setLoading]     = useState(false);
-  const [error, setError]         = useState("");
-  const [offerFile, setOfferFile] = useState(null);
-  const [offerFileUrl, setOfferFileUrl] = useState(null);
-  const [showPdf, setShowPdf]     = useState(false);
-  const fileInputRef = useRef(null);
-
-  const setC  = (k, v) => setCandidate(p => ({ ...p, [k]: v }));
-  const setH  = (k, v) => setHod(p => ({ ...p, [k]: v }));
-  const setHR = (k, v) => setHrPerson(p => ({ ...p, [k]: v }));
-
-  const canSeeRound = (ri) => { if (userRole === "admin") return true; if (userRole === "hr") return ri === 0; return false; };
-  const hodRoundIndices = userRole === "admin" ? [1, 2] : [];
-
-  const handleGrade = (round, key, val) => {
-    const g = val.toUpperCase().replace(/[^ABCDF]/g, "").slice(0, 1);
-    setRoundGrades(prev => { const n = prev.map(r => ({ ...r })); n[round] = { ...n[round], [key]: g }; return n; });
-  };
-
-  const calcOverallGrade = () => {
-    let total = 0, count = 0;
-    roundGrades.forEach(rg => Object.values(rg).forEach(g => { if (g) { total += gradeToNum(g); count++; } }));
-    return count > 0 ? numToGrade(total / count) : "";
-  };
-
-  const handleOfferFileChange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    if (file.type !== "application/pdf") { toast.error("Only PDF files are accepted."); return; }
-    setOfferFile(file); setOfferFileUrl(URL.createObjectURL(file));
-  };
-
-  const handleSubmit = async () => {
-    if (!candidate.name.trim()) { toast.error("Please enter candidate name."); return; }
-    setLoading(true); setError("");
-    const record = {
-      ...candidate,
-      hodName: hod.name, hodDesignation: hod.designation, hodDepartment: hod.department,
-      hrName: hrPerson.name, hrDesignation: hrPerson.designation, hrPanel: hrPerson.panel,
-      roundGrades: roundGrades.map(r => ({ ...r })),
-      roundComments: [...roundComments],
-      verdict, hrComments, overallGrade: calcOverallGrade(),
-    };
-    try {
-      let offerLetterPath = null;
-      if (offerFile) {
-        const fd = new FormData();
-        fd.append("offerLetter", offerFile); fd.append("candidateName", candidate.name);
-        try { const up = await fetch(`${API_BASE}/upload-offer-letter`, { method: "POST", body: fd }); if (up.ok) { const ud = await up.json(); offerLetterPath = ud.filePath; } } catch {}
+      setLoadingCandidates(true);
+      const res = await api.get("/recruitment/candidates");
+      if (res.data?.success && Array.isArray(res.data.data)) {
+        setCandidates(res.data.data);
       }
-      const res = await fetch(`${API_BASE}/assessments`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...record, offerLetterPath }) });
-      if (!res.ok) throw new Error("Server error");
-      const saved = await res.json();
-      onSubmit({ ...record, id: saved.id, offerLetterPath });
-      setSubmitted(true);
-      setCandidate({ name: "", designation: "", appliedRole: "", jobRole: "", qualification: "", expectedSalary: "", finalSalary: "", iDate: "", iTime: "" });
-      setHod({ name: "", designation: "", department: "" }); setHrPerson({ name: "", designation: "", panel: "" });
-      setRoundGrades([{}, {}, {}]); setRoundComments(["", "", ""]);
-      setVerdict(""); setHrComments(""); setOfferFile(null); setOfferFileUrl(null);
-      setTimeout(() => setSubmitted(false), 4000);
-    } catch { setError("Failed to save. Check backend connection."); }
-    finally { setLoading(false); }
+    } catch (err) {
+      console.error("Failed to load recruitment candidates:", err);
+      toast.error("Could not load candidate list.");
+    } finally {
+      setLoadingCandidates(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchCandidates();
+  }, [fetchCandidates]);
+
+  // Load single candidate details when candidateId changes or route params exist
+  const loadCandidateById = useCallback(async (id, fallbackCandidate = null) => {
+    if (!id) {
+      if (fallbackCandidate) setSelectedCandidate(fallbackCandidate);
+      return;
+    }
+    try {
+      setLoadingCandidateDetails(true);
+      const res = await api.get(`/recruitment/candidates/${id}`);
+      if (res.data?.success && res.data.data) {
+        setSelectedCandidate(res.data.data);
+      } else if (fallbackCandidate) {
+        setSelectedCandidate(fallbackCandidate);
+      }
+    } catch (err) {
+      console.warn("Could not load candidate by ID, using state fallback:", err.message);
+      if (fallbackCandidate) setSelectedCandidate(fallbackCandidate);
+    } finally {
+      setLoadingCandidateDetails(false);
+    }
+  }, []);
+
+  // Initial candidate resolution from route or state
+  useEffect(() => {
+    const targetId = routeCandidateId || location.state?.candidateId || location.state?.candidate?.id;
+    const fallback = location.state?.candidate || location.state?.prefillCandidate;
+    if (targetId) {
+      loadCandidateById(targetId, fallback);
+    } else if (fallback) {
+      setSelectedCandidate(fallback);
+    } else if (candidates.length > 0 && !selectedCandidate) {
+      // Pick first candidate in scheduled or interview pipeline
+      const scheduledOne = candidates.find(
+        (c) =>
+          c.interview_stage &&
+          ["SCHEDULED", "ROUND_1_HR", "ROUND_2_TECH", "ROUND_3_FINAL", "INTERVIEW_REQUESTED"].includes(
+            c.interview_stage
+          )
+      ) || candidates[0];
+      setSelectedCandidate(scheduledOne);
+    }
+  }, [routeCandidateId, location.state, candidates, loadCandidateById, selectedCandidate]);
+
+  // Auto-sync evaluation round with candidate's scheduled stage
+  useEffect(() => {
+    if (selectedCandidate?.interview_stage) {
+      const stage = selectedCandidate.interview_stage;
+      if (["ROUND_1_HR", "SCHEDULED", "INTERVIEW_REQUESTED"].includes(stage)) {
+        setEvalRound("ROUND_1_HR");
+      } else if (stage === "ROUND_2_TECH") {
+        setEvalRound("ROUND_2_TECH");
+      } else if (stage === "ROUND_3_FINAL") {
+        setEvalRound("ROUND_3_FINAL");
+      }
+    }
+  }, [selectedCandidate]);
+
+  // Pre-fill form if an existing evaluation for this round is recorded
+  useEffect(() => {
+    if (selectedCandidate?.interview_evaluations && Array.isArray(selectedCandidate.interview_evaluations)) {
+      const existing = selectedCandidate.interview_evaluations.find((e) => e.round === evalRound);
+      if (existing) {
+        setFormData({
+          personal_appearance_and_behaviour: existing.personal_appearance_and_behaviour || "",
+          personal_appearance_rating: existing.personal_appearance_rating || 4,
+          domain_knowledge: existing.domain_knowledge || "",
+          domain_knowledge_rating: existing.domain_knowledge_rating || 4,
+          education: existing.education || "",
+          education_rating: existing.education_rating || 4,
+          job_role: existing.job_role || "satisfactory",
+          detailed_feedback: existing.detailed_feedback || "",
+          recommendation: existing.recommendation || "NEXT_ROUND",
+          next_interview_date: "",
+          next_interview_time: "11:00 AM",
+          next_interview_mode: "Online (Google Meet)",
+          next_interview_link: "",
+        });
+        return;
+      }
+    }
+    // Default reset when switching round without previous review
+    setFormData((prev) => ({
+      ...prev,
+      personal_appearance_and_behaviour: "",
+      personal_appearance_rating: 4,
+      domain_knowledge: "",
+      domain_knowledge_rating: 4,
+      education: "",
+      education_rating: 4,
+      job_role: "satisfactory",
+      detailed_feedback: "",
+      recommendation: evalRound === "ROUND_3_FINAL" ? "SELECTED" : "NEXT_ROUND",
+    }));
+  }, [selectedCandidate, evalRound]);
+
+  // Handle Form Submission
+  const handleSubmitEvaluation = async (e) => {
+    if (e) e.preventDefault();
+    if (!selectedCandidate?.id) {
+      toast.error("Please select a valid candidate for evaluation.");
+      return;
+    }
+    if (!formData.job_role) {
+      toast.error("Please select the candidate's Job Role fitment (High / Satisfactory / Poor).");
+      return;
+    }
+
+    try {
+      setSubmittingEvaluation(true);
+      const payload = {
+        round: evalRound,
+        ...formData,
+      };
+
+      const res = await api.post(`/recruitment/candidates/${selectedCandidate.id}/evaluation`, payload);
+
+      if (res.data?.success) {
+        toast.success(`Evaluation recorded successfully for ${ROUND_LABEL(evalRound)}!`);
+        // Refresh candidate data
+        await loadCandidateById(selectedCandidate.id);
+        await fetchCandidates();
+        // Switch to reports tab to view updated evaluation report
+        setActiveTab("reports");
+      }
+    } catch (err) {
+      console.error("Evaluation submission error:", err);
+      toast.error(err.response?.data?.error || "Failed to submit candidate evaluation.");
+    } finally {
+      setSubmittingEvaluation(false);
+    }
   };
 
-  const GradeTable = ({ roundIdx }) => (
-    <table style={{ width: "100%", borderCollapse: "collapse" }}>
-      <thead><tr>
-        <th style={{ ...thStyle, width: 36 }}>#</th>
-        <th style={thStyle}>Assessment criteria</th>
-        <th style={{ ...thStyle, width: 150 }}>Grade (A/B/C/D/F)</th>
-        <th style={{ ...thStyle, width: 70, textAlign: "center" }}>Badge</th>
-      </tr></thead>
-      <tbody>
-        {roundDefs[roundIdx].criteria.map((c, i) => {
-          const g = roundGrades[roundIdx][c.key] || "";
-          return (
-            <tr key={c.key}>
-              <td style={{ ...tdStyle, color: "#aaa", fontSize: 13 }}>{i + 1}</td>
-              <td style={tdStyle}>{c.name}</td>
-              <td style={tdStyle}><input style={{ ...inputStyle, padding: "7px 10px", fontSize: 13, textTransform: "uppercase" }} maxLength={1} placeholder="A/B/C/D/F" value={g} onChange={e => handleGrade(roundIdx, c.key, e.target.value)} /></td>
-              <td style={{ ...tdStyle, textAlign: "center" }}><Badge grade={g} /></td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
-  );
+  // Helper Labels & Badges
+  const ROUND_LABEL = (key) => {
+    const found = ROUNDS.find((r) => r.key === key);
+    return found ? found.label : key || "Interview Session";
+  };
+
+  const getStageBadge = (stage) => {
+    switch (stage) {
+      case "ROUND_1_HR":
+        return <Badge bg="primary">Round 1 (HR Screening)</Badge>;
+      case "ROUND_2_TECH":
+        return <Badge bg="info" className="text-dark">Round 2 (Technical - HOD)</Badge>;
+      case "ROUND_3_FINAL":
+        return <Badge bg="purple" style={{ backgroundColor: "#8b5cf6" }}>Round 3 (Final)</Badge>;
+      case "SELECTED":
+        return <Badge bg="success">Selected / Offer</Badge>;
+      case "REJECTED":
+        return <Badge bg="danger">Rejected</Badge>;
+      case "ON_HOLD":
+        return <Badge bg="warning" className="text-dark">On Hold</Badge>;
+      case "SCHEDULED":
+        return <Badge bg="primary">Interview Scheduled</Badge>;
+      default:
+        return <Badge bg="secondary">{stage || "Pending"}</Badge>;
+    }
+  };
+
+  // Candidate evaluations list
+  const candidateEvaluations = useMemo(() => {
+    return Array.isArray(selectedCandidate?.interview_evaluations)
+      ? selectedCandidate.interview_evaluations
+      : [];
+  }, [selectedCandidate]);
+
+  // Overall Score Calculation (Average across completed evaluations)
+  const averageCandidateScore = useMemo(() => {
+    if (!candidateEvaluations.length) return null;
+    const sum = candidateEvaluations.reduce((acc, curr) => acc + (Number(curr.overall_score) || 0), 0);
+    return Math.round(sum / candidateEvaluations.length);
+  }, [candidateEvaluations]);
+
+  // Filter candidates for search
+  const filteredCandidates = useMemo(() => {
+    if (!candidateSearch.trim()) return candidates;
+    const q = candidateSearch.toLowerCase();
+    return candidates.filter(
+      (c) =>
+        c.candidate_name?.toLowerCase().includes(q) ||
+        c.requisition?.position?.toLowerCase().includes(q) ||
+        c.requisition?.department?.toLowerCase().includes(q) ||
+        c.current_designation?.toLowerCase().includes(q)
+    );
+  }, [candidates, candidateSearch]);
 
   return (
-    <>
-      {showPdf && offerFileUrl && <PdfViewerModal pdfUrl={offerFileUrl} fileName={offerFile?.name || "offer-letter.pdf"} onClose={() => setShowPdf(false)} />}
-      <Card>
-        <SectionLabel>👤 Candidate information</SectionLabel>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <Field label="Full name"><input style={inputStyle} value={candidate.name} onChange={e => setC("name", e.target.value)} placeholder="e.g. Rahul Sharma" /></Field>
-          <Field label="Current designation"><input style={inputStyle} value={candidate.designation} onChange={e => setC("designation", e.target.value)} placeholder="e.g. Software Engineer" /></Field>
-          <Field label="Applied for"><input style={inputStyle} value={candidate.appliedRole} onChange={e => setC("appliedRole", e.target.value)} placeholder="Role applied for" /></Field>
-          <Field label="Job role / department"><input style={inputStyle} value={candidate.jobRole} onChange={e => setC("jobRole", e.target.value)} placeholder="e.g. Backend, Sales" /></Field>
-          <Field label="Qualification"><input style={inputStyle} value={candidate.qualification} onChange={e => setC("qualification", e.target.value)} placeholder="e.g. B.Tech / MBA" /></Field>
-          <Field label="Expected salary"><input style={inputStyle} value={candidate.expectedSalary} onChange={e => setC("expectedSalary", e.target.value)} placeholder="e.g. 5 LPA" /></Field>
-          <Field label="Interview date"><input style={inputStyle} type="date" value={candidate.iDate} onChange={e => setC("iDate", e.target.value)} /></Field>
-          <Field label="Interview time"><input style={inputStyle} type="time" value={candidate.iTime} onChange={e => setC("iTime", e.target.value)} /></Field>
-        </div>
-      </Card>
-      <Card style={{ border: "0.5px solid #AFA9EC" }}>
-        <SectionLabel>🧑‍💼 HR Interviewer — Round 1</SectionLabel>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <Field label="HR Name"><input style={inputStyle} value={hrPerson.name} onChange={e => setHR("name", e.target.value)} placeholder="e.g. Priya Mehta" /></Field>
-          <Field label="HR Designation"><input style={inputStyle} value={hrPerson.designation} onChange={e => setHR("designation", e.target.value)} placeholder="e.g. HR Manager" /></Field>
-          <Field label="Interview Panel / Team"><input style={inputStyle} value={hrPerson.panel} onChange={e => setHR("panel", e.target.value)} placeholder="e.g. HR Panel A" /></Field>
-        </div>
-      </Card>
-      <Card style={{ border: "0.5px solid #FAC775" }}>
-        <SectionLabel>🏢 Department Head (HOD) — Round 2 &amp; 3</SectionLabel>
-        <div style={{ background: "#FAEEDA", borderRadius: 8, padding: "8px 12px", fontSize: 12, color: "#854F0B", marginBottom: 12 }}>
-          ℹ️ The Department Head conducts Technical (Round 2) and Final (Round 3) interviews.
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <Field label="HOD Name"><input style={inputStyle} value={hod.name} onChange={e => setH("name", e.target.value)} placeholder="e.g. Amit Verma" /></Field>
-          <Field label="HOD Designation"><input style={inputStyle} value={hod.designation} onChange={e => setH("designation", e.target.value)} placeholder="e.g. Senior Manager" /></Field>
-          <Field label="HOD Department"><input style={inputStyle} value={hod.department} onChange={e => setH("department", e.target.value)} placeholder="e.g. Engineering, Sales, Finance" /></Field>
-        </div>
-      </Card>
-      {canSeeRound(0) && (
-        <Card style={{ border: "0.5px solid #AFA9EC" }}>
-          <SectionLabel>
-            <span style={{ color: "#185FA5" }}>🧑‍💼 HR Round — Round 1</span>
-            <span style={{ fontSize: 10, background: "#E6F1FB", color: "#185FA5", borderRadius: 4, padding: "2px 7px", fontWeight: 500, textTransform: "none", letterSpacing: 0 }}>Conducted by HR</span>
-          </SectionLabel>
-          <GradeTable roundIdx={0} />
-          <div style={{ marginTop: 12 }}>
-            <Field label="HR Round comments">
-              <textarea rows={3} style={{ ...inputStyle, resize: "vertical", lineHeight: 1.6 }} placeholder="HR Round observations..." value={roundComments[0]}
-                onChange={e => { const v = e.target.value; setRoundComments(p => { const n = [...p]; n[0] = v; return n; }); }} />
-            </Field>
-          </div>
-        </Card>
-      )}
-      {hodRoundIndices.length > 0 && (
-        <Card style={{ border: "0.5px solid #FAC775" }}>
-          <SectionLabel>
-            <span style={{ color: "#854F0B" }}>🏢 HOD Interview Rounds</span>
-            <span style={{ fontSize: 10, background: "#FAEEDA", color: "#854F0B", borderRadius: 4, padding: "2px 7px", fontWeight: 500, textTransform: "none", letterSpacing: 0 }}>Conducted by Department Head</span>
-          </SectionLabel>
-          {hod.name && (
-            <div style={{ background: "#FAEEDA", border: "0.5px solid #FAC775", borderRadius: 10, padding: "10px 14px", display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-              <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#854F0B", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontWeight: 600, fontSize: 13, flexShrink: 0 }}>{getInitials(hod.name)}</div>
-              <div><div style={{ fontWeight: 500, fontSize: 13, color: "#412402" }}>{hod.name}</div><div style={{ fontSize: 11, color: "#854F0B" }}>{hod.designation} · {hod.department}</div></div>
+    <div className="interview-assessment-page bg-slate-50 min-vh-100 py-4 px-3 px-md-4">
+      <Container fluid="xl">
+        {/* ── TOP HEADER / BREADCRUMB ─────────────────────────────────── */}
+        <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+          <div className="d-flex align-items-center gap-3">
+            {/* <Button
+              variant="outline-secondary"
+              size="sm"
+              onClick={() => navigate("/recruitment")}
+              className="d-flex align-items-center gap-1.5 text-xs rounded-2 bg-white shadow-xs"
+            >
+              <LuArrowLeft size={14} /> Back to Recruitment
+            </Button> */}
+            <div>
+              <h4 className="fs-5 fw-bold text-slate-900 mb-0 d-flex align-items-center gap-2">
+                <LuAward className="text-indigo-600" /> Candidate Interview Assessment
+              </h4>
+              <p className="text-slate-500 text-xs mb-0">
+                Dynamic Candidate Evaluation · Multi-Round Feedback · Candidate Dossier
+              </p>
             </div>
-          )}
-          <div style={{ display: "flex", gap: 6, marginBottom: "1rem", flexWrap: "wrap" }}>
-            {hodRoundIndices.map(i => (
-              <button key={i} onClick={() => setCurrentRound(i)} style={{ padding: "7px 16px", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", border: "0.5px solid", fontFamily: "inherit", borderColor: currentRound === i ? "#854F0B" : "#e0e0e0", background: currentRound === i ? "#854F0B" : "#f8f8f8", color: currentRound === i ? "white" : "#666" }}>Round {i + 1}</button>
-            ))}
           </div>
-          <div style={{ fontWeight: 500, fontSize: 14, color: "#854F0B", marginBottom: 10 }}>{roundDefs[currentRound].label}</div>
-          <GradeTable roundIdx={currentRound} />
-          <div style={{ marginTop: 12 }}>
-            <Field label={`Round ${currentRound + 1} comments`}>
-              <textarea rows={3} style={{ ...inputStyle, resize: "vertical", lineHeight: 1.6 }} placeholder={`HOD observations for Round ${currentRound + 1}...`} value={roundComments[currentRound]}
-                onChange={e => { const v = e.target.value; setRoundComments(p => { const n = [...p]; n[currentRound] = v; return n; }); }} />
-            </Field>
-          </div>
-        </Card>
-      )}
-      <Card>
-        <SectionLabel>💰 HR Negotiation</SectionLabel>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <Field label="Final salary offered"><input style={inputStyle} value={candidate.finalSalary} onChange={e => setC("finalSalary", e.target.value)} placeholder="e.g. 4.5 LPA" /></Field>
-          <Field label="Final status">
-            <select style={{ ...inputStyle, cursor: "pointer" }} value={verdict} onChange={e => setVerdict(e.target.value)}>
-              <option value="">Select status</option><option>Selected</option><option>Rejected</option><option value="On Hold">On Hold</option>
-            </select>
-          </Field>
-        </div>
-        <div style={{ marginTop: 12 }}>
-          <Field label="HR comments">
-            <textarea rows={3} style={inputStyle} value={hrComments} onChange={e => setHrComments(e.target.value)} placeholder="Negotiation remarks, salary justification..." />
-          </Field>
-        </div>
-        {verdict === "Selected" && (
-          <div style={{ marginTop: 16, background: "#EAF3DE", border: "0.5px solid #97C459", borderRadius: 10, padding: "1rem 1.2rem" }}>
-            <div style={{ fontWeight: 500, fontSize: 13, color: "#3B6D11", marginBottom: 8 }}>📎 Upload Offer Letter (PDF)</div>
-            <input ref={fileInputRef} type="file" accept="application/pdf" style={{ display: "none" }} onChange={handleOfferFileChange} />
-            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              <button onClick={() => fileInputRef.current?.click()} style={{ padding: "8px 16px", background: "white", border: "1px solid #3B6D11", borderRadius: 8, fontSize: 13, fontWeight: 500, color: "#3B6D11", cursor: "pointer", fontFamily: "inherit" }}>{offerFile ? "📄 Change File" : "📤 Choose PDF"}</button>
-              {offerFile && (<>
-                <span style={{ fontSize: 12, color: "#3B6D11", fontWeight: 500 }}>✅ {offerFile.name}</span>
-                <button onClick={() => setShowPdf(true)} style={{ padding: "8px 16px", background: "#3B6D11", color: "white", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>👁 View PDF</button>
-                <button onClick={() => { setOfferFile(null); setOfferFileUrl(null); }} style={{ padding: "8px 12px", background: "#FCEBEB", color: "#A32D2D", border: "0.5px solid #F09595", borderRadius: 8, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>✕ Remove</button>
-              </>)}
+
+          <div className="d-flex align-items-center gap-2">
+            <div className="text-end me-1 d-none d-sm-block">
+              <div className="fw-semibold text-xs text-slate-800">{storedUser.name || "Panel Member"}</div>
+              <div className="text-xs text-slate-500">
+                {isHR ? "HR Operations Panel" : isHOD ? "HOD Technical Panel" : "Assessment Committee"}
+              </div>
             </div>
-            {!offerFile && <div style={{ fontSize: 11, color: "#888", marginTop: 6 }}>Only PDF files accepted · Max 10 MB</div>}
+            <Badge
+              bg={isHR ? "primary" : isHOD ? "warning" : "info"}
+              className={`text-xs px-2.5 py-1.5 rounded-pill ${isHOD ? "text-dark" : ""}`}
+            >
+              {isHR ? "HR Mode" : isHOD ? "HOD Panel" : "Admin Review"}
+            </Badge>
+          </div>
+        </div>
+
+        {/* ── CANDIDATE SELECTOR QUICK SWITCHER BAR ───────────────────── */}
+        <Card className="border-slate-200 shadow-xs mb-3.5 rounded-3 bg-white">
+          <Card.Body className="py-2 px-3">
+            <Row className="align-items-center g-2">
+              <Col md={4} sm={6}>
+                <div className="d-flex align-items-center gap-2">
+                  <LuUsers className="text-indigo-600 fs-6 flex-shrink-0" />
+                  <div className="w-100">
+                    <Form.Select
+                      size="sm"
+                      value={selectedCandidate?.id || ""}
+                      onChange={(e) => {
+                        const target = candidates.find((c) => c.id === e.target.value);
+                        if (target) setSelectedCandidate(target);
+                      }}
+                      className="border-slate-300 !text-xs rounded-2 fw-medium"
+                    >
+                      <option value="" disabled>
+                        {loadingCandidates ? "Loading candidates..." : "Select candidate to evaluate..."}
+                      </option>
+                      {candidates.map((cand) => (
+                        <option key={cand.id} value={cand.id}>
+                          {cand.candidate_name} — {cand.requisition?.position || "Role"} (
+                          {cand.interview_stage || "Pending"})
+                        </option>
+                      ))}
+                    </Form.Select>
+                  </div>
+                </div>
+              </Col>
+
+              <Col md={4} sm={6}>
+                <div className="position-relative">
+                  <LuSearch
+                    size={13}
+                    className="text-slate-400 position-absolute"
+                    style={{ left: 10, top: "50%", transform: "translateY(-50%)" }}
+                  />
+                  <Form.Control
+                    size="sm"
+                    type="text"
+                    placeholder="Search candidate by name, role, dept..."
+                    value={candidateSearch}
+                    onChange={(e) => setCandidateSearch(e.target.value)}
+                    className="border-slate-300 !text-xs rounded-2 ps-4"
+                  />
+                </div>
+              </Col>
+
+              <Col md={4} className="text-md-end text-sm-start text-xs text-slate-500">
+                <span>Active Pipeline: </span>
+                <strong className="text-slate-800">{candidates.length} candidates</strong>
+                {selectedCandidate && (
+                  <span className="ms-2 badge bg-indigo-50 text-black border border-indigo-200">
+                    Code: {selectedCandidate.requisition?.requisition_code || "N/A"}
+                  </span>
+                )}
+              </Col>
+            </Row>
+          </Card.Body>
+        </Card>
+
+        {/* ── MAIN NAVIGATION TABS ────────────────────────────────────── */}
+        <Nav variant="tabs" className="border-slate-200 mb-3.5 fs-7 fw-semibold">
+          <Nav.Item>
+            <Nav.Link
+              active={activeTab === "evaluation"}
+              onClick={() => setActiveTab("evaluation")}
+              className={`d-flex align-items-center gap-2 cursor-pointer ${
+                activeTab === "evaluation" ? "text-indigo-600 border-indigo-600 fw-bold" : "text-slate-600"
+              }`}
+            >
+              <LuFileText size={15} /> Candidate Evaluation Form
+            </Nav.Link>
+          </Nav.Item>
+
+          <Nav.Item>
+            <Nav.Link
+              active={activeTab === "reports"}
+              onClick={() => setActiveTab("reports")}
+              className={`d-flex align-items-center gap-2 cursor-pointer ${
+                activeTab === "reports" ? "text-indigo-600 border-indigo-600 fw-bold" : "text-slate-600"
+              }`}
+            >
+              <LuBadgeCheck size={15} /> Detailed Reports & Assessment Dossier
+              {candidateEvaluations.length > 0 && (
+                <span className="badge bg-indigo-100 text-indigo-700 rounded-pill ms-1 text-2xs">
+                  {candidateEvaluations.length} {candidateEvaluations.length === 1 ? "round" : "rounds"}
+                </span>
+              )}
+            </Nav.Link>
+          </Nav.Item>
+        </Nav>
+
+        {loadingCandidateDetails && (
+          <div className="text-center py-5">
+            <Spinner animation="border" variant="primary" />
+            <p className="text-xs text-slate-500 mt-2">Loading candidate profile...</p>
           </div>
         )}
-      </Card>
-      {error && <div style={{ background: "#FCEBEB", border: "0.5px solid #F09595", borderRadius: 8, padding: "12px 16px", color: "#A32D2D", fontSize: 14, marginBottom: 12 }}>{error}</div>}
-      <button onClick={handleSubmit} disabled={loading} style={{ width: "100%", padding: 13, background: loading ? "#9990d6" : "#534AB7", color: "white", border: "none", borderRadius: 8, fontSize: 15, fontWeight: 500, cursor: loading ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
-        {loading ? "Saving..." : "Submit assessment"}
-      </button>
-      {submitted && <div style={{ background: "#EAF3DE", border: "0.5px solid #97C459", borderRadius: 8, padding: "12px 16px", color: "#3B6D11", fontSize: 14, marginTop: "1rem", textAlign: "center" }}>✅ Assessment submitted successfully!</div>}
-    </>
-  );
-}
 
-// ─── REPORTS LIST ─────────────────────────────────────────────────────────────
-
-function ReportsList({ reports, onSelect }) {
-  const [filterVerdict, setFilterVerdict] = useState("");
-  const filtered = filterVerdict ? reports.filter(r => r.verdict === filterVerdict) : reports;
-
-  return (
-    <>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {["", "Selected", "On Hold", "Rejected"].map(v => (
-            <button key={v} onClick={() => setFilterVerdict(v)} style={{ padding: "5px 14px", borderRadius: 20, fontSize: 12, cursor: "pointer", fontFamily: "inherit", border: "0.5px solid", fontWeight: 500, borderColor: filterVerdict === v ? "#534AB7" : "#e0e0e0", background: filterVerdict === v ? "#534AB7" : "white", color: filterVerdict === v ? "white" : "#666" }}>{v || "All"}</button>
-          ))}
-        </div>
-        <button onClick={() => window.open(`${API_BASE}/assessments/export/pdf`, "_blank")} style={{ padding: "7px 16px", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", background: "#A32D2D", color: "white", border: "none" }}>📄 Download All PDF</button>
-      </div>
-      {filtered.length === 0
-        ? <div style={{ textAlign: "center", color: "#888", padding: "2rem", fontSize: 14 }}>No reports yet.</div>
-        : filtered.map((r, i) => {
-          const vc = verdictColors[r.verdict] || { bg: "#f0f0f0", color: "#888" };
-          return (
-            <div key={r.id || i} onClick={() => onSelect(reports.indexOf(r))}
-              style={{ background: "white", border: "0.5px solid #e5e5e5", borderRadius: 12, padding: "1.2rem 1.5rem", marginBottom: "0.75rem", cursor: "pointer", transition: "all 0.15s" }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = "#534AB7"; e.currentTarget.style.background = "#EEEDFE"; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = "#e5e5e5"; e.currentTarget.style.background = "white"; }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                <div>
-                  <div style={{ fontWeight: 500, fontSize: 15, color: "#222" }}>{r.name}</div>
-                  <div style={{ fontSize: 12, color: "#888", marginTop: 3 }}>{r.appliedRole || "—"} · {r.qualification || "—"} · Offered: {r.finalSalary || "—"}</div>
-                  {r.hrName && <div style={{ fontSize: 12, color: "#534AB7", marginTop: 2 }}>HR: {r.hrName}</div>}
-                  {r.hodName && <div style={{ fontSize: 12, color: "#854F0B", marginTop: 2 }}>HOD: {r.hodName} ({r.hodDepartment})</div>}
-                </div>
-                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                  {r.overallGrade && <Badge grade={r.overallGrade} />}
-                  {r.verdict && <span style={{ background: vc.bg, color: vc.color, padding: "3px 12px", borderRadius: 100, fontSize: 12, fontWeight: 500 }}>{r.verdict}</span>}
-                  {r.offerLetterPath && <span style={{ background: "#EAF3DE", color: "#3B6D11", padding: "3px 10px", borderRadius: 100, fontSize: 11, fontWeight: 500 }}>📎 Offer</span>}
-                </div>
-              </div>
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
-                {roundDefs.map((rd, ri) => {
-                  const filled = Object.values(r.roundGrades?.[ri] || {}).filter(g => g).length;
-                  return <span key={ri} style={{ background: "#f0f0f0", color: "#666", padding: "2px 10px", borderRadius: 100, fontSize: 11 }}>R{ri + 1}: {filled}/{rd.criteria.length} graded</span>;
-                })}
-              </div>
-            </div>
-          );
-        })}
-    </>
-  );
-}
-
-// ─── REPORT DETAIL ────────────────────────────────────────────────────────────
-
-function ReportDetail({ report, onBack, userRole = "admin" }) {
-  const [approvalStatus, setApprovalStatus] = useState(report.verdict || "");
-  const [saving, setSaving]   = useState(false);
-  const [showPdf, setShowPdf] = useState(false);
-
-  const vc = verdictColors[approvalStatus] || { bg: "#f0f0f0", color: "#888" };
-  const gc = gradeColors[report.overallGrade] || { bg: "#f0f0f0", color: "#888" };
-  const canSeeRound = (ri) => { if (userRole === "admin") return true; if (userRole === "hr") return ri === 0; return false; };
-
-  const handleApproval = async (status) => {
-    setSaving(true);
-    try { await fetch(`${API_BASE}/assessments/${report.id}/verdict`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ verdict: status }) }); setApprovalStatus(status); } catch {}
-    setSaving(false);
-  };
-
-  const offerPdfUrl = report.offerLetterPath ? `${API_BASE.replace("/api", "")}/uploads/${report.offerLetterPath}` : null;
-
-  const handlePrint = () => {
-    const w = window.open("", "_blank");
-    w.document.write(buildPrintHTML({ ...report, verdict: approvalStatus }));
-    w.document.close(); w.onload = () => w.print();
-  };
-
-  return (
-    <>
-      {showPdf && offerPdfUrl && <PdfViewerModal pdfUrl={offerPdfUrl} fileName={`offer-${report.name}.pdf`} onClose={() => setShowPdf(false)} />}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
-        <button onClick={onBack} style={{ background: "none", border: "none", color: "#534AB7", fontSize: 14, cursor: "pointer", fontFamily: "inherit", padding: 0 }}>← Back to reports</button>
-        <button onClick={handlePrint} style={{ padding: "8px 18px", background: "#534AB7", color: "white", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>🖨️ Print / Save PDF</button>
-      </div>
-      <div style={{ background: "white", border: "0.5px solid #e0e0e0", borderRadius: 12, overflow: "hidden", marginBottom: "1rem" }}>
-        <div style={{ background: "linear-gradient(135deg,#534AB7,#7F77DD)", padding: "1.5rem 2rem", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        {/* ───────────────────────────────────────────────────────────── */}
+        {/* TAB 1: CANDIDATE EVALUATION FORM                             */}
+        {/* ───────────────────────────────────────────────────────────── */}
+        {!loadingCandidateDetails && activeTab === "evaluation" && (
           <div>
-            <div style={{ color: "white", fontSize: 18, fontWeight: 500, marginBottom: 2 }}>Candidate Interview Report</div>
-            <div style={{ color: "rgba(255,255,255,0.75)", fontSize: 12 }}>HR (Round 1) · HOD (Round 2 &amp; 3) · Multi-round panel</div>
-          </div>
-          <div style={{ textAlign: "right" }}>
-            <div style={{ color: "rgba(255,255,255,0.75)", fontSize: 11 }}>Generated</div>
-            <div style={{ color: "white", fontSize: 12, fontWeight: 500 }}>{today()}</div>
-          </div>
-        </div>
-        <div style={{ padding: "1.5rem" }}>
-          <Card>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8, marginBottom: "1rem" }}>
-              <div>
-                <div style={{ fontSize: 20, fontWeight: 500, color: "#222" }}>{report.name}</div>
-                <div style={{ fontSize: 13, color: "#888", marginTop: 2 }}>{report.designation || ""} → Applied: {report.appliedRole || "—"} · {report.jobRole || ""}</div>
-                <div style={{ fontSize: 13, color: "#888", marginTop: 2 }}>{report.iDate || ""} {report.iTime || ""}</div>
-              </div>
-              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                {report.overallGrade && <span style={{ background: gc.bg, color: gc.color, padding: "4px 14px", borderRadius: 100, fontSize: 15, fontWeight: 500 }}>Overall: {report.overallGrade}</span>}
-                {approvalStatus && <span style={{ background: vc.bg, color: vc.color, padding: "5px 14px", borderRadius: 100, fontSize: 13, fontWeight: 500 }}>{approvalStatus}</span>}
-              </div>
-            </div>
-            {report.hrName && (
-              <div style={{ background: "#EEEDFE", border: "0.5px solid #AFA9EC", borderRadius: 10, padding: "12px 16px", display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
-                <div style={{ width: 38, height: 38, borderRadius: "50%", background: "#534AB7", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontWeight: 500, fontSize: 14, flexShrink: 0 }}>{getInitials(report.hrName)}</div>
-                <div><div style={{ fontWeight: 500, fontSize: 13, color: "#26215C" }}>{report.hrName}</div><div style={{ fontSize: 11, color: "#534AB7" }}>{[report.hrDesignation, "HR Round 1"].filter(Boolean).join(" · ")}</div></div>
-                <span style={{ marginLeft: "auto", fontSize: 10, background: "#E6F1FB", color: "#185FA5", padding: "2px 8px", borderRadius: 4 }}>HR</span>
-              </div>
-            )}
-            {report.hodName && (
-              <div style={{ background: "#FAEEDA", border: "0.5px solid #FAC775", borderRadius: 10, padding: "12px 16px", display: "flex", alignItems: "center", gap: 12 }}>
-                <div style={{ width: 38, height: 38, borderRadius: "50%", background: "#854F0B", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontWeight: 500, fontSize: 14, flexShrink: 0 }}>{getInitials(report.hodName)}</div>
-                <div><div style={{ fontWeight: 500, fontSize: 13, color: "#412402" }}>{report.hodName}</div><div style={{ fontSize: 11, color: "#854F0B" }}>{[report.hodDesignation, report.hodDepartment].filter(Boolean).join(" · ")} — Round 2 &amp; 3</div></div>
-                <span style={{ marginLeft: "auto", fontSize: 10, background: "#FAEEDA", color: "#854F0B", padding: "2px 8px", borderRadius: 4 }}>HOD</span>
-              </div>
-            )}
-          </Card>
-          <Card>
-            <SectionLabel>Round-wise assessment</SectionLabel>
-            {roundDefs.map((rd, ri) => {
-              if (!canSeeRound(ri)) return null;
-              const isHr = ri === 0;
-              return (
-                <div key={ri} style={{ marginBottom: "1.2rem" }}>
-                  <div style={{ fontWeight: 500, fontSize: 13, marginBottom: 8, color: isHr ? "#185FA5" : "#854F0B", display: "flex", alignItems: "center", gap: 8 }}>
-                    {rd.label}
-                    <span style={{ fontSize: 10, background: isHr ? "#E6F1FB" : "#FAEEDA", color: isHr ? "#185FA5" : "#854F0B", borderRadius: 4, padding: "2px 7px", fontWeight: 500 }}>{isHr ? "HR Only" : "HOD"}</span>
+            {selectedCandidate ? (
+              <Row className="g-3.5">
+                {/* LEFT COLUMN: CANDIDATE PRE-FILLED PROFILE DOSSIER */}
+                <Col lg={4}>
+                  <Card className="border-slate-200 shadow-xs rounded-3 bg-white sticky-top z-0" style={{ top: 20 }}>
+                    <Card.Header className="bg-slate-50 border-bottom border-slate-200 py-3">
+                      <div className="d-flex align-items-center justify-content-between">
+                        <span className="fs-7 fw-bold text-slate-800 d-flex align-items-center gap-2">
+                          <LuUser className="text-indigo-600" /> Candidate Profile
+                        </span>
+                        {getStageBadge(selectedCandidate.interview_stage)}
+                      </div>
+                    </Card.Header>
+
+                    <Card.Body className="p-3 text-xs">
+                      {/* Name & Initials */}
+                      <div className="d-flex align-items-center gap-3 pb-3 mb-3 border-bottom border-slate-100">
+                        <div
+                          className="rounded-circle d-flex align-items-center justify-content-center fw-bold text-white bg-indigo-600 shadow-xs flex-shrink-0"
+                          style={{ width: 44, height: 44, fontSize: 16 }}
+                        >
+                          {(selectedCandidate.candidate_name || "C").charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <h6 className="fw-bold text-slate-900 mb-0 fs-6">
+                            {selectedCandidate.candidate_name}
+                          </h6>
+                          <div className="text-slate-500">
+                            {selectedCandidate.current_designation || "Applicant"} •{" "}
+                            {selectedCandidate.current_company || "Direct Applicant"}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Applied Role & Department */}
+                      <div className="mb-2.5 pb-2.5 border-bottom border-slate-100">
+                        <div className="text-2xs text-slate-400 uppercase font-semibold">Applied Position</div>
+                        <div className="fw-semibold text-slate-800 fs-7 mt-0.5">
+                          {selectedCandidate.requisition?.position || "General Position"}
+                        </div>
+                        <div className="d-flex align-items-center gap-2 mt-1">
+                          <Badge bg="light" className="text-black border border-slate-200 d-flex items-center">
+                            <LuBuilding2 size={11} className="me-1" />
+                            {selectedCandidate.requisition?.department || "General"}
+                          </Badge>
+                          <Badge bg="light" className="text-black border border-slate-200 w-auto">
+                            {selectedCandidate.requisition?.requisition_code || "REQ-CODE"}
+                          </Badge>
+                        </div>
+                      </div>
+
+                      {/* Contact & Experience */}
+                      <div className="mb-2.5 pb-2.5 border-bottom border-slate-100">
+                        <div className="text-2xs text-slate-400 uppercase font-semibold">Experience & Notice</div>
+                        <div className="d-flex justify-content-between text-slate-700 mt-1">
+                          <span>Total Experience:</span>
+                          <strong className="text-slate-900">{selectedCandidate.experience_years || "N/A"}</strong>
+                        </div>
+                        <div className="d-flex justify-content-between text-slate-700 mt-1">
+                          <span>Notice Period:</span>
+                          <strong className="text-slate-900">{selectedCandidate.notice_period || "30 Days"}</strong>
+                        </div>
+                      </div>
+
+                      {/* CTC Details */}
+                      <div className="mb-2.5 pb-2.5 border-bottom border-slate-100">
+                        <div className="text-2xs text-slate-400 uppercase font-semibold">Salary Expectations</div>
+                        <div className="d-flex justify-content-between text-slate-700 mt-1">
+                          <span>Current CTC:</span>
+                          <strong className="text-slate-900">
+                            {selectedCandidate.current_ctc ? `₹${selectedCandidate.current_ctc}` : "Undisclosed"}
+                          </strong>
+                        </div>
+                        <div className="d-flex justify-content-between text-slate-700 mt-1">
+                          <span>Expected CTC:</span>
+                          <strong className="text-emerald-700">
+                            {selectedCandidate.expected_ctc ? `₹${selectedCandidate.expected_ctc}` : "As per budget"}
+                          </strong>
+                        </div>
+                      </div>
+
+                      {/* Scheduled Meeting Info */}
+                      <div className="mb-3 bg-slate-50 p-2.5 rounded-2 border border-slate-200">
+                        <div className="fw-semibold text-slate-800 mb-1 d-flex align-items-center gap-1.5">
+                          <LuCalendar size={13} className="text-indigo-600" /> Scheduled Meeting
+                        </div>
+                        <div className="text-slate-600">
+                          Date: <strong>{selectedCandidate.interview_date || "Not set yet"}</strong>
+                        </div>
+                        <div className="text-slate-600">
+                          Time: <strong>{selectedCandidate.interview_time || "11:00 AM"}</strong>
+                        </div>
+                        <div className="text-slate-600">
+                          Mode: <strong>{selectedCandidate.interview_mode || "Online"}</strong>
+                        </div>
+
+                        {selectedCandidate.interview_meeting_link && (
+                          <div className="mt-1.5 pt-1.5 border-top border-slate-200">
+                            {selectedCandidate.interview_meeting_link.startsWith("http") ? (
+                              <a
+                                href={selectedCandidate.interview_meeting_link}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-blue-600 d-inline-flex align-items-center gap-1 text-2xs fw-semibold"
+                              >
+                                <LuVideo size={12} /> Open Meeting Link
+                              </a>
+                            ) : (
+                              <span className="text-2xs text-slate-500">
+                                Room: {selectedCandidate.interview_meeting_link}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Resume & Notes Actions */}
+                      <div className="d-grid gap-2">
+                        {selectedCandidate.resume_url ? (
+                          <Button
+                            variant="outline-primary"
+                            size="sm"
+                            onClick={() => setShowResumeModal(true)}
+                            className="text-xs d-flex align-items-center justify-content-center gap-1.5"
+                          >
+                            <LuFileText size={13} /> View Attached Resume
+                          </Button>
+                        ) : (
+                          <div className="text-slate-400 text-2xs text-center py-1">
+                            No resume file uploaded for this candidate
+                          </div>
+                        )}
+                      </div>
+
+                      {/* HOD Feedback note */}
+                      {selectedCandidate.hod_feedback && (
+                        <div className="mt-3 p-2 bg-emerald-50 border border-emerald-200 rounded-2 text-2xs text-emerald-800">
+                          <strong>HOD Shortlist Note:</strong> {selectedCandidate.hod_feedback}
+                        </div>
+                      )}
+                    </Card.Body>
+                  </Card>
+                </Col>
+
+                {/* RIGHT COLUMN: EVALUATION FORM */}
+                <Col lg={8}>
+                  <Card className="border-slate-200 shadow-xs rounded-3 bg-white">
+                    <Card.Header className="bg-white border-bottom border-slate-200 py-3">
+                      <div className="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                        <div>
+                          <h5 className="fs-6 fw-bold text-slate-900 mb-0 d-flex align-items-center gap-2">
+                            <LuSparkles className="text-amber-500" /> Evaluation Feedback Panel
+                          </h5>
+                          <span className="text-slate-500 text-xs">
+                            Provide structured feedback on candidate performance across the 4 key criteria.
+                          </span>
+                        </div>
+
+                        {/* Round Switcher Pills */}
+                        <div className="d-flex align-items-center gap-1 bg-slate-100 p-1 rounded-2">
+                          {ROUNDS.map((r) => (
+                            <button
+                              key={r.key}
+                              type="button"
+                              onClick={() => setEvalRound(r.key)}
+                              className={`btn btn-sm text-xs py-1 px-2.5 rounded-2 border-0 fw-semibold transition-all ${
+                                evalRound === r.key
+                                  ? "bg-white text-indigo-700 shadow-xs"
+                                  : "text-slate-600 hover:text-slate-900"
+                              }`}
+                            >
+                              {r.shortLabel}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </Card.Header>
+
+                    <Card.Body className="p-3.5">
+                      <Form onSubmit={handleSubmitEvaluation}>
+                        {/* Active Round Banner */}
+                        <div className="bg-indigo-50 border border-indigo-100 rounded-2 p-3 mb-3.5 d-flex align-items-center justify-content-between">
+                          <div>
+                            <div className="fw-bold text-indigo-950 fs-7">{ROUND_LABEL(evalRound)}</div>
+                            <div className="text-indigo-700 text-xs">
+                              {ROUNDS.find((r) => r.key === evalRound)?.description}
+                            </div>
+                          </div>
+                          <div className="text-end">
+                            <span className="badge bg-indigo-600 text-white text-2xs px-2 py-1 rounded">
+                              Evaluator: {storedUser.name || "Interviewer"}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* ── 1. PERSONAL APPEARANCE & BEHAVIOUR ───────────────── */}
+                        <Card className="border-slate-200 mb-3 rounded-2 shadow-2xs">
+                          <Card.Body className="p-3">
+                            <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                              <div>
+                                <label className="fw-bold text-sm text-slate-900 mb-0 d-flex align-items-center gap-1.5">
+                                  <span className="badge bg-slate-200 text-black rounded-circle">1</span>
+                                  Personal Appearance & Behaviour <span className="text-danger">*</span>
+                                </label>
+                                <div className="text-xs text-slate-500">
+                                  Grooming, punctuality, professional demeanor, confidence, attitude & body language.
+                                </div>
+                              </div>
+
+                              {/* Star / Rating Selector */}
+                              <div className="d-flex align-items-center gap-1.5">
+                                {[1, 2, 3, 4, 5].map((star) => (
+                                  <button
+                                    key={star}
+                                    type="button"
+                                    onClick={() =>
+                                      setFormData({ ...formData, personal_appearance_rating: star })
+                                    }
+                                    className={`btn btn-sm p-1 border-0 ${
+                                      star <= formData.personal_appearance_rating
+                                        ? "text-amber-500"
+                                        : "text-slate-300"
+                                    }`}
+                                    title={`${star} out of 5 stars`}
+                                  >
+                                    <LuStar size={18} fill={star <= formData.personal_appearance_rating ? "currentColor" : "none"} />
+                                  </button>
+                                ))}
+                                <span className="text-xs fw-bold text-slate-700 ms-1">
+                                  {formData.personal_appearance_rating}/5
+                                </span>
+                              </div>
+                            </div>
+
+                            <Form.Control
+                              as="textarea"
+                              rows={2}
+                              placeholder="Notes on candidate's appearance, punctuality, active listening, poise, and attitude..."
+                              value={formData.personal_appearance_and_behaviour}
+                              onChange={(e) =>
+                                setFormData({
+                                  ...formData,
+                                  personal_appearance_and_behaviour: e.target.value,
+                                })
+                              }
+                              className="border-slate-300 !text-sm rounded-2"
+                            />
+                          </Card.Body>
+                        </Card>
+
+                        {/* ── 2. DOMAIN KNOWLEDGE ─────────────────────────────── */}
+                        <Card className="border-slate-200 mb-3 rounded-2 shadow-2xs">
+                          <Card.Body className="p-3">
+                            <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                              <div>
+                                <label className="fw-bold text-sm text-slate-900 mb-0 d-flex align-items-center gap-1.5">
+                                  <span className="badge bg-slate-200 text-black rounded-circle">2</span>
+                                  Domain Knowledge <span className="text-danger">*</span>
+                                </label>
+                                <div className="text-xs text-slate-500">
+                                  Subject matter expertise, functional competence, technical depth & problem solving.
+                                </div>
+                              </div>
+
+                              <div className="d-flex align-items-center gap-1.5">
+                                {[1, 2, 3, 4, 5].map((star) => (
+                                  <button
+                                    key={star}
+                                    type="button"
+                                    onClick={() =>
+                                      setFormData({ ...formData, domain_knowledge_rating: star })
+                                    }
+                                    className={`btn btn-sm p-1 border-0 ${
+                                      star <= formData.domain_knowledge_rating
+                                        ? "text-amber-500"
+                                        : "text-slate-300"
+                                    }`}
+                                    title={`${star} out of 5 stars`}
+                                  >
+                                    <LuStar size={18} fill={star <= formData.domain_knowledge_rating ? "currentColor" : "none"} />
+                                  </button>
+                                ))}
+                                <span className="text-xs fw-bold text-slate-700 ms-1">
+                                  {formData.domain_knowledge_rating}/5
+                                </span>
+                              </div>
+                            </div>
+
+                            <Form.Control
+                              as="textarea"
+                              rows={2}
+                              placeholder="Notes on core domain principles, tooling skills, architectural knowledge, or problem-solving speed..."
+                              value={formData.domain_knowledge}
+                              onChange={(e) =>
+                                setFormData({
+                                  ...formData,
+                                  domain_knowledge: e.target.value,
+                                })
+                              }
+                              className="border-slate-300 !text-sm rounded-2"
+                            />
+                          </Card.Body>
+                        </Card>
+
+                        {/* ── 3. EDUCATION ────────────────────────────────────── */}
+                        <Card className="border-slate-200 mb-3 rounded-2 shadow-2xs">
+                          <Card.Body className="p-3">
+                            <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                              <div>
+                                <label className="fw-bold text-sm text-slate-900 mb-0 d-flex align-items-center gap-1.5">
+                                  <span className="badge bg-slate-200 text-black rounded-circle">3</span>
+                                  Education & Credentials <span className="text-danger">*</span>
+                                </label>
+                                <div className="text-xs text-slate-500">
+                                  Academic background, degree alignment with job requirements, and industry certifications.
+                                </div>
+                              </div>
+
+                              <div className="d-flex align-items-center gap-1.5">
+                                {[1, 2, 3, 4, 5].map((star) => (
+                                  <button
+                                    key={star}
+                                    type="button"
+                                    onClick={() =>
+                                      setFormData({ ...formData, education_rating: star })
+                                    }
+                                    className={`btn btn-sm p-1 border-0 ${
+                                      star <= formData.education_rating ? "text-amber-500" : "text-slate-300"
+                                    }`}
+                                    title={`${star} out of 5 stars`}
+                                  >
+                                    <LuStar size={18} fill={star <= formData.education_rating ? "currentColor" : "none"} />
+                                  </button>
+                                ))}
+                                <span className="text-xs fw-bold text-slate-700 ms-1">
+                                  {formData.education_rating}/5
+                                </span>
+                              </div>
+                            </div>
+
+                            <Form.Control
+                              as="textarea"
+                              rows={2}
+                              placeholder="Notes on qualifications, college degree credibility, academic record & relevant certifications..."
+                              value={formData.education}
+                              onChange={(e) =>
+                                setFormData({
+                                  ...formData,
+                                  education: e.target.value,
+                                })
+                              }
+                              className="border-slate-300 !text-sm rounded-2"
+                            />
+                          </Card.Body>
+                        </Card>
+
+                        {/* ── 4. JOB ROLE (DROPDOWN: SATISFACTORY / HIGH / POOR) ── */}
+                        <Card className="border-slate-200 mb-3 rounded-2 shadow-2xs bg-slate-50">
+                          <Card.Body className="p-3">
+                            <div className="mb-2">
+                              <label className="fw-bold text-sm text-slate-900 mb-0 d-flex align-items-center gap-1.5">
+                                <span className="badge bg-indigo-600 text-white rounded-circle">4</span>
+                                Job Role Fitment <span className="text-danger">*</span>
+                              </label>
+                              <div className="text-xs text-slate-500">
+                                Match between candidate's capabilities and the day-to-day responsibilities of the role.
+                              </div>
+                            </div>
+
+                            <Row className="g-2.5">
+                              <Col md={6}>
+                                <Form.Group>
+                                  <Form.Label className="text-xs fw-bold text-slate-700 mb-1">
+                                    Role Fit Rating (Dropdown Selection)
+                                  </Form.Label>
+                                  <Form.Select
+                                    size="sm"
+                                    value={formData.job_role}
+                                    onChange={(e) =>
+                                      setFormData({ ...formData, job_role: e.target.value })
+                                    }
+                                    className="border-slate-300 !text-xs rounded-2 fw-semibold"
+                                    required
+                                  >
+                                    <option value="high">High — Exceeds Job Expectations</option>
+                                    <option value="satisfactory">Satisfactory — Meets Required Standards</option>
+                                    <option value="poor">Poor — Below Standards / Significant Gap</option>
+                                  </Form.Select>
+                                </Form.Group>
+                              </Col>
+
+                              <Col md={6}>
+                                <div className="p-2 rounded border bg-white text-xs d-flex align-items-center gap-2 h-100">
+                                  {formData.job_role === "high" && (
+                                    <>
+                                      <LuCircleCheck className="text-success fs-5 flex-shrink-0" />
+                                      <div>
+                                        <strong className="text-success">High Fitment:</strong> Candidate
+                                        comfortably fulfills all job requirements and can scale quickly.
+                                      </div>
+                                    </>
+                                  )}
+                                  {formData.job_role === "satisfactory" && (
+                                    <>
+                                      <LuCheck className="text-primary fs-5 flex-shrink-0" />
+                                      <div>
+                                        <strong className="text-primary">Satisfactory Fitment:</strong> Meets the
+                                        baseline criteria and core job requirements for the opening.
+                                      </div>
+                                    </>
+                                  )}
+                                  {formData.job_role === "poor" && (
+                                    <>
+                                      <LuTriangleAlert className="text-danger fs-5 flex-shrink-0" />
+                                      <div>
+                                        <strong className="text-danger">Poor Fitment:</strong> Noticeable
+                                        deficiencies in expected job role competencies.
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
+                              </Col>
+                            </Row>
+                          </Card.Body>
+                        </Card>
+
+                        {/* ── OVERALL ASSESSMENT & RECOMMENDATION ───────────────── */}
+                        <div className="bg-slate-50 p-3 rounded-2 border border-slate-200 mb-3">
+                          <Row className="g-2.5">
+                            <Col md={6}>
+                              <Form.Group>
+                                <Form.Label className="fw-bold text-sm text-slate-800 mb-1">
+                                  Overall Recommendation <span className="text-danger">*</span>
+                                </Form.Label>
+                                <Form.Select
+                                  size="sm"
+                                  value={formData.recommendation}
+                                  onChange={(e) =>
+                                    setFormData({ ...formData, recommendation: e.target.value })
+                                  }
+                                  className="border-slate-300 !text-xs rounded-2 fw-semibold"
+                                >
+                                  {RECOMMENDATION_OPTIONS.map((rec) => (
+                                    <option key={rec.value} value={rec.value}>
+                                      {rec.label}
+                                    </option>
+                                  ))}
+                                </Form.Select>
+                              </Form.Group>
+                            </Col>
+
+                            <Col md={6}>
+                              <Form.Group>
+                                <Form.Label className="fw-bold text-sm text-slate-800 mb-1">
+                                  Calculated Score
+                                </Form.Label>
+                                <div className="p-1.5 bg-white border rounded-2 d-flex align-items-center justify-content-between">
+                                  <span className="text-xs text-slate-600">Criteria Weighted:</span>
+                                  <strong className="text-indigo-700 fs-7">
+                                    {Math.round(
+                                      ((Number(formData.personal_appearance_rating) || 3) +
+                                        (Number(formData.domain_knowledge_rating) || 3) +
+                                        (Number(formData.education_rating) || 3) +
+                                        (formData.job_role === "high"
+                                          ? 5
+                                          : formData.job_role === "poor"
+                                          ? 2
+                                          : 4)) *
+                                        5
+                                    )}
+                                    % / 100
+                                  </strong>
+                                </div>
+                              </Form.Group>
+                            </Col>
+
+                              <Col md={12}>
+                                <Form.Group>
+                                  <Form.Label className="fw-bold text-sm text-slate-800 mb-1">
+                                    Interviewer Summary & Overall Feedback
+                                  </Form.Label>
+                                  <Form.Control
+                                    as="textarea"
+                                    rows={3}
+                                    placeholder="Provide comprehensive summary notes, key strengths, weaknesses, or specific guidance for subsequent interviewers..."
+                                    value={formData.detailed_feedback}
+                                    onChange={(e) =>
+                                      setFormData({ ...formData, detailed_feedback: e.target.value })
+                                    }
+                                    className="border-slate-300 !text-sm rounded-2"
+                                  />
+                                </Form.Group>
+                              </Col>
+                            </Row>
+
+                          {/* Optional Next Round Scheduling */}
+                          {formData.recommendation === "NEXT_ROUND" && (
+                            <div className="mt-3 pt-3 border-top border-slate-200">
+                              <div className="text-sm fw-bold text-slate-800 mb-2 d-flex align-items-center gap-1.5">
+                                <LuCalendar size={13} className="text-indigo-600" />
+                                Schedule Next Round (Optional — will send email to Candidate, HR & HOD)
+                              </div>
+
+                              <Row className="g-2">
+                                <Col md={4}>
+                                  <Form.Group>
+                                    <Form.Label className="text-sm text-slate-600 mb-1">Next Interview Date</Form.Label>
+                                    <Form.Control
+                                      size="sm"
+                                      type="date"
+                                      value={formData.next_interview_date}
+                                      onChange={(e) =>
+                                        setFormData({ ...formData, next_interview_date: e.target.value })
+                                      }
+                                      className="border-slate-300 text-xs rounded-2"
+                                    />
+                                  </Form.Group>
+                                </Col>
+                                <Col md={4}>
+                                  <Form.Group>
+                                    <Form.Label className="text-sm text-slate-600 mb-1">Time</Form.Label>
+                                    <Form.Control
+                                      size="sm"
+                                      type="text"
+                                      placeholder="11:30 AM"
+                                      value={formData.next_interview_time}
+                                      onChange={(e) =>
+                                        setFormData({ ...formData, next_interview_time: e.target.value })
+                                      }
+                                      className="border-slate-300 text-xs rounded-2"
+                                    />
+                                  </Form.Group>
+                                </Col>
+                                <Col md={4}>
+                                  <Form.Group>
+                                    <Form.Label className="text-sm text-slate-600 mb-1">Mode</Form.Label>
+                                    <Form.Select
+                                      size="sm"
+                                      value={formData.next_interview_mode}
+                                      onChange={(e) =>
+                                        setFormData({ ...formData, next_interview_mode: e.target.value })
+                                      }
+                                      className="border-slate-300 text-xs rounded-2"
+                                    >
+                                      <option value="Online (Google Meet)">Online (Google Meet)</option>
+                                      <option value="Online (Zoom)">Online (Zoom)</option>
+                                      <option value="In-Person Office">In-Person Office</option>
+                                      <option value="Telephonic">Telephonic</option>
+                                    </Form.Select>
+                                  </Form.Group>
+                                </Col>
+                                <Col md={12}>
+                                  <Form.Group>
+                                    <Form.Label className="text-sm text-slate-600 mb-1">Meeting Link</Form.Label>
+                                    <Form.Control
+                                      size="sm"
+                                      type="text"
+                                      placeholder="https://meet.google.com/..."
+                                      value={formData.next_interview_link}
+                                      onChange={(e) =>
+                                        setFormData({ ...formData, next_interview_link: e.target.value })
+                                      }
+                                      className="border-slate-300 text-xs rounded-2"
+                                    />
+                                  </Form.Group>
+                                </Col>
+                              </Row>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Submit Action Buttons */}
+                        <div className="d-flex align-items-center justify-content-between pt-2">
+                          <Button
+                            variant="outline-secondary"
+                            size="sm"
+                            type="button"
+                            onClick={() =>
+                              setFormData({
+                                personal_appearance_and_behaviour: "",
+                                personal_appearance_rating: 4,
+                                domain_knowledge: "",
+                                domain_knowledge_rating: 4,
+                                education: "",
+                                education_rating: 4,
+                                job_role: "satisfactory",
+                                detailed_feedback: "",
+                                recommendation: "NEXT_ROUND",
+                                next_interview_date: "",
+                                next_interview_time: "11:00 AM",
+                                next_interview_mode: "Online (Google Meet)",
+                                next_interview_link: "",
+                              })
+                            }
+                            className="text-xs"
+                          >
+                            Reset Form
+                          </Button>
+
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            type="submit"
+                            disabled={submittingEvaluation}
+                            className="bg-indigo-600 border-indigo-600 text-xs px-4 py-2 d-flex align-items-center gap-1.5 shadow-xs"
+                          >
+                            {submittingEvaluation ? (
+                              <>
+                                <Spinner size="sm" animation="border" /> Submitting...
+                              </>
+                            ) : (
+                              <>
+                                <LuSend size={13} /> Submit Evaluation for {ROUND_LABEL(evalRound)}
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </Form>
+                    </Card.Body>
+                  </Card>
+                </Col>
+              </Row>
+            ) : (
+              <Card className="border-slate-200 text-center py-5 shadow-xs rounded-3 bg-white">
+                <Card.Body>
+                  <LuUser className="text-slate-400 fs-1 mb-2" />
+                  <h6 className="fw-bold text-slate-800 mb-1">No Candidate Selected for Evaluation</h6>
+                  <p className="text-slate-500 text-xs mb-3">
+                    Please choose a candidate from the switcher dropdown above or select from the pipeline below.
+                  </p>
+                  <div className="d-flex justify-content-center gap-2">
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => navigate("/recruitment")}
+                      className="text-xs bg-indigo-600 border-indigo-600"
+                    >
+                      Go to Recruitment Pipeline
+                    </Button>
                   </div>
-                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                    <thead><tr><th style={{ ...thStyle, width: 36 }}>#</th><th style={thStyle}>Criteria</th><th style={{ ...thStyle, width: 80, textAlign: "center" }}>Grade</th></tr></thead>
-                    <tbody>
-                      {rd.criteria.map((c, ci) => (
-                        <tr key={c.key}>
-                          <td style={{ ...tdStyle, color: "#aaa", fontSize: 13 }}>{ci + 1}</td>
-                          <td style={tdStyle}>{c.name}</td>
-                          <td style={{ ...tdStyle, textAlign: "center" }}><Badge grade={report.roundGrades?.[ri]?.[c.key] || ""} /></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {report.roundComments?.[ri] && (
-                    <div style={{ background: "#f8f8f8", borderRadius: 8, padding: "10px 12px", marginTop: 8, fontSize: 13, color: "#444", lineHeight: 1.6 }}>
-                      <span style={{ fontSize: 11, color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: 4 }}>Round {ri + 1} comments</span>
-                      {report.roundComments[ri]}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </Card>
-          <Card>
-            <SectionLabel>HR Negotiation details</SectionLabel>
-            <div style={{ fontSize: 14, lineHeight: 1.9 }}>
-              {[
-                ["Candidate", report.name], ["Qualification", report.qualification],
-                ["Current designation", report.designation], ["Expected salary", report.expectedSalary],
-                ["Final salary offered", report.finalSalary],
-                ["Date & Time", `${report.iDate || ""} ${report.iTime || ""}`],
-                ["HR", `${report.hrName || "—"} (${report.hrDesignation || "—"})`],
-                ["HOD", `${report.hodName || "—"} (${report.hodDepartment || "—"})`],
-              ].map(([k, v]) => (
-                <div key={k} style={{ display: "flex", gap: 12, borderBottom: "0.5px solid #f0f0f0", padding: "6px 0" }}>
-                  <span style={{ color: "#888", minWidth: 160, fontSize: 13 }}>{k}</span>
-                  <span style={{ color: "#222", fontWeight: k === "Final salary offered" ? 600 : 400 }}>{v || "—"}</span>
-                </div>
-              ))}
-            </div>
-          </Card>
-          {report.hrComments && <Card><SectionLabel>HR comments</SectionLabel><div style={{ fontSize: 14, color: "#333", lineHeight: 1.7 }}>{report.hrComments}</div></Card>}
-        </div>
-      </div>
-      <Card>
-        <SectionLabel>Approval &amp; Final decision</SectionLabel>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
-          {[
-            { label: "Approve / Select", value: "Selected", bg: "#EAF3DE", color: "#3B6D11", hoverBg: "#639922" },
-            { label: "Reject",           value: "Rejected", bg: "#FCEBEB", color: "#A32D2D", hoverBg: "#E24B4A" },
-            { label: "Hold",             value: "On Hold",  bg: "#FAEEDA", color: "#854F0B", hoverBg: "#EF9F27" },
-          ].map(btn => (
-            <button key={btn.value} onClick={() => handleApproval(btn.value)} disabled={saving} style={{ padding: "9px 18px", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", border: "0.5px solid", borderColor: approvalStatus === btn.value ? btn.hoverBg : btn.color, background: approvalStatus === btn.value ? btn.hoverBg : btn.bg, color: approvalStatus === btn.value ? "white" : btn.color }}>{btn.label}</button>
-          ))}
-        </div>
-        {approvalStatus && <div style={{ fontSize: 13, color: "#666" }}>Current status: <strong style={{ color: verdictColors[approvalStatus]?.color || "#222" }}>{approvalStatus}</strong></div>}
-      </Card>
-      {(approvalStatus === "Selected" || report.offerLetterPath) && (
-        <Card style={{ border: `0.5px solid ${report.offerLetterPath ? "#97C459" : "#e0e0e0"}`, background: report.offerLetterPath ? "#EAF3DE" : "white" }}>
-          <SectionLabel>📎 Offer Letter</SectionLabel>
-          {report.offerLetterPath ? (
-            <div>
-              <div style={{ fontSize: 14, color: "#3B6D11", marginBottom: 12 }}>Offer letter uploaded for <strong>{report.name}</strong>.</div>
-              <button onClick={() => setShowPdf(true)} style={{ padding: "10px 20px", background: "#3B6D11", color: "white", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>👁 View Offer Letter PDF</button>
-            </div>
-          ) : <div style={{ fontSize: 14, color: "#888" }}>No offer letter uploaded yet.</div>}
-        </Card>
-      )}
-    </>
-  );
-}
-
-// ─── MAIN APP ─────────────────────────────────────────────────────────────────
-
-export default function InterviewApp() {
-  const [currentUser, setCurrentUser]       = useState(null);
-  const [activeTab, setActiveTab]           = useState("form");
-  const [reports, setReports]               = useState([]);
-  const [selectedReport, setSelectedReport] = useState(null);
-  const [loading, setLoading]               = useState(false);
-
-  // ── NEW: controls whether Onboarding page is showing ──────────────────────
-  const [showOnboarding, setShowOnboarding] = useState(false);
-
-  const handleLogin = (user) => {
-    setCurrentUser(user);
-    setLoading(true);
-    fetch(`${API_BASE}/assessments`)
-      .then(r => r.json())
-      .then(data => setReports(Array.isArray(data) ? data : []))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  };
-
-  const handleLogout = () => {
-    setCurrentUser(null);
-    setActiveTab("form");
-    setSelectedReport(null);
-    setReports([]);
-    setShowOnboarding(false);
-  };
-
-  const handleSubmit = record => setReports(prev => [record, ...prev]);
-
-  if (!currentUser) return <LoginScreen onLogin={handleLogin} />;
-
-  // ── If Onboarding button was clicked, render OnboardingForm full-page ──────
-  if (showOnboarding) {
-    return (
-      <div style={{ fontFamily: "'Segoe UI', Arial, sans-serif" }}>
-        {/* Slim top bar so user can go back */}
-        <div style={{
-          background: "linear-gradient(135deg,#534AB7,#7F77DD)",
-          padding: "10px 20px",
-          display: "flex", alignItems: "center", gap: 12,
-        }}>
-          <button
-            onClick={() => setShowOnboarding(false)}
-            style={{
-              padding: "7px 16px", background: "rgba(255,255,255,0.15)",
-              color: "white", border: "0.5px solid rgba(255,255,255,0.3)",
-              borderRadius: 8, fontSize: 13, fontWeight: 500,
-              cursor: "pointer", fontFamily: "inherit",
-            }}
-          >
-            ← Back to Dashboard
-          </button>
-          <span style={{ color: "rgba(255,255,255,0.85)", fontSize: 14, fontWeight: 500 }}>
-            🏢 HR Onboarding
-          </span>
-        </div>
-        <OnboardingForm onSubmit={() => {}} />
-      </div>
-    );
-  }
-
-  const roleColor = currentUser.role === "admin" ? "#534AB7" : "#185FA5";
-  const roleBg    = currentUser.role === "admin" ? "#EEEDFE"  : "#E6F1FB";
-
-  const tabs = [
-    { key: "form",    label: "Assessment Form" },
-    { key: "reports", label: `Interview Reports${reports.length > 0 ? ` (${reports.length})` : ""}` },
-    ...(currentUser.role === "admin" ? [{ key: "users", label: "👥 Users" }] : []),
-  ];
-
-  return (
-    <div style={{ maxWidth: 720, margin: "0 auto", padding: "1.5rem 1rem", fontFamily: "'Segoe UI', Arial, sans-serif" }}>
-
-      {/* ── Header ── */}
-      <div style={{
-        background: "linear-gradient(135deg,#534AB7,#7F77DD)", borderRadius: 12,
-        padding: "1.25rem 1.5rem", marginBottom: "1.5rem",
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        gap: "1rem", flexWrap: "wrap",
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-          <div style={{ width: 44, height: 44, background: "rgba(255,255,255,0.2)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
+                </Card.Body>
+              </Card>
+            )}
           </div>
+        )}
+
+        {/* ───────────────────────────────────────────────────────────── */}
+        {/* TAB 2: DETAILED REPORTS ABOUT CANDIDATE                      */}
+        {/* ───────────────────────────────────────────────────────────── */}
+        {!loadingCandidateDetails && activeTab === "reports" && (
           <div>
-            <div style={{ color: "white", fontSize: 17, fontWeight: 500, marginBottom: 2 }}>Candidate Interview Assessment</div>
-            <div style={{ color: "rgba(255,255,255,0.75)", fontSize: 12 }}>HR (Round 1) · HOD (Round 2 &amp; 3) · Multi-round panel</div>
+            {selectedCandidate ? (
+              <div>
+                {/* REPORT ACTIONS BAR */}
+                <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3 bg-white p-3 rounded-3 border border-slate-200 shadow-xs">
+                  <div>
+                    <h5 className="fs-6 fw-bold text-slate-900 mb-0 d-flex align-items-center gap-2">
+                      <LuFileText className="text-indigo-600" /> Comprehensive Assessment Dossier:{" "}
+                      {selectedCandidate.candidate_name}
+                    </h5>
+                    <span className="text-slate-500 text-xs">
+                      Complete evaluation breakdown across interview rounds, criteria scorecard, and hiring recommendations.
+                    </span>
+                  </div>
+
+                  <div className="d-flex align-items-center gap-2">
+                    <Button
+                      variant="outline-secondary"
+                      size="sm"
+                      onClick={() => window.print()}
+                      className="text-xs d-flex align-items-center gap-1.5 bg-white"
+                    >
+                      <LuPrinter size={13} /> Print / Export Report
+                    </Button>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => setActiveTab("evaluation")}
+                      className="text-xs bg-indigo-600 border-indigo-600 d-flex align-items-center gap-1.5"
+                    >
+                      <LuSparkles size={13} /> Evaluate Next Round
+                    </Button>
+                  </div>
+                </div>
+
+                <Row className="g-3.5">
+                  {/* LEFT: CANDIDATE EXECUTIVE SUMMARY & SCORECARD */}
+                  <Col lg={4}>
+                    <Card className="border-slate-200 shadow-xs rounded-3 bg-white mb-3">
+                      <Card.Header className="bg-slate-50 border-bottom border-slate-200 py-3">
+                        <span className="fs-7 fw-bold text-slate-800 d-flex align-items-center gap-2">
+                          <LuAward className="text-indigo-600" /> Executive Scorecard
+                        </span>
+                      </Card.Header>
+
+                      <Card.Body className="p-3 text-xs">
+                        {/* Overall Score Dial */}
+                        <div className="text-center py-3 bg-indigo-50 border border-indigo-100 rounded-3 mb-3">
+                          <div className="text-2xs text-indigo-700 uppercase fw-bold tracking-wide">
+                            Overall Assessment Score
+                          </div>
+                          <div className="fs-2 fw-bolder text-indigo-900 mt-1">
+                            {averageCandidateScore ? `${averageCandidateScore}%` : "Pending"}
+                          </div>
+                          <div className="text-2xs text-indigo-600">
+                            {averageCandidateScore >= 80
+                              ? "🌟 Highly Recommended for Role"
+                              : averageCandidateScore >= 65
+                              ? "✅ Competent / Meets Role Standards"
+                              : averageCandidateScore
+                              ? "⚠️ Below Benchmark / Skill Deficit"
+                              : "No evaluations submitted yet"}
+                          </div>
+                        </div>
+
+                        {/* Progress Bar */}
+                        {averageCandidateScore && (
+                          <div className="mb-3">
+                            <div className="d-flex justify-content-between text-2xs text-slate-500 mb-1">
+                              <span>Score Benchmark</span>
+                              <span>{averageCandidateScore} / 100</span>
+                            </div>
+                            <ProgressBar
+                              now={averageCandidateScore}
+                              variant={
+                                averageCandidateScore >= 80
+                                  ? "success"
+                                  : averageCandidateScore >= 65
+                                  ? "primary"
+                                  : "warning"
+                              }
+                              style={{ height: 6 }}
+                              className="rounded-pill"
+                            />
+                          </div>
+                        )}
+
+                        {/* Summary Details */}
+                        <div className="pb-2 mb-2 border-bottom border-slate-100">
+                          <div className="d-flex justify-content-between text-slate-600 py-1">
+                            <span>Candidate Name:</span>
+                            <strong className="text-slate-900">{selectedCandidate.candidate_name}</strong>
+                          </div>
+                          <div className="d-flex justify-content-between text-slate-600 py-1">
+                            <span>Applied Position:</span>
+                            <strong className="text-slate-900">
+                              {selectedCandidate.requisition?.position || "N/A"}
+                            </strong>
+                          </div>
+                          <div className="d-flex justify-content-between text-slate-600 py-1">
+                            <span>Department:</span>
+                            <span className="text-slate-800">
+                              {selectedCandidate.requisition?.department || "General"}
+                            </span>
+                          </div>
+                          <div className="d-flex justify-content-between text-slate-600 py-1">
+                            <span>Requisition Code:</span>
+                            <span className="badge bg-slate-100 text-slate-700">
+                              {selectedCandidate.requisition?.requisition_code || "N/A"}
+                            </span>
+                          </div>
+                          <div className="d-flex justify-content-between text-slate-600 py-1">
+                            <span>Current Stage:</span>
+                            {getStageBadge(selectedCandidate.interview_stage)}
+                          </div>
+                          <div className="d-flex justify-content-between text-slate-600 py-1">
+                            <span>Evaluated Rounds:</span>
+                            <strong className="text-indigo-700">
+                              {candidateEvaluations.length} Completed
+                            </strong>
+                          </div>
+                        </div>
+
+                        {/* Compensation Comparison */}
+                        <div className="bg-slate-50 p-2.5 rounded-2 border border-slate-200">
+                          <div className="text-2xs fw-bold text-slate-700 mb-1">Compensation Overview</div>
+                          <div className="d-flex justify-content-between text-2xs text-slate-600 py-0.5">
+                            <span>Current CTC:</span>
+                            <strong>{selectedCandidate.current_ctc ? `₹${selectedCandidate.current_ctc}` : "N/A"}</strong>
+                          </div>
+                          <div className="d-flex justify-content-between text-2xs text-slate-600 py-0.5">
+                            <span>Expected CTC:</span>
+                            <strong className="text-emerald-700">
+                              {selectedCandidate.expected_ctc ? `₹${selectedCandidate.expected_ctc}` : "N/A"}
+                            </strong>
+                          </div>
+                          <div className="d-flex justify-content-between text-2xs text-slate-600 py-0.5">
+                            <span>Max Budget:</span>
+                            <strong>
+                              {selectedCandidate.requisition?.max_salary
+                                ? `₹${selectedCandidate.requisition.max_salary}`
+                                : "N/A"}
+                            </strong>
+                          </div>
+                        </div>
+                      </Card.Body>
+                    </Card>
+                  </Col>
+
+                  {/* RIGHT: ROUND-BY-ROUND DETAILED EVALUATION CARDS */}
+                  <Col lg={8}>
+                    <Card className="border-slate-200 shadow-xs rounded-3 bg-white mb-3">
+                      <Card.Header className="bg-slate-50 border-bottom border-slate-200 py-3 d-flex align-items-center justify-content-between">
+                        <span className="fs-7 fw-bold text-slate-800 d-flex align-items-center gap-2">
+                          <LuBadgeCheck className="text-indigo-600" /> Round-by-Round Evaluation Breakdown
+                        </span>
+                        <span className="text-2xs text-slate-500">
+                          {candidateEvaluations.length} evaluation record(s) on file
+                        </span>
+                      </Card.Header>
+
+                      <Card.Body className="p-3">
+                        {candidateEvaluations.length === 0 ? (
+                          <div className="text-center py-5">
+                            <LuFileText className="text-slate-300 fs-1 mb-2" />
+                            <h6 className="fw-bold text-slate-700 mb-1">No Round Evaluations Yet</h6>
+                            <p className="text-slate-500 text-xs mb-3">
+                              This candidate has not been formally evaluated yet. Switch to the evaluation form to submit feedback.
+                            </p>
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              onClick={() => setActiveTab("evaluation")}
+                              className="text-xs bg-indigo-600 border-indigo-600"
+                            >
+                              Begin Evaluation
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="d-flex flex-column gap-3.5">
+                            {candidateEvaluations.map((evalItem, idx) => (
+                              <Card key={evalItem.id || idx} className="border-slate-200 rounded-3 shadow-xs">
+                                <Card.Header className="bg-slate-50 py-2.5 px-3 border-bottom border-slate-200 d-flex flex-wrap align-items-center justify-content-between gap-2">
+                                  <div className="d-flex align-items-center gap-2">
+                                    <span className="badge bg-indigo-600 text-white rounded-pill px-2.5 py-1 text-2xs">
+                                      {evalItem.round || `Round ${idx + 1}`}
+                                    </span>
+                                    <strong className="fs-7 text-slate-900">
+                                      {ROUND_LABEL(evalItem.round)}
+                                    </strong>
+                                  </div>
+
+                                  <div className="d-flex align-items-center gap-2">
+                                    <span className="text-2xs text-slate-500">
+                                      Evaluator: <strong>{evalItem.evaluator_name}</strong> (
+                                      {(evalItem.evaluator_role || "HR").toUpperCase()})
+                                    </span>
+                                    <Badge
+                                      bg={
+                                        evalItem.recommendation === "SELECTED"
+                                          ? "success"
+                                          : evalItem.recommendation === "REJECTED"
+                                          ? "danger"
+                                          : evalItem.recommendation === "HOLD"
+                                          ? "warning"
+                                          : "primary"
+                                      }
+                                      className={`text-2xs ${evalItem.recommendation === "HOLD" ? "text-dark" : ""}`}
+                                    >
+                                      {evalItem.recommendation || "NEXT_ROUND"}
+                                    </Badge>
+                                  </div>
+                                </Card.Header>
+
+                                <Card.Body className="p-3 text-xs">
+                                  {/* 4 Criteria Grid */}
+                                  <Row className="g-2.5 mb-3">
+                                    {/* 1. Personal Appearance & Behaviour */}
+                                    <Col md={6}>
+                                      <div className="p-2.5 rounded-2 bg-slate-50 border border-slate-200 h-100">
+                                        <div className="d-flex justify-content-between align-items-center mb-1">
+                                          <strong className="text-slate-800 text-2xs">
+                                            1. Personal Appearance & Behaviour
+                                          </strong>
+                                          <span className="badge bg-amber-100 text-amber-800 border border-amber-200 text-2xs">
+                                            ★ {evalItem.personal_appearance_rating || "N/A"}/5
+                                          </span>
+                                        </div>
+                                        <p className="text-slate-600 text-xs mb-0">
+                                          {evalItem.personal_appearance_and_behaviour || (
+                                            <em className="text-slate-400">No specific remarks entered</em>
+                                          )}
+                                        </p>
+                                      </div>
+                                    </Col>
+
+                                    {/* 2. Domain Knowledge */}
+                                    <Col md={6}>
+                                      <div className="p-2.5 rounded-2 bg-slate-50 border border-slate-200 h-100">
+                                        <div className="d-flex justify-content-between align-items-center mb-1">
+                                          <strong className="text-slate-800 text-2xs">2. Domain Knowledge</strong>
+                                          <span className="badge bg-amber-100 text-amber-800 border border-amber-200 text-2xs">
+                                            ★ {evalItem.domain_knowledge_rating || "N/A"}/5
+                                          </span>
+                                        </div>
+                                        <p className="text-slate-600 text-xs mb-0">
+                                          {evalItem.domain_knowledge || (
+                                            <em className="text-slate-400">No specific remarks entered</em>
+                                          )}
+                                        </p>
+                                      </div>
+                                    </Col>
+
+                                    {/* 3. Education */}
+                                    <Col md={6}>
+                                      <div className="p-2.5 rounded-2 bg-slate-50 border border-slate-200 h-100">
+                                        <div className="d-flex justify-content-between align-items-center mb-1">
+                                          <strong className="text-slate-800 text-2xs">
+                                            3. Education & Credentials
+                                          </strong>
+                                          <span className="badge bg-amber-100 text-amber-800 border border-amber-200 text-2xs">
+                                            ★ {evalItem.education_rating || "N/A"}/5
+                                          </span>
+                                        </div>
+                                        <p className="text-slate-600 text-xs mb-0">
+                                          {evalItem.education || (
+                                            <em className="text-slate-400">No specific remarks entered</em>
+                                          )}
+                                        </p>
+                                      </div>
+                                    </Col>
+
+                                    {/* 4. Job Role Fit */}
+                                    <Col md={6}>
+                                      <div className="p-2.5 rounded-2 bg-slate-50 border border-slate-200 h-100">
+                                        <div className="d-flex justify-content-between align-items-center mb-1">
+                                          <strong className="text-slate-800 text-2xs">4. Job Role Fit</strong>
+                                          <Badge
+                                            bg={
+                                              evalItem.job_role === "high"
+                                                ? "success"
+                                                : evalItem.job_role === "poor"
+                                                ? "danger"
+                                                : "primary"
+                                            }
+                                            className="text-2xs uppercase"
+                                          >
+                                            {evalItem.job_role || "Satisfactory"}
+                                          </Badge>
+                                        </div>
+                                        <p className="text-slate-600 text-xs mb-0">
+                                          Fit Level:{" "}
+                                          <strong className="text-capitalize text-slate-800">
+                                            {evalItem.job_role || "satisfactory"}
+                                          </strong>{" "}
+                                          —{" "}
+                                          {evalItem.job_role === "high"
+                                            ? "Exceeds Job Requirements"
+                                            : evalItem.job_role === "poor"
+                                            ? "Below Standards"
+                                            : "Meets Core Standards"}
+                                        </p>
+                                      </div>
+                                    </Col>
+                                  </Row>
+
+                                  {/* Detailed Remarks */}
+                                  {evalItem.detailed_feedback && (
+                                    <div className="p-2.5 bg-indigo-50/50 border border-indigo-100 rounded-2 text-xs text-slate-700">
+                                      <strong className="text-indigo-900 d-block mb-1">
+                                        Evaluator Summary Remarks:
+                                      </strong>
+                                      <span style={{ whiteSpace: "pre-wrap" }}>{evalItem.detailed_feedback}</span>
+                                    </div>
+                                  )}
+
+                                  <div className="d-flex justify-content-between align-items-center text-2xs text-slate-400 mt-2.5 pt-2 border-top border-slate-100">
+                                    <span>
+                                      Evaluated on:{" "}
+                                      {evalItem.evaluated_at
+                                        ? new Date(evalItem.evaluated_at).toLocaleString()
+                                        : "Recent"}
+                                    </span>
+                                    <span>
+                                      Round Score: <strong>{evalItem.overall_score || 80}%</strong>
+                                    </span>
+                                  </div>
+                                </Card.Body>
+                              </Card>
+                            ))}
+                          </div>
+                        )}
+                      </Card.Body>
+                    </Card>
+
+                    {/* ALL PIPELINE CANDIDATES COMPARISON TABLE */}
+                    <Card className="border-slate-200 shadow-xs rounded-3 bg-white">
+                      <Card.Header className="bg-slate-50 border-bottom border-slate-200 py-3 d-flex align-items-center justify-content-between">
+                        <span className="fs-7 fw-bold text-slate-800 d-flex align-items-center gap-2">
+                          <LuUsers className="text-indigo-600" /> Pipeline Candidates Overview
+                        </span>
+                        <span className="text-2xs text-slate-500">
+                          Showing {filteredCandidates.length} candidate(s)
+                        </span>
+                      </Card.Header>
+
+                      <div className="table-responsive">
+                        <Table hover className="align-middle mb-0 text-xs">
+                          <thead className="bg-slate-50 text-slate-600 text-2xs uppercase">
+                            <tr>
+                              <th className="ps-3">Candidate</th>
+                              <th>Position & Dept</th>
+                              <th>Stage</th>
+                              <th>Evaluations</th>
+                              <th className="text-end pe-3">Action</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {filteredCandidates.map((cand) => {
+                              const evalsCount = Array.isArray(cand.interview_evaluations)
+                                ? cand.interview_evaluations.length
+                                : 0;
+                              const isCurrent = cand.id === selectedCandidate.id;
+                              return (
+                                <tr key={cand.id} className={isCurrent ? "table-primary" : ""}>
+                                  <td className="ps-3">
+                                    <div className="fw-bold text-slate-900">{cand.candidate_name}</div>
+                                    <div className="text-2xs text-slate-500">
+                                      {cand.current_designation || "Applicant"}
+                                    </div>
+                                  </td>
+                                  <td>
+                                    <div>{cand.requisition?.position || "Role"}</div>
+                                    <div className="text-2xs text-slate-500">
+                                      {cand.requisition?.department || "General"}
+                                    </div>
+                                  </td>
+                                  <td>{getStageBadge(cand.interview_stage)}</td>
+                                  <td>
+                                    {evalsCount > 0 ? (
+                                      <Badge bg="success" className="text-2xs">
+                                        {evalsCount} evaluated
+                                      </Badge>
+                                    ) : (
+                                      <span className="text-slate-400 text-2xs">No rounds yet</span>
+                                    )}
+                                  </td>
+                                  <td className="text-end pe-3">
+                                    <Button
+                                      variant={isCurrent ? "primary" : "outline-primary"}
+                                      size="sm"
+                                      onClick={() => setSelectedCandidate(cand)}
+                                      className="text-xs py-1 px-2.5"
+                                    >
+                                      {isCurrent ? "Selected" : "View / Evaluate"}
+                                    </Button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </Table>
+                      </div>
+                    </Card>
+                  </Col>
+                </Row>
+              </div>
+            ) : (
+              <Card className="border-slate-200 text-center py-5 shadow-xs rounded-3 bg-white">
+                <Card.Body>
+                  <LuFileText className="text-slate-400 fs-1 mb-2" />
+                  <h6 className="fw-bold text-slate-800 mb-1">No Candidate Selected for Report</h6>
+                  <p className="text-slate-500 text-xs mb-3">
+                    Select a candidate from the dropdown above to view their complete assessment report.
+                  </p>
+                </Card.Body>
+              </Card>
+            )}
           </div>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ textAlign: "right" }}>
-            <div style={{ color: "white", fontSize: 13, fontWeight: 500 }}>{currentUser.name}</div>
-            <span style={{ background: roleBg, color: roleColor, fontSize: 11, fontWeight: 500, padding: "2px 8px", borderRadius: 4 }}>{currentUser.label}</span>
-          </div>
-          <button onClick={handleLogout} style={{
-            padding: "7px 14px", background: "rgba(255,255,255,0.15)",
-            color: "white", border: "0.5px solid rgba(255,255,255,0.3)",
-            borderRadius: 8, fontSize: 12, fontWeight: 500,
-            cursor: "pointer", fontFamily: "inherit",
-          }}>Sign out</button>
-        </div>
-      </div>
+        )}
 
-      {/* ── Tabs + Onboarding button ── */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: "1.5rem", flexWrap: "wrap" }}>
-        {tabs.map(t => (
-          <button key={t.key} onClick={() => { setActiveTab(t.key); setSelectedReport(null); }} style={{
-            padding: "9px 20px", borderRadius: 8, fontSize: 14, cursor: "pointer",
-            fontWeight: 500, fontFamily: "inherit", border: "0.5px solid",
-            borderColor: activeTab === t.key ? "#534AB7" : "#e0e0e0",
-            background: activeTab === t.key ? "#534AB7" : "white",
-            color: activeTab === t.key ? "white" : "#666",
-          }}>{t.label}</button>
-        ))}
-
-        {/* ── Onboarding Button ── */}
-        <button
-          onClick={() => setShowOnboarding(true)}
-          style={{
-            marginLeft: "auto",
-            padding: "9px 20px", borderRadius: 8, fontSize: 14, cursor: "pointer",
-            fontWeight: 500, fontFamily: "inherit",
-            border: "0.5px solid #0F6E56",
-            background: "#E1F5EE", color: "#0F6E56",
-            display: "flex", alignItems: "center", gap: 6,
-          }}
-        >
-          🏢 Onboarding
-        </button>
-      </div>
-
-      {loading && <div style={{ textAlign: "center", color: "#888", padding: "2rem", fontSize: 14 }}>Loading...</div>}
-
-      {!loading && activeTab === "form" && <AssessmentForm onSubmit={handleSubmit} userRole={currentUser.role} />}
-      {!loading && activeTab === "reports" && (
-        selectedReport !== null
-          ? <ReportDetail report={reports[selectedReport]} onBack={() => setSelectedReport(null)} userRole={currentUser.role} />
-          : <ReportsList reports={reports} onSelect={setSelectedReport} />
-      )}
-      {!loading && activeTab === "users" && currentUser.role === "admin" && <UserManagement />}
+        {/* ── RESUME MODAL ────────────────────────────────────────────── */}
+        <Modal show={showResumeModal} onHide={() => setShowResumeModal(false)} size="lg" centered>
+          <Modal.Header closeButton className="bg-slate-50 border-bottom border-slate-200 py-3">
+            <Modal.Title className="fs-6 fw-bold d-flex align-items-center gap-2 text-slate-900">
+              <LuFileText className="text-indigo-600" /> Candidate Resume: {selectedCandidate?.candidate_name}
+            </Modal.Title>
+          </Modal.Header>
+          <Modal.Body className="p-3 text-center">
+            {selectedCandidate?.resume_url ? (
+              <div>
+                <iframe
+                  src={getUploadUrl(selectedCandidate.resume_url)}
+                  title="Resume Document"
+                  style={{ width: "100%", height: "550px", border: "1px solid #cbd5e1", borderRadius: 8 }}
+                />
+                <div className="mt-3">
+                  <a
+                    href={getUploadUrl(selectedCandidate.resume_url)}
+                    target="_blank"
+                    rel="noreferrer"
+                    download
+                    className="btn btn-outline-primary btn-sm text-xs d-inline-flex align-items-center gap-1.5"
+                  >
+                    <LuDownload size={13} /> Open / Download File in New Tab
+                  </a>
+                </div>
+              </div>
+            ) : (
+              <p className="text-slate-500 text-xs py-4">No resume file URL available.</p>
+            )}
+          </Modal.Body>
+        </Modal>
+      </Container>
     </div>
   );
 }

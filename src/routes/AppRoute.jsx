@@ -9,9 +9,9 @@ import ForgotPassword from "../pages/auth/ForgotPassword";
 // HR Pages
 import HRDashboard from "../pages/HR/HRDashboard";
 import Recruitment from "../pages/HR/Recruitment";
-import Onboarding from "../pages/HR/onboarding";
 import InterviewForm from "../pages/HR/InterviewForm";
 import PerformanceKPI from "../pages/Apps/PerformanceKPI";
+import Onboarding from "../pages/HR/onboarding";
 
 // Admin Pages
 import AdminDashboard from "../pages/Admin/AdminDashboard";
@@ -27,6 +27,7 @@ import IT_Declaration from "../pages/Apps/IT_Declaration";
 import ID_Card from "../pages/Apps/ID_Card";
 import Mediclaim from "../pages/Apps/Mediclaim";
 import Profile from "../pages/Apps/Profile";
+import Requisition from "../pages/Apps/Requisition";
 
 // Employee Pages
 import EmployeeDashboard from "../pages/Employee/EmployeeDashboard";
@@ -89,7 +90,7 @@ export default function AppRoute() {
       <Route path="/employee/dashboard" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "accounts", "payroll", "hod", "manager"]}> <UnifiedDashboard /> </ProtectedRoute>} />
       <Route path="/accounts/dashboard" element={<ProtectedRoute allowedRoles={["accounts", "payroll", "admin"]}> <UnifiedDashboard /> </ProtectedRoute>} />
       <Route path="/hod/dashboard" element={<ProtectedRoute allowedRoles={["hod", "manager", "hr", "admin"]}> <UnifiedDashboard /> </ProtectedRoute>} />
-      
+
       {/* HR & Admin Restricted Routes */}
       <Route path="/attendance" element={<ProtectedRoute allowedRoles={["employee", "hr", "hod", "accounts"]}> <MyAttendance /> </ProtectedRoute>} />
       <Route path="/admin/attendance" element={<Navigate to="/attendance" replace />} />
@@ -97,8 +98,12 @@ export default function AppRoute() {
       <Route path="/admin/manage-employees" element={<ProtectedRoute allowedRoles={["hr", "admin", "hod", "accounts"]}> <ManageEmployees /> </ProtectedRoute>} />
       <Route path="/admin/register-employee" element={<ProtectedRoute allowedRoles={["hr"]}> <Register /> </ProtectedRoute>} />
 
-      <Route path="/onboarding" element={<ProtectedRoute allowedRoles={["hr"]}> <Onboarding /> </ProtectedRoute>} />
-      <Route path="/recruitment" element={<ProtectedRoute allowedRoles={["hr"]}> <Recruitment /> </ProtectedRoute>} />
+      <Route path="/requisition" element={<ProtectedRoute allowedRoles={["hr", "admin", "hod", "manager", "teamlead", "ceo", "coo", "hrmanager"]}> <Requisition /> </ProtectedRoute>} />
+      <Route path="/onboarding" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager", "ceo", "coo"]}> <Onboarding /> </ProtectedRoute>} />
+      <Route path="/onboarding/:id" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager", "ceo", "coo"]}> <Onboarding /> </ProtectedRoute>} />
+      {/* <Route path="/recruitment" element={<ProtectedRoute allowedRoles={["hr", "admin", "hod", "manager", "teamlead", "ceo", "coo", "hrmanager"]}> <Recruitment /> </ProtectedRoute>} /> */}
+      <Route path="/interview" element={<ProtectedRoute allowedRoles={["hod", "hr", "admin", "manager", "hrmanager"]}> <InterviewForm /> </ProtectedRoute>} />
+      <Route path="/interview/:candidateId" element={<ProtectedRoute allowedRoles={["hod", "hr", "admin", "manager", "hrmanager"]}> <InterviewForm /> </ProtectedRoute>} />
       <Route path="/manage-employee" element={<ProtectedRoute allowedRoles={["hr", "admin", "hod", "accounts"]}> <ManageEmployees /> </ProtectedRoute>} />
       <Route path="/admin/manage-employee" element={<ProtectedRoute allowedRoles={["hr", "admin", "hod", "accounts"]}> <ManageEmployees /> </ProtectedRoute>} />
       <Route path="/holidaymanager" element={<ProtectedRoute allowedRoles={["hr"]}> <HolidayManager /> </ProtectedRoute>} />
@@ -106,17 +111,15 @@ export default function AppRoute() {
       <Route path="/policies" element={<ProtectedRoute allowedRoles={["employee", "hr", "hod", "accounts"]}> <Policies /> </ProtectedRoute>} />
       <Route path="/schedule" element={<ProtectedRoute allowedRoles={["employee", "hr", "hod", "accounts"]}> <Schedule /> </ProtectedRoute>} />
       <Route path="/leave" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager"]}> <Leave /> </ProtectedRoute>} />
-      <Route path="/employee/leave" element={<Navigate to="/leave" replace />} />
-      
-      <Route path="/employee/profile/:employeeid" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager"]}><Profile /></ProtectedRoute>} />
+
+      <Route path="/profile/:employeeid" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager"]}><Profile /></ProtectedRoute>} />
       <Route path="/kpi" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager"]}> <PerformanceKPI /> </ProtectedRoute>} />
       <Route path="/appraisal" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager"]}> <Appraisal /> </ProtectedRoute>} />
-      <Route path="/interview" element={<ProtectedRoute allowedRoles={["hod", "hr"]}> <InterviewForm /> </ProtectedRoute>} />
       <Route path="/resignation" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager"]}> <Separation /> </ProtectedRoute>} />
       <Route path="/it-declaration" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager"]}> <IT_Declaration /> </ProtectedRoute>} />
       <Route path="/id-card" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager"]}> <ID_Card /> </ProtectedRoute>} />
       <Route path="/mediclaim" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager"]}> <Mediclaim /> </ProtectedRoute>} />
-      
+
       {/* Payroll Management & Salary Slips (Payslips) */}
       <Route path="/payroll" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager"]}> <PayrollManagement /> </ProtectedRoute>} />
       <Route path="/Payroll" element={<Navigate to="/payroll" replace />} />

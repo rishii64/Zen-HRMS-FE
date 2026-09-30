@@ -1,1370 +1,3244 @@
-import { useState, useCallback, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import toast, { Toaster } from "react-hot-toast";
+import {
+  LuUserCheck,
+  LuFileText,
+  LuGraduationCap,
+  LuBuilding2,
+  LuScale,
+  LuLaptop,
+  LuMail,
+  LuCreditCard,
+  LuFingerprint,
+  LuShoppingBag,
+  LuPenTool,
+  LuCheck,
+  LuCircleCheck,
+  LuCircleX,
+  LuClock,
+  LuCircleAlert,
+  LuSearch,
+  LuFilter,
+  LuPlus,
+  LuChevronRight,
+  LuUpload,
+  LuEye,
+  LuExternalLink,
+  LuSparkles,
+  LuStar,
+  LuBriefcase,
+  LuShieldCheck,
+  LuUsers,
+  LuCalendar,
+  LuArrowLeft,
+  LuRefreshCw,
+  LuLock,
+  LuCheckCheck,
+  LuAward,
+  LuArrowRight,
+  LuX,
+} from "react-icons/lu";
+import api, { getUploadUrl } from "../../api";
 
-const API = "http://localhost:3002";
-
-const C = {
-  purple: { 50: "#EEEDFE", 200: "#AFA9EC", 400: "#7F77DD", 600: "#534AB7", 800: "#3C3489" },
-  amber:  { 50: "#FAEEDA", 200: "#EF9F27", 600: "#854F0B", 800: "#633806" },
-  teal:   { 50: "#E1F5EE", 200: "#5DCAA5", 600: "#0F6E56", 800: "#085041" },
-  red:    { 50: "#FCEBEB", 200: "#F09595", 600: "#A32D2D" },
-  green:  { 50: "#EAF3DE", 200: "#97C459", 600: "#3B6D11" },
-  gray:   { 50: "#F1EFE8", 200: "#B4B2A9", 600: "#5F5E5A" },
-  orange: { 50: "#FFF7ED", 200: "#FED7AA", 600: "#C2410C" },
-};
-
-const inputStyle = {
-  width: "100%", padding: "9px 12px", fontSize: 13,
-  border: "1px solid #e2e8f0", borderRadius: 10,
-  background: "#fdfdfd", color: "#1a202c",
-  fontFamily: "inherit", outline: "none", boxSizing: "border-box",
-};
-const inputErrorStyle = {
-  ...inputStyle,
-  border: `1.5px solid ${C.red[200]}`,
-  background: C.red[50],
-};
-const cardStyle = {
-  background: "#fff", border: "1px solid #edf2f7",
-  borderRadius: 16, padding: "1.5rem", marginBottom: "1.25rem",
-  boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
-};
-
-const TRAINING_CONFIG = [
-  { key: "hr",            label: "HR Training",               days: 3, group: "induction" },
-  { key: "culture",       label: "Company Culture & Values",  days: 1, group: "induction" },
-  { key: "payroll",       label: "Payroll & Leave Policy",    days: 1, group: "induction" },
-  { key: "posh",          label: "POSH & Code of Conduct",    days: 1, group: "induction" },
-  { key: "pos",           label: "POS Training",              days: 2, group: "induction" },
-  { key: "dept",          label: "Department Training",       days: 1, group: "induction" },
-  { key: "floor",         label: "Floor / Store Training",    days: 1, group: "induction" },
-  { key: "grooming",      label: "Grooming & Uniform",        days: 1, group: "induction" },
-  { key: "compliance",    label: "Compliance & Policy",       days: 1, group: "induction" },
-  { key: "it_security",   label: "IT Security & Cyber Safety",days: 1, group: "induction" },
-  { key: "behavioral",    label: "Behavioral Standard",       days: 1, group: "induction" },
-  { key: "product",       label: "Product Knowledge",         days: 2, group: "product"   },
-  { key: "customer",      label: "Customer Service",          days: 1, group: "product"   },
-  { key: "communication", label: "Communication Skills",      days: 1, group: "product"   },
-  { key: "softskills",    label: "Soft Skills",               days: 2, group: "product"   },
-  { key: "billing",       label: "Billing Training",          days: 1, group: "product"   },
-  { key: "merchandising", label: "Visual Merchandising",      days: 1, group: "product"   },
-  { key: "inventory",     label: "Inventory & Stock Take",    days: 1, group: "product"   },
-  { key: "sales_tech",    label: "Upselling Techniques",      days: 1, group: "product"   },
-  { key: "market_trend",  label: "Market Trends & Insights",  days: 1, group: "product"   },
-  { key: "safety",        label: "Safety Training",           days: 1, group: "safety"    },
-  { key: "fire",          label: "Fire Safety & Evacuation",  days: 1, group: "safety"    },
-  { key: "firstaid",      label: "First Aid Training",        days: 1, group: "safety"    },
-  { key: "ojt",           label: "OJT",                       days: 3, group: "safety"    },
-  { key: "loss_prev",     label: "Loss Prevention",           days: 1, group: "safety"    },
-  { key: "emergency",     label: "Emergency Response Plan",   days: 1, group: "safety"    },
-  { key: "health_hygiene",label: "Health & Hygiene",          days: 1, group: "safety"    },
-  { key: "first_aid_adv", label: "Advanced First Aid",        days: 1, group: "safety"    },
-  { key: "waste_mgmt",    label: "Waste & Environment",       days: 1, group: "safety"    },
+const DEPARTMENTS = [
+  "IT",
+  "Engineering",
+  "HR",
+  "Accounts",
+  "Sales",
+  "Marketing",
+  "Operations",
+  "Retail",
+  "Quality Assurance",
+  "Customer Success",
+  "General",
 ];
 
-const GROUPS = [
-  { key: "induction", label: "🏢 Induction Trainings",  accent: C.purple[600], bg: C.purple[50], border: C.purple[200] },
-  { key: "product",   label: "📦 Product & Customer",   accent: C.amber[600],  bg: C.amber[50],  border: C.amber[200]  },
-  { key: "safety",    label: "🛡️ Safety & On-the-Job",  accent: C.teal[600],   bg: C.teal[50],   border: C.teal[200]   },
+const STAGES = [
+  { key: "JOINING", step: "1", label: "Joining & Assets", icon: LuLaptop, desc: "Email, ID, Biometric, Laptop, Bag, Stationery" },
+  { key: "DOCUMENTATION", step: "2", label: "Documentation", icon: LuFileText, desc: "Aadhaar, PAN, Degrees, Relieving, NDA, Bank" },
+  { key: "TRAINING", step: "3", label: "4-Stage Training", icon: LuGraduationCap, desc: "HR, Admin, POS & Dept. Training Tracks" },
+  { key: "DEPT_ASSIGNMENT", step: "4", label: "Dept. Assignment", icon: LuBuilding2, desc: "Formal HOD Placement (Post Training)" },
+  { key: "PROBATION_EVALUATION", step: "5", label: "6-Mo Probation Review", icon: LuScale, desc: "HOD Analysis & Permanent vs Reject" },
 ];
 
-// ── Validation helpers ────────────────────────────────────────────────────────
-function validatePhone(phone) {
-  const digits = phone.replace(/\D/g, "");
-  return digits.length === 10;
-}
+export default function Onboarding() {
+  const navigate = useNavigate();
+  const location = useLocation();
 
-function validateEmail(email) {
-  // Must end with @gmail.com exactly — nothing after .com
-  return /^[a-zA-Z0-9._%+\-]+@gmail\.com$/.test(email.trim());
-}
-
-// ── Helper: file type check ───────────────────────────────────────────────────
-function isImageFile(file) {
-  if (!file) return false;
-  if (file instanceof File) return file.type?.startsWith("image/");
-  const ext = String(file).split(".").pop().toLowerCase();
-  return ["jpg","jpeg","png","gif","webp","bmp","svg"].includes(ext);
-}
-function isPdfFile(file) {
-  if (!file) return false;
-  if (file instanceof File) return file.type === "application/pdf";
-  return String(file).toLowerCase().endsWith(".pdf");
-}
-
-// ── File Preview ──────────────────────────────────────────────────────────────
-function FilePreview({ file, height = 120, baseUrl = "" }) {
-  if (!file) return null;
-
-  if (file instanceof File) {
-    if (isImageFile(file)) {
-      return (
-        <div style={{ marginTop: 6, borderRadius: 8, overflow: "hidden", border: "1px solid #e2e8f0", height, background: "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <img src={URL.createObjectURL(file)} alt={file.name} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", display: "block" }} />
-        </div>
-      );
-    }
-    if (isPdfFile(file)) {
-      return (
-        <div style={{ marginTop: 6, borderRadius: 8, border: "1px solid #e2e8f0", height, background: "#f8fafc", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6 }}>
-          <div style={{ fontSize: 32 }}>📄</div>
-          <div style={{ fontSize: 11, color: "#718096", fontWeight: 600, textAlign: "center", padding: "0 8px" }}>{file.name}</div>
-          <a href={URL.createObjectURL(file)} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: C.purple[600], fontWeight: 700, background: C.purple[50], padding: "3px 10px", borderRadius: 6, textDecoration: "none", border: `1px solid ${C.purple[200]}` }}>Open PDF ↗</a>
-        </div>
-      );
-    }
-    const ext = file.name?.split(".").pop()?.toUpperCase() || "FILE";
-    const extColors = { DOCX: "#2563EB", DOC: "#2563EB", XLSX: "#16a34a", XLS: "#16a34a", CSV: "#16a34a", PPTX: "#dc2626", PPT: "#dc2626" };
-    const color = extColors[ext] || "#718096";
-    return (
-      <div style={{ marginTop: 6, borderRadius: 8, border: "1px solid #e2e8f0", padding: "8px 10px", background: "#f8fafc", display: "flex", alignItems: "center", gap: 8 }}>
-        <span style={{ fontWeight: 800, fontSize: 10, color: "#fff", background: color, padding: "3px 7px", borderRadius: 4 }}>{ext}</span>
-        <span style={{ fontSize: 11, color: "#4a5568", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{file.name}</span>
-      </div>
-    );
-  }
-
-  const filename = String(file);
-  const url = `${baseUrl}/uploads/${filename}`;
-  const originalName = filename.replace(/^\d+_\d+\./, "file.");
-
-  if (isImageFile(filename)) {
-    return (
-      <div style={{ marginTop: 6, borderRadius: 8, overflow: "hidden", border: "1px solid #e2e8f0", background: "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center", minHeight: height }}>
-        <img src={url} alt={originalName} style={{ maxWidth: "100%", maxHeight: height * 1.5, objectFit: "contain", display: "block" }}
-          onError={e => { e.target.style.display = "none"; e.target.nextSibling.style.display = "flex"; }} />
-        <div style={{ display: "none", flexDirection: "column", alignItems: "center", gap: 4, padding: 10 }}>
-          <span style={{ fontSize: 24 }}>🖼️</span>
-          <span style={{ fontSize: 11, color: "#a0aec0" }}>Image load failed</span>
-        </div>
-      </div>
-    );
-  }
-
-  if (isPdfFile(filename)) {
-    return (
-      <div style={{ marginTop: 6, borderRadius: 8, border: "1px solid #e2e8f0", background: "#f8fafc", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, padding: 10, minHeight: 80 }}>
-        <div style={{ fontSize: 32 }}>📄</div>
-        <div style={{ fontSize: 11, color: "#718096", fontWeight: 600, textAlign: "center" }}>{originalName}</div>
-        <a href={url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: C.purple[600], fontWeight: 700, background: C.purple[50], padding: "3px 10px", borderRadius: 6, textDecoration: "none", border: `1px solid ${C.purple[200]}` }}>Open PDF ↗</a>
-      </div>
-    );
-  }
-
-  const ext = filename.split(".").pop().toUpperCase();
-  const extColors = { DOCX: "#2563EB", DOC: "#2563EB", XLSX: "#16a34a", XLS: "#16a34a", CSV: "#16a34a", PPTX: "#dc2626", PPT: "#dc2626" };
-  const color = extColors[ext] || "#718096";
-  return (
-    <div style={{ marginTop: 6, borderRadius: 8, border: "1px solid #e2e8f0", padding: "8px 10px", background: "#f8fafc", display: "flex", alignItems: "center", gap: 8 }}>
-      <span style={{ fontWeight: 800, fontSize: 10, color: "#fff", background: color, padding: "3px 7px", borderRadius: 4 }}>{ext}</span>
-      <a href={url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: C.purple[600], overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textDecoration: "none", fontWeight: 600 }}>{originalName} ↗</a>
-    </div>
+  // Current logged in user context
+  const [currentUserRole, setCurrentUserRole] = useState(
+    (localStorage.getItem("role") || "").toLowerCase()
   );
-}
-
-function initials(name) {
-  const w = (name || "").trim().split(" ").filter(Boolean);
-  return w.length >= 2 ? (w[0][0] + w[1][0]).toUpperCase() : w.length === 1 ? w[0][0].toUpperCase() : "?";
-}
-
-function buildEmptyModules() {
-  return Object.fromEntries(TRAINING_CONFIG.map(({ key, days }) => [key, { dates: Array(days).fill(""), trainer: "", questions: null, resultSheet: null, marks: "", mandatory: false }]));
-}
-
-function SectionTitle({ children, color = C.purple[600] }) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: "1rem" }}>
-      <span style={{ fontSize: 13, fontWeight: 700, color, textTransform: "uppercase", letterSpacing: ".05em", whiteSpace: "nowrap" }}>{children}</span>
-      <span style={{ flex: 1, height: 1, background: "#f1f5f9" }} />
-    </div>
+  const [currentEmpId, setCurrentEmpId] = useState(
+    localStorage.getItem("empId") || localStorage.getItem("employeeCode") || ""
   );
-}
-
-function Field({ label, children, full, required }) {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 5, gridColumn: full ? "1/-1" : undefined }}>
-      <label style={{ fontSize: 13, color: "#4a5568", fontWeight: 600 }}>
-        {label}
-        {required && <span style={{ color: C.red[600], marginLeft: 3 }}>*</span>}
-      </label>
-      {children}
-    </div>
+  const [currentUserName, setCurrentUserName] = useState(
+    localStorage.getItem("userName") || "User"
   );
-}
-
-function FieldError({ msg }) {
-  if (!msg) return null;
-  return <span style={{ fontSize: 11, color: C.red[600], fontWeight: 600, marginTop: 2 }}>⚠ {msg}</span>;
-}
-
-function Badge({ children, variant = "gray" }) {
-  const map = {
-    pass: { bg: C.green[50], color: C.green[600] }, fail: { bg: C.red[50], color: C.red[600] },
-    pending: { bg: C.gray[50], color: C.gray[600] }, gray: { bg: C.gray[50], color: C.gray[600] },
-    purple: { bg: C.purple[50], color: C.purple[800] }, amber: { bg: C.amber[50], color: C.amber[600] },
-    teal: { bg: C.teal[50], color: C.teal[600] }, mandatory: { bg: C.orange[50], color: C.orange[600] },
-  };
-  const s = map[variant] || map.gray;
-  return <span style={{ display: "inline-block", padding: "2px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: s.bg, color: s.color }}>{children}</span>;
-}
-
-function TabBar({ tabs, active, onChange }) {
-  return (
-    <div style={{ display: "flex", gap: 0, borderBottom: "2px solid #edf2f7", marginBottom: "1.25rem", flexWrap: "wrap" }}>
-      {tabs.map(t => (
-        <button key={t.key} onClick={() => onChange(t.key)} style={{ padding: "10px 20px", fontSize: 13, fontWeight: active === t.key ? 700 : 500, color: active === t.key ? C.purple[600] : "#718096", background: "transparent", border: "none", borderBottom: active === t.key ? `2px solid ${C.purple[600]}` : "2px solid transparent", cursor: "pointer", marginBottom: -2, fontFamily: "inherit" }}>{t.label}</button>
-      ))}
-    </div>
+  const [currentUserDept, setCurrentUserDept] = useState(
+    localStorage.getItem("dept") || ""
   );
-}
 
-function UploadZone({ label, file, onFile, accept, required, missing }) {
-  const borderColor = missing ? C.red[200] : file ? C.teal[200] : "#cbd5e0";
-  const bg = missing ? C.red[50] : file ? C.teal[50] : "#f8fafc";
-  const textColor = missing ? C.red[600] : file ? C.teal[600] : "#718096";
-  const displayName = file instanceof File ? file.name : file ? String(file) : null;
-  return (
-    <label style={{ display: "block", border: `1.5px dashed ${borderColor}`, borderRadius: 10, padding: "8px 10px", cursor: "pointer", background: bg, fontSize: 12, color: textColor, textAlign: "center", position: "relative" }}>
-      <input type="file" accept={accept} style={{ display: "none" }} onChange={e => e.target.files[0] && onFile(e.target.files[0])} />
-      {required && !file && <span style={{ position: "absolute", top: -7, right: -4, background: C.orange[600], color: "#fff", fontSize: 9, fontWeight: 800, padding: "1px 5px", borderRadius: 8 }}>REQUIRED</span>}
-      {displayName ? `✓ ${displayName}` : label}
-    </label>
-  );
-}
-
-// ── LOGIN ─────────────────────────────────────────────────────────────────────
-function LoginPage({ onLogin }) {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-  const handleLogin = async () => {
-    if (!username || !password) { setError("Please enter both fields."); return; }
-    setLoading(true); setError("");
-    try {
-      const res = await fetch(`${API}/api/auth/login`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username, password }) });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Login failed");
-      localStorage.setItem("hr_token", data.token);
-      localStorage.setItem("hr_fullname", data.fullName || username);
-      onLogin(data.token, data.fullName || username);
-    } catch (e) { setError(e.message); } finally { setLoading(false); }
-  };
-  return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "linear-gradient(135deg,#1a1060 0%,#3C3489 50%,#534AB7 100%)", fontFamily: "'Segoe UI',sans-serif" }}>
-      <div style={{ background: "#fff", borderRadius: 24, padding: "2.5rem 2rem", width: "100%", maxWidth: 400, boxShadow: "0 24px 80px rgba(0,0,0,0.35)" }}>
-        <div style={{ textAlign: "center", marginBottom: "2rem" }}>
-          <div style={{ width: 64, height: 64, borderRadius: 20, background: C.purple[600], display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, margin: "0 auto 12px" }}>🏢</div>
-          <h2 style={{ fontSize: 22, fontWeight: 800, color: "#1a202c", margin: 0 }}>HR Manager Portal</h2>
-          <p style={{ fontSize: 13, color: "#718096", marginTop: 6 }}>Only authorized HR personnel can access this.</p>
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          <Field label="Username"><input style={inputStyle} placeholder="admin" value={username} onChange={e => setUsername(e.target.value)} onKeyDown={e => e.key === "Enter" && handleLogin()} /></Field>
-          <Field label="Password"><input style={inputStyle} type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === "Enter" && handleLogin()} /></Field>
-          {error && <div style={{ background: C.red[50], border: `1px solid ${C.red[200]}`, borderRadius: 10, padding: "10px 14px", color: C.red[600], fontSize: 13 }}>❌ {error}</div>}
-          <button onClick={handleLogin} disabled={loading} style={{ padding: 14, background: loading ? "#94a3b8" : C.purple[600], color: "#fff", border: "none", borderRadius: 12, fontSize: 15, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", fontFamily: "inherit", boxShadow: "0 4px 14px rgba(83,74,183,.4)", marginTop: 4 }}>
-            {loading ? "Logging in..." : "🔐 HR Login"}
-          </button>
-        </div>
-        <p style={{ fontSize: 11, color: "#a0aec0", textAlign: "center", marginTop: "1.5rem" }}>Default: <strong>admin</strong> / <strong>admin123</strong></p>
-      </div>
-    </div>
-  );
-}
-
-// ── DASHBOARD ─────────────────────────────────────────────────────────────────
-function EmployeeDashboard({ token, hrName, onLogout, onNewEmployee, onViewEmployee }) {
-  const [employees, setEmployees] = useState([]);
+  // Main data state
+  const [onboardings, setOnboardings] = useState([]);
+  const [stats, setStats] = useState({
+    total: 0,
+    inJoining: 0,
+    inDocs: 0,
+    inTraining: 0,
+    inDeptAssignment: 0,
+    inProbation: 0,
+    confirmedPermanent: 0,
+    rejected: 0,
+  });
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Filters
+  const [filterStage, setFilterStage] = useState("ALL");
+  const [filterStatus, setFilterStatus] = useState("ALL");
+  const [filterDept, setFilterDept] = useState("ALL");
+  const [searchTerm, setSearchTerm] = useState("");
+
+  // Active view: "pipeline" or "workspace"
+  const [selectedOnboarding, setSelectedOnboarding] = useState(null);
+  const [activeStepTab, setActiveStepTab] = useState("JOINING");
+
+  // Modals state
+  const [showInitiateModal, setShowInitiateModal] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showTrainingModal, setShowTrainingModal] = useState(false);
+
+  // Candidate / Employee pool for initiating onboarding
+  const [candidatesPool, setCandidatesPool] = useState([]);
+  const [employeesPool, setEmployeesPool] = useState([]);
+
+  // Form states
+  const [initiateForm, setInitiateForm] = useState({
+    type: "candidate", // "candidate" | "employee" | "direct"
+    candidate_id: "",
+    employee_id: "",
+    employee_name: "",
+    personal_email: "",
+    phone: "",
+    designation: "Associate Trainee",
+    target_department: "Engineering",
+    joining_date: new Date().toISOString().split("T")[0],
+  });
+
+  // Joining assets form
+  const [assetsForm, setAssetsForm] = useState({
+    email_issued: false,
+    email_address: "",
+    email_issued_date: "",
+    id_card_issued: false,
+    id_card_number: "",
+    id_card_issued_date: "",
+    biometric_registered: false,
+    biometric_device_id: "",
+    biometric_registered_date: "",
+    laptop_issued: false,
+    laptop_serial_no: "",
+    laptop_model: "",
+    laptop_issued_date: "",
+    bag_issued: false,
+    bag_type: "",
+    bag_issued_date: "",
+    stationery_issued: false,
+    stationery_details: "",
+    stationery_issued_date: "",
+    joining_remarks: "",
+  });
+
+  // Document upload state
+  const [selectedDocKey, setSelectedDocKey] = useState("aadhaar");
+  const [uploadFile, setUploadFile] = useState(null);
+  const [docNumberInput, setDocNumberInput] = useState("");
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+
+  // Training editing state
+  const [editingModuleKey, setEditingModuleKey] = useState("hr");
+  const [trainingEditForm, setTrainingEditForm] = useState({
+    status: "IN_PROGRESS",
+    trainer_name: "",
+    mentor_name: "",
+    department_name: "",
+    scheduled_date: "",
+    completed_date: "",
+    score: 85,
+    feedback: "",
+  });
+
+  // Department assignment form
+  const [deptAssignForm, setDeptAssignForm] = useState({
+    assigned_department: "Engineering",
+    assigned_hod_id: "",
+    assigned_hod_name: "",
+    assigned_reporting_manager: "",
+    assigned_date: new Date().toISOString().split("T")[0],
+    assignment_notes: "",
+    probation_period_months: 6,
+  });
+
+  // HOD probation review form
+  const [hodReviewForm, setHodReviewForm] = useState({
+    hod_performance_rating: 4.5,
+    hod_kpi_rating: 4,
+    hod_discipline_rating: 5,
+    hod_culture_fit_rating: 4.5,
+    hod_analysis_remarks: "",
+    hod_decision: "PERMANENT", // "PERMANENT" | "REJECTED" | "EXTENDED"
+    hod_decision_reason: "",
+    hod_extension_months: 3,
+  });
+
+  // =========================================================================
+  // DATA FETCHING
+  // =========================================================================
+
+  const fetchPipelineData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const [resOnboardings, resStats] = await Promise.all([
+        api.get("/onboarding", {
+          params: {
+            stage: filterStage,
+            status: filterStatus,
+            department: filterDept,
+            search: searchTerm,
+          },
+        }),
+        api.get("/onboarding/stats"),
+      ]);
+
+      if (resOnboardings.data?.success) {
+        setOnboardings(resOnboardings.data.data || []);
+      }
+      if (resStats.data?.success) {
+        setStats(resStats.data.data || {});
+      }
+    } catch (err) {
+      console.error("Error loading onboarding data:", err);
+      toast.error(err.response?.data?.error || "Failed to load onboarding pipeline");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [filterStage, filterStatus, filterDept, searchTerm]);
+
+  // Load candidate and employee pools for the Initiate Onboarding modal
+  const fetchPools = useCallback(async () => {
+    try {
+      const [candRes, empRes] = await Promise.allSettled([
+        api.get("/recruitment/candidates"),
+        api.get("/employees"),
+      ]);
+
+      if (candRes.status === "fulfilled" && candRes.value.data) {
+        const rawCands = Array.isArray(candRes.value.data.data)
+          ? candRes.value.data.data
+          : Array.isArray(candRes.value.data)
+          ? candRes.value.data
+          : [];
+        setCandidatesPool(rawCands);
+      }
+
+      if (empRes.status === "fulfilled" && empRes.value.data) {
+        const rawEmps = Array.isArray(empRes.value.data.data)
+          ? empRes.value.data.data
+          : Array.isArray(empRes.value.data)
+          ? empRes.value.data
+          : [];
+        setEmployeesPool(rawEmps);
+      }
+    } catch (e) {
+      console.warn("Could not load candidate/employee pool:", e);
+    }
+  }, []);
 
   useEffect(() => {
-    fetch(`${API}/api/onboarding`, { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.json()).then(data => { setEmployees(Array.isArray(data) ? data : []); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, [token]);
+    fetchPipelineData();
+    fetchPools();
+  }, [fetchPipelineData, fetchPools]);
 
-  const deleteEmployee = async (id, name) => {
-    if (!window.confirm(`Do you want to delete "${name}"?`)) return;
-    await fetch(`${API}/api/onboarding/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
-    setEmployees(p => p.filter(e => e.id !== id));
+  // Sync active record into forms when selected
+  useEffect(() => {
+    if (selectedOnboarding) {
+      setAssetsForm({
+        email_issued: !!selectedOnboarding.email_issued,
+        email_address: selectedOnboarding.email_address || "",
+        email_issued_date: selectedOnboarding.email_issued_date || "",
+        id_card_issued: !!selectedOnboarding.id_card_issued,
+        id_card_number: selectedOnboarding.id_card_number || "",
+        id_card_issued_date: selectedOnboarding.id_card_issued_date || "",
+        biometric_registered: !!selectedOnboarding.biometric_registered,
+        biometric_device_id: selectedOnboarding.biometric_device_id || "",
+        biometric_registered_date: selectedOnboarding.biometric_registered_date || "",
+        laptop_issued: !!selectedOnboarding.laptop_issued,
+        laptop_serial_no: selectedOnboarding.laptop_serial_no || "",
+        laptop_model: selectedOnboarding.laptop_model || "",
+        laptop_issued_date: selectedOnboarding.laptop_issued_date || "",
+        bag_issued: !!selectedOnboarding.bag_issued,
+        bag_type: selectedOnboarding.bag_type || "",
+        bag_issued_date: selectedOnboarding.bag_issued_date || "",
+        stationery_issued: !!selectedOnboarding.stationery_issued,
+        stationery_details: selectedOnboarding.stationery_details || "",
+        stationery_issued_date: selectedOnboarding.stationery_issued_date || "",
+        joining_remarks: selectedOnboarding.joining_remarks || "",
+      });
+
+      setDeptAssignForm({
+        assigned_department:
+          selectedOnboarding.assigned_department ||
+          selectedOnboarding.target_department ||
+          "Engineering",
+        assigned_hod_id: selectedOnboarding.assigned_hod_id || "",
+        assigned_hod_name: selectedOnboarding.assigned_hod_name || "",
+        assigned_reporting_manager: selectedOnboarding.assigned_reporting_manager || "",
+        assigned_date: selectedOnboarding.assigned_date || new Date().toISOString().split("T")[0],
+        assignment_notes: selectedOnboarding.assignment_notes || "",
+        probation_period_months: selectedOnboarding.probation_period_months || 6,
+      });
+
+      setHodReviewForm({
+        hod_performance_rating: selectedOnboarding.hod_performance_rating || 4.5,
+        hod_kpi_rating: selectedOnboarding.hod_kpi_rating || 4,
+        hod_discipline_rating: selectedOnboarding.hod_discipline_rating || 5,
+        hod_culture_fit_rating: selectedOnboarding.hod_culture_fit_rating || 4.5,
+        hod_analysis_remarks: selectedOnboarding.hod_analysis_remarks || "",
+        hod_decision: selectedOnboarding.hod_decision || "PERMANENT",
+        hod_decision_reason: selectedOnboarding.hod_decision_reason || "",
+        hod_extension_months: selectedOnboarding.hod_extension_months || 3,
+      });
+
+      if (selectedOnboarding.current_stage) {
+        setActiveStepTab(selectedOnboarding.current_stage);
+      }
+    }
+  }, [selectedOnboarding]);
+
+  const refreshCurrentOnboarding = async (id) => {
+    try {
+      const res = await api.get(`/onboarding/${id}`);
+      if (res.data?.success) {
+        setSelectedOnboarding(res.data.data);
+        setOnboardings((prev) =>
+          prev.map((item) => (item.id === id ? res.data.data : item))
+        );
+      }
+    } catch (e) {
+      console.warn("Could not reload record:", e);
+    }
   };
 
-  const filtered = employees.filter(e =>
-    e.name?.toLowerCase().includes(search.toLowerCase()) ||
-    e.department?.toLowerCase().includes(search.toLowerCase()) ||
-    e.employee_code?.toLowerCase().includes(search.toLowerCase())
-  );
+  // =========================================================================
+  // ACTIONS: INITIATE ONBOARDING
+  // =========================================================================
 
-  return (
-    <div style={{ minHeight: "100vh", background: "#f8fafc", fontFamily: "'Segoe UI',sans-serif" }}>
-      <div style={{ background: "linear-gradient(135deg,#1a1060,#534AB7)", padding: "16px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ fontSize: 28 }}>🏢</div>
+  const handleCandidateSelect = (candId) => {
+    const cand = candidatesPool.find((c) => c.id === candId);
+    if (cand) {
+      setInitiateForm((prev) => ({
+        ...prev,
+        candidate_id: cand.id,
+        employee_name: cand.candidate_name,
+        personal_email: cand.email || "",
+        phone: cand.phone || "",
+        designation: cand.current_designation || cand.requisition?.position || prev.designation,
+        target_department: cand.requisition?.department || prev.target_department,
+      }));
+    }
+  };
+
+  const handleEmployeeSelect = (empCode) => {
+    const emp = employeesPool.find((e) => e.employee_id === empCode);
+    if (emp) {
+      setInitiateForm((prev) => ({
+        ...prev,
+        employee_id: emp.employee_id,
+        employee_name: `${emp.first_name || ""} ${emp.last_name || ""}`.trim() || emp.name,
+        personal_email: emp.email || emp.personal_email || "",
+        phone: emp.phone_no || "",
+        designation: emp.designation || prev.designation,
+        target_department: emp.dept || prev.target_department,
+      }));
+    }
+  };
+
+  const handleInitiateSubmit = async (e) => {
+    e.preventDefault();
+    if (!initiateForm.employee_name.trim()) {
+      toast.error("Employee / Candidate name is required");
+      return;
+    }
+
+    try {
+      const payload = {
+        ...initiateForm,
+        candidate_id: initiateForm.type === "candidate" ? initiateForm.candidate_id : null,
+        employee_id: initiateForm.type === "employee" ? initiateForm.employee_id : null,
+      };
+
+      const res = await api.post("/onboarding/initiate", payload);
+      if (res.data?.success) {
+        toast.success("Onboarding process initiated successfully!");
+        setShowInitiateModal(false);
+        fetchPipelineData();
+        setSelectedOnboarding(res.data.data);
+        setActiveStepTab("JOINING");
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Failed to initiate onboarding");
+    }
+  };
+
+  // =========================================================================
+  // STAGE A: JOINING — ASSET & IDENTITY ISSUANCE
+  // =========================================================================
+
+  const handleSaveAssets = async (markComplete = false) => {
+    if (!selectedOnboarding) return;
+    try {
+      const payload = {
+        ...assetsForm,
+        mark_completed: markComplete,
+      };
+
+      const res = await api.patch(
+        `/onboarding/${selectedOnboarding.id}/joining-assets`,
+        payload
+      );
+      if (res.data?.success) {
+        toast.success(
+          markComplete
+            ? "Joining stage completed! Proceeding to Documentation."
+            : "Joining assets updated successfully"
+        );
+        refreshCurrentOnboarding(selectedOnboarding.id);
+        if (markComplete) {
+          setActiveStepTab("DOCUMENTATION");
+        }
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Failed to update assets");
+    }
+  };
+
+  // =========================================================================
+  // STAGE B: DOCUMENTATION PROCESS
+  // =========================================================================
+
+  const handleVerifyDocument = async (docKey, newStatus) => {
+    if (!selectedOnboarding) return;
+    try {
+      const currentDocs = Array.isArray(selectedOnboarding.documents)
+        ? [...selectedOnboarding.documents]
+        : [];
+      const updatedDocs = currentDocs.map((doc) =>
+        doc.key === docKey ? { ...doc, status: newStatus } : doc
+      );
+
+      const res = await api.patch(
+        `/onboarding/${selectedOnboarding.id}/documentation`,
+        { documents: updatedDocs }
+      );
+      if (res.data?.success) {
+        toast.success(`Document marked as ${newStatus}`);
+        refreshCurrentOnboarding(selectedOnboarding.id);
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Failed to update document status");
+    }
+  };
+
+  const handleUploadDocSubmit = async (e) => {
+    e.preventDefault();
+    if (!uploadFile) {
+      toast.error("Please choose a file to upload");
+      return;
+    }
+
+    try {
+      setUploadingDoc(true);
+      const formData = new FormData();
+      formData.append("doc_file", uploadFile);
+      formData.append("doc_key", selectedDocKey);
+      formData.append("doc_number", docNumberInput);
+
+      const res = await api.post(
+        `/onboarding/${selectedOnboarding.id}/documentation/upload`,
+        formData,
+        { headers: { "Content-Type": "multipart/form-data" } }
+      );
+
+      if (res.data?.success) {
+        toast.success("Document uploaded successfully!");
+        setShowUploadModal(false);
+        setUploadFile(null);
+        setDocNumberInput("");
+        refreshCurrentOnboarding(selectedOnboarding.id);
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Failed to upload document");
+    } finally {
+      setUploadingDoc(false);
+    }
+  };
+
+  const handleMarkAllDocsVerified = async () => {
+    if (!selectedOnboarding) return;
+    try {
+      const currentDocs = Array.isArray(selectedOnboarding.documents)
+        ? [...selectedOnboarding.documents]
+        : [];
+      const updatedDocs = currentDocs.map((doc) => ({
+        ...doc,
+        status: "VERIFIED",
+      }));
+
+      const res = await api.patch(
+        `/onboarding/${selectedOnboarding.id}/documentation`,
+        {
+          documents: updatedDocs,
+          mark_verified: true,
+        }
+      );
+      if (res.data?.success) {
+        toast.success("All documents verified! Stage advanced to 4-Stage Training.");
+        refreshCurrentOnboarding(selectedOnboarding.id);
+        setActiveStepTab("TRAINING");
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Failed to complete documentation");
+    }
+  };
+
+  // =========================================================================
+  // STAGE C: 4-STAGE INTRO & TRAINING (HR, ADMIN, POS, DEPT)
+  // =========================================================================
+
+  const openTrainingModal = (moduleKey) => {
+    setEditingModuleKey(moduleKey);
+    const mod = selectedOnboarding?.[`${moduleKey}_training`] || {};
+    setTrainingEditForm({
+      status: mod.status || "IN_PROGRESS",
+      trainer_name: mod.trainer_name || "",
+      mentor_name: mod.mentor_name || "",
+      department_name: mod.department_name || selectedOnboarding?.target_department || "",
+      scheduled_date: mod.scheduled_date || "",
+      completed_date: mod.completed_date || (mod.status === "COMPLETED" ? new Date().toISOString().split("T")[0] : ""),
+      score: mod.score !== undefined && mod.score !== null ? mod.score : 85,
+      feedback: mod.feedback || "",
+    });
+    setShowTrainingModal(true);
+  };
+
+  const handleSaveTrainingModule = async (e) => {
+    e.preventDefault();
+    if (!selectedOnboarding) return;
+
+    try {
+      const res = await api.patch(
+        `/onboarding/${selectedOnboarding.id}/training`,
+        {
+          module_key: editingModuleKey,
+          ...trainingEditForm,
+        }
+      );
+
+      if (res.data?.success) {
+        toast.success(`${editingModuleKey.toUpperCase()} training updated!`);
+        setShowTrainingModal(false);
+        refreshCurrentOnboarding(selectedOnboarding.id);
+
+        if (
+          res.data.data?.trainings_completed &&
+          res.data.data?.current_stage === "DEPT_ASSIGNMENT"
+        ) {
+          toast.success(
+            "🎉 All 4 trainings completed! Employee is ready for Department Assignment."
+          );
+          setActiveStepTab("DEPT_ASSIGNMENT");
+        }
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Failed to update training");
+    }
+  };
+
+  // =========================================================================
+  // STAGE D: DEPARTMENT ASSIGNMENT (Unlocked after Dept Training)
+  // =========================================================================
+
+  const handleAssignDepartment = async (e) => {
+    e.preventDefault();
+    if (!selectedOnboarding) return;
+
+    if (selectedOnboarding.dept_training?.status !== "COMPLETED") {
+      toast.error("Department Training must be COMPLETED before assigning department!");
+      return;
+    }
+
+    try {
+      const res = await api.patch(
+        `/onboarding/${selectedOnboarding.id}/assign-department`,
+        deptAssignForm
+      );
+
+      if (res.data?.success) {
+        toast.success(
+          `Assigned to ${deptAssignForm.assigned_department}! 6-Month Probation Period started.`
+        );
+        refreshCurrentOnboarding(selectedOnboarding.id);
+        setActiveStepTab("PROBATION_EVALUATION");
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Failed to assign department");
+    }
+  };
+
+  // =========================================================================
+  // STAGE E: 6-MONTH PROBATION REVIEW & HOD PERMANENT / REJECT DECISION
+  // =========================================================================
+
+  const handleSubmitHodDecision = async (e) => {
+    e.preventDefault();
+    if (!selectedOnboarding) return;
+
+    if (!selectedOnboarding.is_assigned_to_dept) {
+      toast.error("Employee has not been assigned to a department yet!");
+      return;
+    }
+
+    try {
+      const res = await api.patch(
+        `/onboarding/${selectedOnboarding.id}/probation-decision`,
+        hodReviewForm
+      );
+
+      if (res.data?.success) {
+        toast.success(
+          hodReviewForm.hod_decision === "PERMANENT"
+            ? "🌟 Employee confirmed as Permanent!"
+            : hodReviewForm.hod_decision === "REJECTED"
+            ? "Employee rejected after probation review"
+            : "Probation extended successfully"
+        );
+        refreshCurrentOnboarding(selectedOnboarding.id);
+        fetchPipelineData();
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Failed to submit HOD decision");
+    }
+  };
+
+  // =========================================================================
+  // MATERIAL DESIGN 3 HELPERS & BADGES (Zero text wrapping)
+  // =========================================================================
+
+  const getStageBadge = (stage) => {
+    switch (stage) {
+      case "JOINING":
+        return (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/80 whitespace-nowrap shadow-xs">
+            <LuLaptop size={12} className="flex-shrink-0" />
+            <span>1. Joining Assets</span>
+          </span>
+        );
+      case "DOCUMENTATION":
+        return (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-sky-50 text-sky-700 border border-sky-200/80 whitespace-nowrap shadow-xs">
+            <LuFileText size={12} className="flex-shrink-0" />
+            <span>2. Documentation</span>
+          </span>
+        );
+      case "TRAINING":
+        return (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200/80 whitespace-nowrap shadow-xs">
+            <LuGraduationCap size={12} className="flex-shrink-0" />
+            <span>3. 4-Stage Training</span>
+          </span>
+        );
+      case "DEPT_ASSIGNMENT":
+        return (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200/80 whitespace-nowrap shadow-xs">
+            <LuBuilding2 size={12} className="flex-shrink-0" />
+            <span>4. Dept. Assignment</span>
+          </span>
+        );
+      case "PROBATION_EVALUATION":
+        return (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-orange-50 text-orange-700 border border-orange-200/80 whitespace-nowrap shadow-xs">
+            <LuScale size={12} className="flex-shrink-0" />
+            <span>5. 6-Mo Probation</span>
+          </span>
+        );
+      case "COMPLETED":
+        return (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80 whitespace-nowrap shadow-xs">
+            <LuAward size={12} className="flex-shrink-0" />
+            <span>Confirmed Permanent</span>
+          </span>
+        );
+      case "REJECTED":
+        return (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200/80 whitespace-nowrap shadow-xs">
+            <LuCircleX size={12} className="flex-shrink-0" />
+            <span>Probation Rejected</span>
+          </span>
+        );
+      default:
+        return (
+          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 whitespace-nowrap">
+            {stage}
+          </span>
+        );
+    }
+  };
+
+  const getStageProgressPercent = (rec) => {
+    if (!rec) return 0;
+    if (rec.probation_status === "CONFIRMED_PERMANENT" || rec.overall_status === "COMPLETED")
+      return 100;
+    if (rec.probation_status === "REJECTED") return 100;
+    if (rec.current_stage === "PROBATION_EVALUATION" || rec.is_assigned_to_dept) return 80;
+    if (rec.current_stage === "DEPT_ASSIGNMENT") return 65;
+    if (rec.current_stage === "TRAINING") return 45;
+    if (rec.current_stage === "DOCUMENTATION") return 25;
+    return 10;
+  };
+
+  const getTrainingsSummary = (rec) => {
+    if (!rec) return { count: 0, total: 4, pct: 0 };
+    let c = 0;
+    if (rec.hr_training?.status === "COMPLETED") c++;
+    if (rec.admin_training?.status === "COMPLETED") c++;
+    if (rec.pos_training?.status === "COMPLETED") c++;
+    if (rec.dept_training?.status === "COMPLETED") c++;
+    return { count: c, total: 4, pct: Math.round((c / 4) * 100) };
+  };
+
+  // Filtered onboardings list
+  const filteredList = useMemo(() => {
+    return onboardings.filter((item) => {
+      const matchStage = filterStage === "ALL" || item.current_stage === filterStage;
+      const matchStatus = filterStatus === "ALL" || item.overall_status === filterStatus;
+      const matchDept =
+        filterDept === "ALL" ||
+        item.target_department?.toLowerCase().includes(filterDept.toLowerCase()) ||
+        item.assigned_department?.toLowerCase().includes(filterDept.toLowerCase());
+      const matchSearch =
+        !searchTerm.trim() ||
+        item.employee_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.employee_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.personal_email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.email_address?.toLowerCase().includes(searchTerm.toLowerCase());
+
+      return matchStage && matchStatus && matchDept && matchSearch;
+    });
+  }, [onboardings, filterStage, filterStatus, filterDept, searchTerm]);
+
+  // =========================================================================
+  // VIEW A: PIPELINE DASHBOARD (MATERIAL DESIGN 3 & ZERO TEXT WRAPPING)
+  // =========================================================================
+
+  const renderPipelineView = () => (
+    <div className="space-y-5">
+      {/* 4 Material Design 3 Metric Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        {/* Card 1 */}
+        <div className="bg-white text-center rounded-2xl p-4 sm:p-5 border-1 border-gray-300 shadow-xs hover:shadow-md transition-all duration-200 flex flex-col justify-between">
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <span className="text-xs sm:text-sm font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
+              Total Onboarding
+            </span>
+            <div className="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0">
+              <LuUsers size={20} />
+            </div>
+          </div>
           <div>
-            <div style={{ fontSize: 18, fontWeight: 800, color: "#fff" }}>HR Onboarding Dashboard</div>
-            <div style={{ fontSize: 12, color: "rgba(255,255,255,.7)" }}>Employee Training Management</div>
+            <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight whitespace-nowrap">
+              {stats.total || 0}
+            </div>
+            <div className="text-xs text-slate-500 font-medium mt-1 truncate whitespace-nowrap">
+              Active & Completed Candidates
+            </div>
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <button onClick={onNewEmployee} style={{ padding: "10px 20px", background: "#fff", color: C.purple[600], border: "none", borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>+ New Employee</button>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", background: "rgba(255,255,255,.15)", borderRadius: 10 }}>
-            <div style={{ width: 28, height: 28, borderRadius: "50%", background: C.purple[200], color: C.purple[800], display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700 }}>{initials(hrName)}</div>
-            <span style={{ fontSize: 13, color: "#fff", fontWeight: 600 }}>{hrName}</span>
-            <button onClick={onLogout} style={{ padding: "4px 10px", fontSize: 11, background: "rgba(255,255,255,.2)", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}>Logout</button>
+
+        {/* Card 2 */}
+        <div className="bg-white text-center rounded-2xl p-4 sm:p-5 border-1 border-gray-300 shadow-xs hover:shadow-md transition-all duration-200 flex flex-col justify-between">
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <span className="text-xs sm:text-sm font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
+              Joining & Docs
+            </span>
+            <div className="w-10 h-10 rounded-2xl bg-cyan-50 text-cyan-600 flex items-center justify-center flex-shrink-0">
+              <LuFileText size={20} />
+            </div>
+          </div>
+          <div>
+            <div className="text-2xl sm:text-3xl font-extrabold text-cyan-600 tracking-tight whitespace-nowrap">
+              {(stats.inJoining || 0) + (stats.inDocs || 0)}
+            </div>
+            <div className="text-xs text-slate-500 font-medium mt-1 whitespace-nowrap">
+              {stats.inJoining || 0} Assets Pending • {stats.inDocs || 0} In Docs
+            </div>
+          </div>
+        </div>
+
+        {/* Card 3 */}
+        <div className="bg-white text-center rounded-2xl p-4 sm:p-5 border-1 border-gray-300 shadow-xs hover:shadow-md transition-all duration-200 flex flex-col justify-between">
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <span className="text-xs sm:text-sm font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
+              4-Stage Training
+            </span>
+            <div className="w-10 h-10 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center flex-shrink-0">
+              <LuGraduationCap size={20} />
+            </div>
+          </div>
+          <div>
+            <div className="text-2xl sm:text-3xl font-extrabold text-amber-600 tracking-tight whitespace-nowrap">
+              {stats.inTraining || 0}
+            </div>
+            <div className="text-xs text-slate-500 font-medium mt-1 whitespace-nowrap">
+              HR, Admin, POS & Dept. Tracks
+            </div>
+          </div>
+        </div>
+
+        {/* Card 4 - Clean single-line layout without wrapping */}
+        <div className="bg-white text-center rounded-2xl p-4 sm:p-5 border-1 border-gray-300 shadow-xs hover:shadow-md transition-all duration-200 flex flex-col justify-between">
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <span className="text-xs sm:text-sm font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
+              6-Mo Probation
+            </span>
+            <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
+              <LuAward size={20} />
+            </div>
+          </div>
+          <div>
+            <div className="text-2xl sm:text-3xl font-extrabold text-emerald-600 tracking-tight whitespace-nowrap flex items-baseline gap-1.5">
+              <span>{stats.confirmedPermanent || 0}</span>
+              <span className="text-xs sm:text-sm font-normal text-slate-500 whitespace-nowrap">
+                / {stats.inProbation || 0} in review
+              </span>
+            </div>
+            <div className="text-xs text-slate-500 font-medium mt-1 whitespace-nowrap">
+              HOD Confirmations
+            </div>
           </div>
         </div>
       </div>
 
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "24px 20px" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(250px,1fr))", gap: 30 }}>
-          {[
-            { label: "Total Employees", value: employees.length, color: C.purple[600], bg: C.purple[50], icon: "👥" },
-            { label: "Avg Score", value: employees.length ? Math.round(employees.reduce((s, e) => s + (e.avg_score_pct || 0), 0) / employees.length) + "%" : "—", color: C.teal[600], bg: C.teal[50], icon: "📊" },
-            { label: "Passed Modules", value: employees.reduce((s, e) => s + (e.passed_modules || 0), 0), color: C.green[600], bg: C.green[50], icon: "✅" },
-            { label: "Failed Modules", value: employees.reduce((s, e) => s + (e.failed_modules || 0), 0), color: C.red[600], bg: C.red[50], icon: "❌" },
-          ].map(s => (
-            <div key={s.label} style={{ background: s.bg, borderRadius: 14, padding: "16px 20px" }}>
-              <div style={{ fontSize: 22 }}>{s.icon}</div>
-              <div style={{ fontSize: 26, fontWeight: 800, color: s.color, marginTop: 4 }}>{s.value}</div>
-              <div style={{ fontSize: 12, color: s.color, opacity: .8 }}>{s.label}</div>
-            </div>
-          ))}
-        </div>
+      {/* Material 3 Responsive Filter Strip */}
+      <div className="bg-white rounded-2xl p-3 sm:p-4 border border-slate-200/80 shadow-xs">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-12 gap-2 sm:gap-3 items-center">
+          {/* Search Input */}
+          <div className="lg:col-span-4 relative">
+            <LuSearch
+              size={17}
+              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+            />
+            <input
+              type="text"
+              placeholder="Search by name, ID, email..."
+              className="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200/70 text-slate-800 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder:text-slate-400 whitespace-nowrap"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
 
-        <div style={{ ...cardStyle, padding: "14px 16px", marginBottom: 16 }}>
-          <input style={inputStyle} placeholder="🔍 Search by name, department, employee code..." value={search} onChange={e => setSearch(e.target.value)} />
-        </div>
+          {/* Filter Stage */}
+          <div className="lg:col-span-3">
+            <select
+              className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200/70 text-slate-800 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all whitespace-nowrap cursor-pointer"
+              value={filterStage}
+              onChange={(e) => setFilterStage(e.target.value)}
+            >
+              <option value="ALL">All Stages (Pipeline)</option>
+              <option value="JOINING">1. Joining Assets</option>
+              <option value="DOCUMENTATION">2. Documentation</option>
+              <option value="TRAINING">3. 4-Stage Training</option>
+              <option value="DEPT_ASSIGNMENT">4. Dept. Placement</option>
+              <option value="PROBATION_EVALUATION">5. 6-Mo Probation Review</option>
+              <option value="COMPLETED">Confirmed Permanent</option>
+              <option value="REJECTED">Probation Rejected</option>
+            </select>
+          </div>
 
-        <div style={cardStyle}>
-          <SectionTitle>👥 Employee List</SectionTitle>
+          {/* Filter Department */}
+          <div className="lg:col-span-3">
+            <select
+              className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200/70 text-slate-800 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all whitespace-nowrap cursor-pointer"
+              value={filterDept}
+              onChange={(e) => setFilterDept(e.target.value)}
+            >
+              <option value="ALL">All Departments</option>
+              {DEPARTMENTS.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Filter Status */}
+          <div className="lg:col-span-2">
+            <select
+              className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200/70 text-slate-800 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all whitespace-nowrap cursor-pointer"
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+            >
+              <option value="ALL">All Status</option>
+              <option value="IN_PROGRESS">In Progress</option>
+              <option value="COMPLETED">Completed</option>
+              <option value="REJECTED">Rejected</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Material 3 Data Table (Horizontally Scrollable, Zero Wrapping) */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+        <div className="overflow-x-auto scrollbar-thin">
           {loading ? (
-            <div style={{ textAlign: "center", padding: 40, color: "#a0aec0" }}>Loading...</div>
-          ) : filtered.length === 0 ? (
-            <div style={{ textAlign: "center", padding: 40, color: "#a0aec0" }}>
-              <div style={{ fontSize: 40 }}>📋</div>
-              <div style={{ marginTop: 8 }}>No employees found</div>
-              <button onClick={onNewEmployee} style={{ marginTop: 12, padding: "10px 20px", background: C.purple[600], color: "#fff", border: "none", borderRadius: 10, cursor: "pointer", fontFamily: "inherit", fontWeight: 700 }}>+ Add First Employee</button>
+            <div className="text-center py-16">
+              <div className="inline-block w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+              <div className="text-slate-500 font-medium text-sm mt-3 whitespace-nowrap">
+                Loading onboarding pipeline records...
+              </div>
+            </div>
+          ) : filteredList.length === 0 ? (
+            <div className="text-center py-16 px-4">
+              <div className="w-14 h-14 rounded-2xl bg-slate-50 text-slate-400 flex items-center justify-center mx-auto mb-3">
+                <LuUserCheck size={28} />
+              </div>
+              <h6 className="font-bold text-slate-800 text-base mb-1 whitespace-nowrap">
+                No Onboarding Records Found
+              </h6>
+              <p className="text-slate-500 text-sm max-w-sm mx-auto mb-4">
+                No active onboarding candidates match the selected filters. Click "+ Initiate Onboarding" to begin.
+              </p>
+              <button
+                onClick={() => setShowInitiateModal(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 shadow-sm transition-all whitespace-nowrap"
+              >
+                <LuPlus size={16} /> Initiate First Candidate
+              </button>
             </div>
           ) : (
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                <thead>
-                  <tr style={{ background: "#f8fafc" }}>
-                    {["Employee", "Department", "Designation", "Joining Date", "ID Status", "Passed", "Failed", "Avg Score", "Actions"].map(h => (
-                      <th key={h} style={{ padding: "10px 12px", textAlign: "left", fontWeight: 700, color: "#4a5568", fontSize: 11, textTransform: "uppercase", whiteSpace: "nowrap" }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map(emp => (
-                    <tr key={emp.id} style={{ borderTop: "1px solid #edf2f7" }}>
-                      <td style={{ padding: "12px" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                          <div style={{ width: 34, height: 34, borderRadius: "50%", background: C.purple[600], color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, flexShrink: 0, overflow: "hidden" }}>
-                            {emp.id_card_image_url
-                              ? <img src={`${API}/uploads/${emp.id_card_image_url}`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} onError={e => { e.target.style.display = "none"; }} />
-                              : initials(emp.name)
-                            }
+            <table className="w-full text-left border-collapse min-w-[1080px]">
+              <thead>
+                <tr className="bg-slate-50/90 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  <th className="py-3.5 px-4 whitespace-nowrap min-w-[240px]">Employee / Candidate</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap min-w-[210px]">Target Dept & Role</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap min-w-[170px]">Current Stage</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap min-w-[160px]">Lifecycle Progress</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap min-w-[220px]">4 Trainings Status</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap min-w-[200px]">6-Mo Probation Review</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap text-right min-w-[120px]">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-sm">
+                {filteredList.map((item) => {
+                  const trSummary = getTrainingsSummary(item);
+                  const progressPct = getStageProgressPercent(item);
+
+                  const hrDone = item.hr_training?.status === "COMPLETED";
+                  const adminDone = item.admin_training?.status === "COMPLETED";
+                  const posDone = item.pos_training?.status === "COMPLETED";
+                  const deptDone = item.dept_training?.status === "COMPLETED";
+
+                  return (
+                    <tr
+                      key={item.id}
+                      className="hover:bg-slate-50/70 transition-colors duration-150"
+                    >
+                      {/* 1. Employee / Candidate (Zero wrapping) */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className="w-10 h-10 rounded-2xl flex items-center justify-center font-bold text-white shadow-xs flex-shrink-0"
+                            style={{
+                              background: "linear-gradient(135deg, #4f46e5, #06b6d4)",
+                              fontSize: 14,
+                            }}
+                          >
+                            {item.employee_name?.charAt(0)?.toUpperCase() || "E"}
                           </div>
-                          <div>
-                            <div style={{ fontWeight: 700, color: "#1a202c" }}>{emp.name}</div>
-                            <div style={{ fontSize: 11, color: "#a0aec0" }}>{emp.employee_code || "—"}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td style={{ padding: "12px", color: "#4a5568" }}>{emp.department || "—"}</td>
-                      <td style={{ padding: "12px", color: "#4a5568" }}>{emp.designation || "—"}</td>
-                      <td style={{ padding: "12px", color: "#4a5568", whiteSpace: "nowrap" }}>{emp.joining_date ? new Date(emp.joining_date).toLocaleDateString("en-IN") : "—"}</td>
-                      <td style={{ padding: "12px" }}><Badge variant={emp.id_status === "Issued" ? "teal" : emp.id_status === "Pending" ? "amber" : "gray"}>{emp.id_status || "—"}</Badge></td>
-                      <td style={{ padding: "12px" }}><span style={{ fontWeight: 700, color: C.green[600] }}>{emp.passed_modules ?? "—"}</span></td>
-                      <td style={{ padding: "12px" }}><span style={{ fontWeight: 700, color: C.red[600] }}>{emp.failed_modules ?? "—"}</span></td>
-                      <td style={{ padding: "12px" }}>
-                        {emp.avg_score_pct != null ? (
-                          <div>
-                            <div style={{ fontWeight: 700, color: emp.avg_score_pct >= 70 ? C.green[600] : C.red[600] }}>{Math.round(emp.avg_score_pct)}%</div>
-                            <div style={{ height: 4, background: "#edf2f7", borderRadius: 4, width: 60, marginTop: 3 }}>
-                              <div style={{ height: "100%", width: `${Math.min(emp.avg_score_pct, 100)}%`, background: emp.avg_score_pct >= 70 ? C.green[600] : C.red[600], borderRadius: 4 }} />
+                          <div className="min-w-0">
+                            <div className="font-semibold text-slate-900 whitespace-nowrap flex items-center gap-1.5">
+                              <span>{item.employee_name}</span>
+                              {item.employee_id && (
+                                <span className="px-1.5 py-0.5 rounded text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200 whitespace-nowrap">
+                                  {item.employee_id}
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-xs text-slate-500 whitespace-nowrap truncate max-w-[220px]">
+                              {item.email_address || item.personal_email || "No email"}
                             </div>
                           </div>
-                        ) : "—"}
-                      </td>
-                      <td style={{ padding: "12px" }}>
-                        <div style={{ display: "flex", gap: 6 }}>
-                          <button onClick={() => onViewEmployee(emp.id)} style={{ padding: "5px 12px", background: C.purple[50], color: C.purple[600], border: `1px solid ${C.purple[200]}`, borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit" }}>View</button>
-                          <button onClick={() => deleteEmployee(emp.id, emp.name)} style={{ padding: "5px 12px", background: C.red[50], color: C.red[600], border: `1px solid ${C.red[200]}`, borderRadius: 8, cursor: "pointer", fontSize: 12, fontFamily: "inherit" }}>Delete</button>
                         </div>
                       </td>
+
+                      {/* 2. Target Dept & Role (Zero wrapping) */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <div className="font-medium text-slate-900 whitespace-nowrap">
+                          {item.designation || "Trainee"}
+                        </div>
+                        <div className="text-xs whitespace-nowrap mt-0.5">
+                          {item.assigned_department ? (
+                            <span className="text-emerald-700 font-semibold flex items-center gap-1">
+                              <LuCircleCheck size={12} className="flex-shrink-0" />
+                              <span>Assigned: {item.assigned_department}</span>
+                            </span>
+                          ) : (
+                            <span className="text-slate-500">
+                              Target: {item.target_department || "General"}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* 3. Current Stage Chip */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        {getStageBadge(item.current_stage)}
+                      </td>
+
+                      {/* 4. Lifecycle Progress */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <div className="flex justify-between items-center text-xs font-semibold text-slate-600 mb-1.5 whitespace-nowrap">
+                          <span>Progress</span>
+                          <span className="text-slate-900 font-bold">{progressPct}%</span>
+                        </div>
+                        <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-500 ${
+                              item.probation_status === "CONFIRMED_PERMANENT"
+                                ? "bg-emerald-500"
+                                : item.probation_status === "REJECTED"
+                                ? "bg-rose-500"
+                                : "bg-blue-600"
+                            }`}
+                            style={{ width: `${progressPct}%` }}
+                          />
+                        </div>
+                      </td>
+
+                      {/* 5. 4 Trainings Status (Single line, zero wrapping) */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <div className="flex items-center gap-2 mb-1 whitespace-nowrap">
+                          <span
+                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold whitespace-nowrap ${
+                              trSummary.count === 4
+                                ? "bg-emerald-100 text-emerald-800"
+                                : "bg-amber-100 text-amber-800"
+                            }`}
+                          >
+                            {trSummary.count}/4 Done
+                          </span>
+                        </div>
+                        {/* 4 compact badges strictly on one single line */}
+                        <div className="flex items-center gap-1 text-[11px] font-medium whitespace-nowrap">
+                          <span
+                            className={`px-1.5 py-0.5 rounded whitespace-nowrap ${
+                              hrDone
+                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                : "bg-slate-100 text-slate-400"
+                            }`}
+                          >
+                            HR {hrDone ? "✓" : "○"}
+                          </span>
+                          <span
+                            className={`px-1.5 py-0.5 rounded whitespace-nowrap ${
+                              adminDone
+                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                : "bg-slate-100 text-slate-400"
+                            }`}
+                          >
+                            Admin {adminDone ? "✓" : "○"}
+                          </span>
+                          <span
+                            className={`px-1.5 py-0.5 rounded whitespace-nowrap ${
+                              posDone
+                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                : "bg-slate-100 text-slate-400"
+                            }`}
+                          >
+                            POS {posDone ? "✓" : "○"}
+                          </span>
+                          <span
+                            className={`px-1.5 py-0.5 rounded whitespace-nowrap ${
+                              deptDone
+                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                : "bg-slate-100 text-slate-400"
+                            }`}
+                          >
+                            Dept {deptDone ? "✓" : "○"}
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* 6. 6-Mo Probation Review */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        {item.probation_status === "CONFIRMED_PERMANENT" ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80 whitespace-nowrap shadow-xs">
+                            <LuAward size={13} className="flex-shrink-0" />
+                            <span>Confirmed Permanent</span>
+                          </span>
+                        ) : item.probation_status === "REJECTED" ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200/80 whitespace-nowrap shadow-xs">
+                            <LuCircleX size={13} className="flex-shrink-0" />
+                            <span>Probation Rejected</span>
+                          </span>
+                        ) : item.probation_status === "IN_PROBATION" ? (
+                          <div className="whitespace-nowrap">
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200/80 whitespace-nowrap shadow-xs">
+                              <LuClock size={13} className="flex-shrink-0" />
+                              <span>6-Mo Probation</span>
+                            </span>
+                            <div className="text-[11px] text-slate-400 mt-1 whitespace-nowrap">
+                              Ends: {item.probation_end_date || "6 Months"}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-slate-400 whitespace-nowrap">
+                            Pending Dept Training
+                          </span>
+                        )}
+                      </td>
+
+                      {/* 7. Action Button */}
+                      <td className="py-3.5 px-4 whitespace-nowrap text-right">
+                        <button
+                          onClick={() => {
+                            setSelectedOnboarding(item);
+                            setActiveStepTab(item.current_stage || "JOINING");
+                          }}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold text-blue-600 bg-blue-50/80 hover:bg-blue-100 hover:text-blue-700 border border-blue-200/80 transition-all duration-150 whitespace-nowrap shadow-xs active:scale-95 cursor-pointer"
+                        >
+                          <span>Workspace</span>
+                          <LuChevronRight size={13} />
+                        </button>
+                      </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  );
+                })}
+              </tbody>
+            </table>
           )}
         </div>
       </div>
     </div>
   );
-}
 
-// ── EMPLOYEE VIEW ─────────────────────────────────────────────────────────────
-function EmployeeView({ empId, token, onBack }) {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  // =========================================================================
+  // VIEW B: EMPLOYEE WORKSPACE VIEW (5-STEP PROCESS & TABS)
+  // =========================================================================
 
-  useEffect(() => {
-    fetch(`${API}/api/onboarding/${empId}`, { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.json()).then(d => { setData(d); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, [empId, token]);
+  const renderWorkspaceView = () => {
+    if (!selectedOnboarding) return null;
 
-  if (loading) return <div style={{ padding: 40, textAlign: "center", color: "#a0aec0", fontFamily: "'Segoe UI',sans-serif" }}>Loading...</div>;
-  if (!data) return <div style={{ padding: 40, textAlign: "center", color: C.red[600], fontFamily: "'Segoe UI',sans-serif" }}>Employee not found</div>;
+    return (
+      <div className="space-y-4">
+        {/* Workspace Top Navigation Bar */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <button
+            onClick={() => {
+              setSelectedOnboarding(null);
+              fetchPipelineData();
+            }}
+            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50 transition-all whitespace-nowrap shadow-xs cursor-pointer"
+          >
+            <LuArrowLeft size={16} />
+            <span>Back to Pipeline</span>
+          </button>
 
-  const { employee: emp, modules, docs, passConfig } = data;
-  const checklist = (() => { try { return JSON.parse(emp.checklist || "{}"); } catch { return {}; } })();
-  const passMark = passConfig?.pass_mark || 70;
-  const maxMarks = passConfig?.max_marks || 100;
-  const moduleMap = {};
-  (modules || []).forEach(m => { moduleMap[m.module_key] = m; });
-  let totalPassed = 0, totalFailed = 0;
-  TRAINING_CONFIG.forEach(({ key }) => {
-    const m = moduleMap[key];
-    if (m?.marks != null) { const pct = Math.round((m.marks / maxMarks) * 100); if (pct >= passMark) totalPassed++; else totalFailed++; }
-  });
-
-  return (
-    <div style={{ maxWidth: 1000, margin: "0 auto", padding: "24px 20px", fontFamily: "'Segoe UI',sans-serif" }}>
-      <button onClick={onBack} style={{ marginBottom: 20, padding: "8px 16px", background: C.purple[50], color: C.purple[600], border: `1px solid ${C.purple[200]}`, borderRadius: 10, cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "inherit" }}>← Back to Dashboard</button>
-
-      <div style={{ background: "linear-gradient(135deg,#534AB7,#3a3293)", borderRadius: 16, padding: "24px", marginBottom: 20, color: "#fff", display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
-        <div style={{ width: 72, height: 72, borderRadius: "50%", background: "rgba(255,255,255,.2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, fontWeight: 800, border: "3px solid rgba(255,255,255,.3)", overflow: "hidden", flexShrink: 0 }}>
-          {emp.id_card_image_url
-            ? <img src={`${API}/uploads/${emp.id_card_image_url}`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} onError={e => { e.target.style.display = "none"; }} />
-            : initials(emp.name)
-          }
-        </div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 22, fontWeight: 800 }}>{emp.name}</div>
-          <div style={{ opacity: .8, fontSize: 14 }}>{emp.designation}  {emp.department}</div>
-          <div style={{ fontFamily: "monospace", fontSize: 12, marginTop: 4, opacity: .7 }}>{emp.employee_code || "ID: PENDING"}</div>
-        </div>
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-          {[{ label: "Passed", value: totalPassed, color: "#86efac" }, { label: "Failed", value: totalFailed, color: "#fca5a5" }].map(s => (
-            <div key={s.label} style={{ textAlign: "center", background: "rgba(255,255,255,.15)", borderRadius: 10, padding: "10px 16px" }}>
-              <div style={{ fontSize: 22, fontWeight: 800, color: s.color }}>{s.value}</div>
-              <div style={{ fontSize: 11, opacity: .8 }}>{s.label}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {emp.id_card_image_url && (
-        <div style={cardStyle}>
-          <SectionTitle color={C.purple[600]}>🪪 ID Card Photo</SectionTitle>
-          <div style={{ display: "flex", justifyContent: "center" }}>
-            <img src={`${API}/uploads/${emp.id_card_image_url}`} alt="ID Card" style={{ maxWidth: "100%", maxHeight: 300, objectFit: "contain", borderRadius: 12, border: `2px solid ${C.purple[200]}` }} />
+          <div className="flex items-center gap-2 whitespace-nowrap">
+            <button
+              onClick={() => refreshCurrentOnboarding(selectedOnboarding.id)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-700 text-xs font-medium hover:bg-slate-50 transition-all whitespace-nowrap shadow-xs cursor-pointer"
+            >
+              <LuRefreshCw size={13} />
+              <span>Refresh</span>
+            </button>
+            {getStageBadge(selectedOnboarding.current_stage)}
           </div>
         </div>
-      )}
 
-      <div style={cardStyle}>
-        <SectionTitle>👤 Employee Information</SectionTitle>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 14 }}>
-          {[
-            { label: "Email", value: emp.email },
-            { label: "Phone", value: emp.phone },
-            { label: "Father's Name", value: emp.father_name },
-            { label: "Mother's Name", value: emp.mother_name },
-            { label: "Address", value: emp.address },
-            { label: "Joining Date", value: emp.joining_date ? new Date(emp.joining_date).toLocaleDateString("en-IN") : "—" },
-            { label: "ID Status", value: emp.id_status },
-          ].map(f => (
-            <div key={f.label}>
-              <div style={{ fontSize: 11, color: "#a0aec0", fontWeight: 700, textTransform: "uppercase", marginBottom: 3 }}>{f.label}</div>
-              <div style={{ fontSize: 13, color: "#1a202c", fontWeight: 600, wordBreak: "break-all", overflowWrap: "anywhere" }}>{f.value || "—"}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div style={cardStyle}>
-        <SectionTitle color={C.green[600]}>✅ Welcome Kit Checklist</SectionTitle>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-          {[{ key: "lunch", label: "Lunch" }, { key: "stationary", label: "Stationary" }, { key: "laptop", label: "Laptop/Bag" }, { key: "workstation", label: "Workstation" }, { key: "credentials", label: "Credentials" }].map(item => (
-            <div key={item.key} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", border: `1.5px solid ${checklist[item.key] ? "#38a169" : "#e2e8f0"}`, borderRadius: 10, background: checklist[item.key] ? C.green[50] : "#fff" }}>
-              <span style={{ color: checklist[item.key] ? "#38a169" : "#cbd5e0", fontWeight: 700 }}>{checklist[item.key] ? "✓" : "○"}</span>
-              <span style={{ fontSize: 13, color: checklist[item.key] ? "#2f855a" : "#718096", fontWeight: checklist[item.key] ? 600 : 400 }}>{item.label}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {GROUPS.map(group => {
-        const mods = TRAINING_CONFIG.filter(m => m.group === group.key);
-        return (
-          <div key={group.key} style={cardStyle}>
-            <SectionTitle color={group.accent}>{group.label}</SectionTitle>
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-                <thead>
-                  <tr style={{ background: "#f8fafc" }}>
-                    {["Module", "Date(s)", "Trainer", "Score", "%", "Question Paper", "Result Sheet", "Result"].map(h => (
-                      <th key={h} style={{ padding: "8px 10px", textAlign: "left", fontWeight: 700, color: "#718096", fontSize: 11, textTransform: "uppercase" }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {mods.map(({ key, label }) => {
-                    const m = moduleMap[key];
-                    const marks = m?.marks;
-                    const pct = marks != null ? Math.round((marks / maxMarks) * 100) : null;
-                    const isPassed = pct != null && pct >= passMark;
-                    const isFailed = pct != null && pct < passMark;
-                    const dates = (() => { try { return JSON.parse(m?.training_dates || "[]").filter(Boolean).join(", "); } catch { return "—"; } })();
-                    return (
-                      <tr key={key} style={{ borderTop: "1px solid #edf2f7", background: isPassed ? C.green[50] : isFailed ? C.red[50] : "transparent" }}>
-                        <td style={{ padding: "8px 10px" }}>
-                          <span style={{ fontWeight: 600, color: "#1a202c" }}>{label}</span>
-                          {m?.mandatory ? <span style={{ marginLeft: 5, fontSize: 10, color: C.orange[600], fontWeight: 800 }}>★M</span> : null}
-                        </td>
-                        <td style={{ padding: "8px 10px", color: "#718096" }}>{dates || "—"}</td>
-                        <td style={{ padding: "8px 10px", color: "#4a5568" }}>{m?.trainer_name || "—"}</td>
-                        <td style={{ padding: "8px 10px", fontWeight: 700 }}>{marks ?? "—"}</td>
-                        <td style={{ padding: "8px 10px", fontWeight: 700, color: isPassed ? C.green[600] : isFailed ? C.red[600] : "#a0aec0" }}>{pct != null ? pct + "%" : "—"}</td>
-                        <td style={{ padding: "8px 10px", minWidth: 120 }}>
-                          {m?.questions_file ? <FilePreview file={m.questions_file} height={80} baseUrl={API} /> : <span style={{ color: "#a0aec0", fontSize: 11 }}>—</span>}
-                        </td>
-                        <td style={{ padding: "8px 10px", minWidth: 120 }}>
-                          {m?.result_file ? <FilePreview file={m.result_file} height={80} baseUrl={API} /> : <span style={{ color: "#a0aec0", fontSize: 11 }}>—</span>}
-                        </td>
-                        <td style={{ padding: "8px 10px" }}>
-                          <Badge variant={isPassed ? "pass" : isFailed ? "fail" : "pending"}>{isPassed ? "PASS" : isFailed ? "FAIL" : "Pending"}</Badge>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        );
-      })}
-
-      {docs?.length > 0 && (
-        <div style={cardStyle}>
-          <SectionTitle>📂 Documents</SectionTitle>
-          {docs.map(d => (
-            <div key={d.id} style={{ marginBottom: 12 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", background: "#f8fafc", border: "1px solid #edf2f7", borderRadius: 10 }}>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>{d.title}</div>
-                  <div style={{ fontSize: 11, color: "#a0aec0" }}>{d.file_name} · {d.category}</div>
-                </div>
-                <Badge variant="gray">{d.category}</Badge>
+        {/* Hero Card of Selected Employee */}
+        <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 shadow-xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+              <div
+                className="w-14 h-14 rounded-2xl flex items-center justify-center font-bold text-white shadow-xs flex-shrink-0"
+                style={{
+                  background: "linear-gradient(135deg, #6366f1, #06b6d4)",
+                  fontSize: 22,
+                }}
+              >
+                {selectedOnboarding.employee_name?.charAt(0)?.toUpperCase() || "E"}
               </div>
-              {(d.stored_name || d.file_name) && <FilePreview file={d.stored_name || d.file_name} height={140} baseUrl={API} />}
+
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2 mb-1">
+                  <h3 className="text-xl font-bold text-slate-900 tracking-tight whitespace-nowrap">
+                    {selectedOnboarding.employee_name}
+                  </h3>
+                  {selectedOnboarding.employee_id && (
+                    <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200 whitespace-nowrap">
+                      {selectedOnboarding.employee_id}
+                    </span>
+                  )}
+                  {selectedOnboarding.probation_status === "CONFIRMED_PERMANENT" && (
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 whitespace-nowrap">
+                      🌟 Permanent Employee
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 whitespace-nowrap">
+                  <span className="flex items-center gap-1 whitespace-nowrap">
+                    <LuBriefcase size={13} className="text-slate-400" />
+                    <strong>Role:</strong> {selectedOnboarding.designation || "Trainee"}
+                  </span>
+                  <span className="flex items-center gap-1 whitespace-nowrap">
+                    <LuBuilding2 size={13} className="text-slate-400" />
+                    <strong>Dept:</strong>{" "}
+                    {selectedOnboarding.assigned_department ? (
+                      <span className="text-emerald-700 font-semibold">
+                        {selectedOnboarding.assigned_department} (Assigned)
+                      </span>
+                    ) : (
+                      <span>{selectedOnboarding.target_department || "General"} (Target)</span>
+                    )}
+                  </span>
+                  <span className="flex items-center gap-1 whitespace-nowrap">
+                    <LuCalendar size={13} className="text-slate-400" />
+                    <strong>Joining:</strong> {selectedOnboarding.joining_date || "Immediate"}
+                  </span>
+                  <span className="flex items-center gap-1 whitespace-nowrap">
+                    <LuMail size={13} className="text-slate-400" />
+                    <strong>Email:</strong>{" "}
+                    {selectedOnboarding.email_address ||
+                      selectedOnboarding.personal_email ||
+                      "N/A"}
+                  </span>
+                </div>
+              </div>
             </div>
-          ))}
+
+            {/* Overall progress on right */}
+            <div className="flex items-center sm:flex-col sm:items-end justify-between border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-100 flex-shrink-0">
+              <span className="text-xs text-slate-500 font-medium whitespace-nowrap mb-1">
+                Lifecycle Progress
+              </span>
+              <div className="flex items-center gap-2 whitespace-nowrap">
+                <div className="w-24 bg-slate-100 rounded-full h-2 overflow-hidden">
+                  <div
+                    className="h-full bg-blue-600 rounded-full"
+                    style={{ width: `${getStageProgressPercent(selectedOnboarding)}%` }}
+                  />
+                </div>
+                <span className="text-sm font-bold text-slate-800 whitespace-nowrap">
+                  {getStageProgressPercent(selectedOnboarding)}%
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
-      )}
-    </div>
-  );
-}
 
-// ── EMPLOYEE TAB — all fields mandatory ──────────────────────────────────────
-function TabEmployee({ emp, setE, fieldErrors }) {
-  return (
-    <>
-      <div style={cardStyle}>
-        <SectionTitle>👤 Employee Information</SectionTitle>
+        {/* 5-Stage Material 3 Segmented Pill Navigation Bar (Horizontally scrollable on mobile, zero wrapping) */}
+        <div className="bg-white rounded-2xl p-1.5 border border-slate-200/80 shadow-xs overflow-hidden">
+          <div className="flex items-center gap-1 overflow-x-auto scrollbar-none whitespace-nowrap">
+            {STAGES.map((s) => {
+              const IconComp = s.icon;
+              const isActive = activeStepTab === s.key;
 
-        {/* Required fields notice */}
-        <div style={{ marginBottom: 16, padding: "10px 14px", background: C.purple[50], border: `1px solid ${C.purple[200]}`, borderRadius: 10, fontSize: 12, color: C.purple[600], fontWeight: 600 }}>
-          ⓘ All fields marked with <span style={{ color: C.red[600] }}>*</span> are required
+              let isDone = false;
+              if (s.key === "JOINING" && selectedOnboarding.joining_completed) isDone = true;
+              if (s.key === "DOCUMENTATION" && selectedOnboarding.documentation_status === "VERIFIED")
+                isDone = true;
+              if (s.key === "TRAINING" && selectedOnboarding.trainings_completed) isDone = true;
+              if (s.key === "DEPT_ASSIGNMENT" && selectedOnboarding.is_assigned_to_dept)
+                isDone = true;
+              if (s.key === "PROBATION_EVALUATION" && selectedOnboarding.hod_analysis_completed)
+                isDone = true;
+
+              return (
+                <button
+                  key={s.key}
+                  onClick={() => setActiveStepTab(s.key)}
+                  className={`flex-1 inline-flex items-center justify-between gap-2.5 px-3.5 py-2.5 rounded-xl font-medium text-xs sm:text-sm transition-all whitespace-nowrap cursor-pointer ${
+                    isActive
+                      ? "bg-blue-600 text-white shadow-sm font-semibold"
+                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                  }`}
+                >
+                  <div className="flex items-center gap-2 whitespace-nowrap">
+                    <IconComp size={16} className={isActive ? "text-white" : "text-slate-400"} />
+                    <span className="whitespace-nowrap">{s.step}. {s.label}</span>
+                  </div>
+                  {isDone ? (
+                    <LuCircleCheck
+                      size={15}
+                      className={isActive ? "text-white" : "text-emerald-500"}
+                    />
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.25rem 3rem" }}>
-          <Field label="Name of Candidate" required>
-            <input
-              style={fieldErrors.name ? inputErrorStyle : inputStyle}
-              placeholder="e.g. Rahul Sharma"
-              value={emp.name}
-              onChange={e => setE("name", e.target.value)}
-            />
-            <FieldError msg={fieldErrors.name} />
-          </Field>
+        {/* STEP CONTENT SWITCHER */}
+        {activeStepTab === "JOINING" && renderStageA_Joining()}
+        {activeStepTab === "DOCUMENTATION" && renderStageB_Documentation()}
+        {activeStepTab === "TRAINING" && renderStageC_Training()}
+        {activeStepTab === "DEPT_ASSIGNMENT" && renderStageD_DeptAssignment()}
+        {activeStepTab === "PROBATION_EVALUATION" && renderStageE_ProbationReview()}
+      </div>
+    );
+  };
 
-          <Field label="Email Address" required>
-            <input
-              style={fieldErrors.email ? inputErrorStyle : inputStyle}
-              type="email"
-              placeholder="example@gmail.com"
-              value={emp.email}
-              onChange={e => setE("email", e.target.value)}
-            />
-            <FieldError msg={fieldErrors.email} />
-            {!fieldErrors.email && emp.email && (
-              <span style={{ fontSize: 11, color: "#a0aec0" }}>Only @gmail.com allowed</span>
-            )}
-          </Field>
+  // =========================================================================
+  // STAGE A: JOINING — ASSET & IDENTITY ISSUANCE
+  // =========================================================================
 
-          <Field label="Phone No" required>
-            <input
-              style={fieldErrors.phone ? inputErrorStyle : inputStyle}
-              placeholder="10-digit mobile number"
-              value={emp.phone}
-              maxLength={10}
-              onChange={e => {
-                const val = e.target.value.replace(/\D/g, "").slice(0, 10);
-                setE("phone", val);
-              }}
-            />
-            <FieldError msg={fieldErrors.phone} />
-            {!fieldErrors.phone && (
-              <span style={{ fontSize: 11, color: emp.phone.length === 10 ? C.green[600] : "#a0aec0", fontWeight: emp.phone.length === 10 ? 700 : 400 }}>
-                {emp.phone.length}/10 digits {emp.phone.length === 10 ? "✓" : ""}
+  const renderStageA_Joining = () => {
+    return (
+      <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/80 shadow-xs space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-100">
+          <div>
+            <h4 className="text-lg font-bold text-slate-900 flex items-center gap-2 whitespace-nowrap">
+              <LuLaptop className="text-blue-600" /> a) Joining — Asset & Identity Issuance
+            </h4>
+            <p className="text-xs sm:text-sm text-slate-500 mt-0.5 whitespace-nowrap">
+              Issue company Email ID, ID Card, Biometric registration, Laptop, Corporate Bag, Stationery kit, etc.
+            </p>
+          </div>
+          <div>
+            {selectedOnboarding.joining_completed ? (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
+                <LuCircleCheck size={14} /> Joining Stage Completed
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 whitespace-nowrap">
+                <LuClock size={14} /> Assets Issuance Pending
               </span>
             )}
-          </Field>
+          </div>
+        </div>
 
-          <Field label="Father's Name" required>
-            <input
-              style={fieldErrors.father ? inputErrorStyle : inputStyle}
-              placeholder="Father's full name"
-              value={emp.father}
-              onChange={e => setE("father", e.target.value)}
-            />
-            <FieldError msg={fieldErrors.father} />
-          </Field>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* 1. Email ID */}
+          <div className="p-4 rounded-2xl border border-slate-200/80 bg-slate-50/50 space-y-3">
+            <div className="flex items-center justify-between whitespace-nowrap">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-white border border-slate-200 text-blue-600 flex items-center justify-center shadow-xs">
+                  <LuMail size={18} />
+                </div>
+                <div>
+                  <div className="font-semibold text-slate-900 text-sm whitespace-nowrap">Official Email ID</div>
+                  <div className="text-xs text-slate-500 whitespace-nowrap">Corporate mailbox</div>
+                </div>
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer whitespace-nowrap">
+                <input
+                  type="checkbox"
+                  checked={assetsForm.email_issued}
+                  onChange={(e) =>
+                    setAssetsForm((p) => ({ ...p, email_issued: e.target.checked }))
+                  }
+                  className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                />
+                <span className="text-xs font-semibold text-slate-700">
+                  {assetsForm.email_issued ? "Issued" : "Pending"}
+                </span>
+              </label>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1 whitespace-nowrap">
+                Assigned Email Address
+              </label>
+              <input
+                type="email"
+                placeholder="e.g. employee@company.com"
+                value={assetsForm.email_address}
+                onChange={(e) =>
+                  setAssetsForm((p) => ({ ...p, email_address: e.target.value }))
+                }
+                className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 whitespace-nowrap"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1 whitespace-nowrap">
+                Issue Date
+              </label>
+              <input
+                type="date"
+                value={assetsForm.email_issued_date}
+                onChange={(e) =>
+                  setAssetsForm((p) => ({ ...p, email_issued_date: e.target.value }))
+                }
+                className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 whitespace-nowrap"
+              />
+            </div>
+          </div>
 
-          <Field label="Mother's Name" required>
-            <input
-              style={fieldErrors.mother ? inputErrorStyle : inputStyle}
-              placeholder="Mother's full name"
-              value={emp.mother}
-              onChange={e => setE("mother", e.target.value)}
-            />
-            <FieldError msg={fieldErrors.mother} />
-          </Field>
+          {/* 2. ID Card */}
+          <div className="p-4 rounded-2xl border border-slate-200/80 bg-slate-50/50 space-y-3">
+            <div className="flex items-center justify-between whitespace-nowrap">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-white border border-slate-200 text-blue-600 flex items-center justify-center shadow-xs">
+                  <LuCreditCard size={18} />
+                </div>
+                <div>
+                  <div className="font-semibold text-slate-900 text-sm whitespace-nowrap">Employee ID Card</div>
+                  <div className="text-xs text-slate-500 whitespace-nowrap">RFID badge & card number</div>
+                </div>
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer whitespace-nowrap">
+                <input
+                  type="checkbox"
+                  checked={assetsForm.id_card_issued}
+                  onChange={(e) =>
+                    setAssetsForm((p) => ({ ...p, id_card_issued: e.target.checked }))
+                  }
+                  className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                />
+                <span className="text-xs font-semibold text-slate-700">
+                  {assetsForm.id_card_issued ? "Issued" : "Pending"}
+                </span>
+              </label>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1 whitespace-nowrap">
+                ID Card / Badge Number
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. IDC-2026-9041"
+                value={assetsForm.id_card_number}
+                onChange={(e) =>
+                  setAssetsForm((p) => ({ ...p, id_card_number: e.target.value }))
+                }
+                className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 whitespace-nowrap"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1 whitespace-nowrap">
+                Issue Date
+              </label>
+              <input
+                type="date"
+                value={assetsForm.id_card_issued_date}
+                onChange={(e) =>
+                  setAssetsForm((p) => ({ ...p, id_card_issued_date: e.target.value }))
+                }
+                className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 whitespace-nowrap"
+              />
+            </div>
+          </div>
 
-          <Field label="Designation" required>
-            <input
-              style={fieldErrors.designation ? inputErrorStyle : inputStyle}
-              placeholder="e.g. Sales Associate"
-              value={emp.designation}
-              onChange={e => setE("designation", e.target.value)}
-            />
-            <FieldError msg={fieldErrors.designation} />
-          </Field>
+          {/* 3. Biometric Registration */}
+          <div className="p-4 rounded-2xl border border-slate-200/80 bg-slate-50/50 space-y-3">
+            <div className="flex items-center justify-between whitespace-nowrap">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-white border border-slate-200 text-blue-600 flex items-center justify-center shadow-xs">
+                  <LuFingerprint size={18} />
+                </div>
+                <div>
+                  <div className="font-semibold text-slate-900 text-sm whitespace-nowrap">Biometric Registration</div>
+                  <div className="text-xs text-slate-500 whitespace-nowrap">Fingerprint / Facial punch</div>
+                </div>
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer whitespace-nowrap">
+                <input
+                  type="checkbox"
+                  checked={assetsForm.biometric_registered}
+                  onChange={(e) =>
+                    setAssetsForm((p) => ({ ...p, biometric_registered: e.target.checked }))
+                  }
+                  className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                />
+                <span className="text-xs font-semibold text-slate-700">
+                  {assetsForm.biometric_registered ? "Registered" : "Pending"}
+                </span>
+              </label>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1 whitespace-nowrap">
+                Biometric Device Terminal ID
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. BIO-HQ-TERMINAL-01"
+                value={assetsForm.biometric_device_id}
+                onChange={(e) =>
+                  setAssetsForm((p) => ({ ...p, biometric_device_id: e.target.value }))
+                }
+                className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 whitespace-nowrap"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1 whitespace-nowrap">
+                Registration Date
+              </label>
+              <input
+                type="date"
+                value={assetsForm.biometric_registered_date}
+                onChange={(e) =>
+                  setAssetsForm((p) => ({ ...p, biometric_registered_date: e.target.value }))
+                }
+                className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 whitespace-nowrap"
+              />
+            </div>
+          </div>
 
-          <Field label="Department" required>
-            <input
-              style={fieldErrors.department ? inputErrorStyle : inputStyle}
-              placeholder="e.g. Retail Operations"
-              value={emp.department}
-              onChange={e => setE("department", e.target.value)}
-            />
-            <FieldError msg={fieldErrors.department} />
-          </Field>
+          {/* 4. Company Laptop */}
+          <div className="p-4 rounded-2xl border border-slate-200/80 bg-slate-50/50 space-y-3">
+            <div className="flex items-center justify-between whitespace-nowrap">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-white border border-slate-200 text-blue-600 flex items-center justify-center shadow-xs">
+                  <LuLaptop size={18} />
+                </div>
+                <div>
+                  <div className="font-semibold text-slate-900 text-sm whitespace-nowrap">Company Laptop</div>
+                  <div className="text-xs text-slate-500 whitespace-nowrap">Asset tag & serial number</div>
+                </div>
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer whitespace-nowrap">
+                <input
+                  type="checkbox"
+                  checked={assetsForm.laptop_issued}
+                  onChange={(e) =>
+                    setAssetsForm((p) => ({ ...p, laptop_issued: e.target.checked }))
+                  }
+                  className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                />
+                <span className="text-xs font-semibold text-slate-700">
+                  {assetsForm.laptop_issued ? "Issued" : "Pending"}
+                </span>
+              </label>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1 whitespace-nowrap">
+                  Serial / Tag No.
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. LP-DELL-8921"
+                  value={assetsForm.laptop_serial_no}
+                  onChange={(e) =>
+                    setAssetsForm((p) => ({ ...p, laptop_serial_no: e.target.value }))
+                  }
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 whitespace-nowrap"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1 whitespace-nowrap">
+                  Brand & Model
+                </label>
+                <input
+                  type="text"
+                  placeholder="Dell Latitude 5440"
+                  value={assetsForm.laptop_model}
+                  onChange={(e) =>
+                    setAssetsForm((p) => ({ ...p, laptop_model: e.target.value }))
+                  }
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 whitespace-nowrap"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1 whitespace-nowrap">
+                Issue Date
+              </label>
+              <input
+                type="date"
+                value={assetsForm.laptop_issued_date}
+                onChange={(e) =>
+                  setAssetsForm((p) => ({ ...p, laptop_issued_date: e.target.value }))
+                }
+                className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 whitespace-nowrap"
+              />
+            </div>
+          </div>
 
-          <Field label="Joining Date" required>
-            <input
-              style={fieldErrors.joiningDate ? inputErrorStyle : inputStyle}
-              type="date"
-              value={emp.joiningDate}
-              onChange={e => setE("joiningDate", e.target.value)}
-            />
-            <FieldError msg={fieldErrors.joiningDate} />
-          </Field>
+          {/* 5. Corporate Bag */}
+          <div className="p-4 rounded-2xl border border-slate-200/80 bg-slate-50/50 space-y-3">
+            <div className="flex items-center justify-between whitespace-nowrap">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-white border border-slate-200 text-blue-600 flex items-center justify-center shadow-xs">
+                  <LuShoppingBag size={18} />
+                </div>
+                <div>
+                  <div className="font-semibold text-slate-900 text-sm whitespace-nowrap">Corporate Bag</div>
+                  <div className="text-xs text-slate-500 whitespace-nowrap">Laptop backpack / messenger</div>
+                </div>
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer whitespace-nowrap">
+                <input
+                  type="checkbox"
+                  checked={assetsForm.bag_issued}
+                  onChange={(e) =>
+                    setAssetsForm((p) => ({ ...p, bag_issued: e.target.checked }))
+                  }
+                  className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                />
+                <span className="text-xs font-semibold text-slate-700">
+                  {assetsForm.bag_issued ? "Issued" : "Pending"}
+                </span>
+              </label>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1 whitespace-nowrap">
+                Bag Model / Type
+              </label>
+              <input
+                type="text"
+                placeholder="Corporate Anti-Theft Backpack"
+                value={assetsForm.bag_type}
+                onChange={(e) =>
+                  setAssetsForm((p) => ({ ...p, bag_type: e.target.value }))
+                }
+                className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 whitespace-nowrap"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1 whitespace-nowrap">
+                Issue Date
+              </label>
+              <input
+                type="date"
+                value={assetsForm.bag_issued_date}
+                onChange={(e) =>
+                  setAssetsForm((p) => ({ ...p, bag_issued_date: e.target.value }))
+                }
+                className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 whitespace-nowrap"
+              />
+            </div>
+          </div>
 
-          <Field label="Address" full required>
-            <input
-              style={fieldErrors.address ? inputErrorStyle : inputStyle}
-              placeholder="Full residential address"
-              value={emp.address}
-              onChange={e => setE("address", e.target.value)}
-            />
-            <FieldError msg={fieldErrors.address} />
-          </Field>
+          {/* 6. Stationery Kit */}
+          <div className="p-4 rounded-2xl border border-slate-200/80 bg-slate-50/50 space-y-3">
+            <div className="flex items-center justify-between whitespace-nowrap">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-white border border-slate-200 text-blue-600 flex items-center justify-center shadow-xs">
+                  <LuPenTool size={18} />
+                </div>
+                <div>
+                  <div className="font-semibold text-slate-900 text-sm whitespace-nowrap">Stationery Kit</div>
+                  <div className="text-xs text-slate-500 whitespace-nowrap">Diary, pen & folder pack</div>
+                </div>
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer whitespace-nowrap">
+                <input
+                  type="checkbox"
+                  checked={assetsForm.stationery_issued}
+                  onChange={(e) =>
+                    setAssetsForm((p) => ({ ...p, stationery_issued: e.target.checked }))
+                  }
+                  className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                />
+                <span className="text-xs font-semibold text-slate-700">
+                  {assetsForm.stationery_issued ? "Issued" : "Pending"}
+                </span>
+              </label>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1 whitespace-nowrap">
+                Kit Details
+              </label>
+              <input
+                type="text"
+                placeholder="Executive Diary, Metal Pen, Sticky Notes"
+                value={assetsForm.stationery_details}
+                onChange={(e) =>
+                  setAssetsForm((p) => ({ ...p, stationery_details: e.target.value }))
+                }
+                className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 whitespace-nowrap"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1 whitespace-nowrap">
+                Issue Date
+              </label>
+              <input
+                type="date"
+                value={assetsForm.stationery_issued_date}
+                onChange={(e) =>
+                  setAssetsForm((p) => ({ ...p, stationery_issued_date: e.target.value }))
+                }
+                className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 whitespace-nowrap"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Joining Remarks */}
+        <div>
+          <label className="block text-xs font-semibold text-slate-600 mb-1 whitespace-nowrap">
+            Asset Allocation Notes & Handover Remarks
+          </label>
+          <textarea
+            rows={2}
+            placeholder="Asset condition, warranty tags, accessories issued..."
+            value={assetsForm.joining_remarks}
+            onChange={(e) =>
+              setAssetsForm((p) => ({ ...p, joining_remarks: e.target.value }))
+            }
+            className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+          />
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex flex-wrap items-center justify-end gap-3 pt-4 border-t border-slate-100">
+          <button
+            type="button"
+            onClick={() => handleSaveAssets(false)}
+            className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50 transition-all whitespace-nowrap cursor-pointer shadow-xs"
+          >
+            Save Draft Assets
+          </button>
+          <button
+            type="button"
+            onClick={() => handleSaveAssets(true)}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-all whitespace-nowrap shadow-sm shadow-blue-500/20 active:scale-95 cursor-pointer"
+          >
+            <LuCheckCheck size={18} />
+            <span>Mark Joining Completed & Proceed to Docs</span>
+          </button>
         </div>
       </div>
+    );
+  };
 
-      <div style={{ ...cardStyle, background: "#f8fafc" }}>
-        <SectionTitle color="#475569">🪪 ID Card Issuance</SectionTitle>
-        <div style={{ background: "linear-gradient(135deg,#534AB7,#3a3293)", borderRadius: 14, padding: "20px 24px", display: "flex", alignItems: "center", gap: 18, marginBottom: 20, color: "#fff" }}>
-          <div style={{ width: 56, height: 56, borderRadius: 16, background: "rgba(255,255,255,.2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 700, border: "2px solid rgba(255,255,255,.3)", overflow: "hidden", flexShrink: 0 }}>
-            {emp.idCardImage
-              ? <img src={URL.createObjectURL(emp.idCardImage)} alt="ID" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-              : (emp.name ? initials(emp.name) : "?")
-            }
+  // =========================================================================
+  // STAGE B: DOCUMENTATION PROCESS
+  // =========================================================================
+
+  const renderStageB_Documentation = () => {
+    const docs = Array.isArray(selectedOnboarding.documents)
+      ? selectedOnboarding.documents
+      : [];
+
+    return (
+      <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/80 shadow-xs space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-100">
+          <div>
+            <h4 className="text-lg font-bold text-slate-900 flex items-center gap-2 whitespace-nowrap">
+              <LuFileText className="text-sky-600" /> b) Documentation Process
+            </h4>
+            <p className="text-xs sm:text-sm text-slate-500 mt-0.5 whitespace-nowrap">
+              Collect and verify essential employee documents: Aadhaar, PAN, Education, Relieving letters, NDA & Bank details.
+            </p>
           </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 17, fontWeight: 700 }}>{emp.name || "Employee Name"}</div>
-            <div style={{ opacity: .8, fontSize: 13 }}>{emp.designation || "Designation"}</div>
-            <div style={{ fontFamily: "monospace", fontSize: 12, marginTop: 4 }}>{emp.employeeId || "ID: PENDING"}</div>
-          </div>
-          <Badge variant={emp.idStatus === "Issued" ? "teal" : emp.idStatus === "Pending" ? "amber" : "pending"}>{emp.idStatus}</Badge>
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-          <Field label="Employee ID" required>
-            <input
-              style={fieldErrors.employeeId ? inputErrorStyle : inputStyle}
-              placeholder="EMP-2026-001"
-              value={emp.employeeId}
-              onChange={e => setE("employeeId", e.target.value)}
-            />
-            <FieldError msg={fieldErrors.employeeId} />
-          </Field>
-          <Field label="ID Card Status" required>
-            <select style={{ ...inputStyle, cursor: "pointer" }} value={emp.idStatus} onChange={e => setE("idStatus", e.target.value)}>
-              <option>Not issued</option><option>Issued</option><option>Pending</option>
-            </select>
-          </Field>
-        </div>
-
-        {emp.idStatus === "Not issued" ? (
-          <div style={{ marginTop: 14 }}>
-            <label style={{ fontSize: 13, color: "#4a5568", fontWeight: 600, display: "block", marginBottom: 6 }}>
-              📸 ID Card Photo
-              <span style={{ marginLeft: 8, fontSize: 11, color: C.orange[600], fontWeight: 700 }}>(Upload a photo to issue the ID card)</span>
-            </label>
-            <label style={{ display: "flex", alignItems: "center", gap: 10, border: `1.5px dashed ${emp.idCardImage ? C.teal[200] : "#cbd5e0"}`, borderRadius: 10, padding: "10px 14px", cursor: "pointer", background: emp.idCardImage ? C.teal[50] : "#fff", color: emp.idCardImage ? C.teal[600] : "#718096", fontSize: 13 }}>
-              <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => e.target.files[0] && setE("idCardImage", e.target.files[0])} />
-              <span style={{ fontSize: 20 }}>{emp.idCardImage ? "✅" : "📷"}</span>
-              <span style={{ fontWeight: 600 }}>{emp.idCardImage ? emp.idCardImage.name : "Click to upload photo (JPG, PNG, etc.)"}</span>
-              {emp.idCardImage && (
-                <span onClick={e => { e.preventDefault(); setE("idCardImage", null); }} style={{ marginLeft: "auto", color: C.red[600], fontWeight: 700, fontSize: 16, cursor: "pointer" }}>×</span>
-              )}
-            </label>
-            {emp.idCardImage && (
-              <div style={{ marginTop: 10, borderRadius: 10, overflow: "hidden", border: `2px solid ${C.teal[200]}`, background: "#f0fdf4", display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: 10 }}>
-                <img src={URL.createObjectURL(emp.idCardImage)} alt="ID Card Preview" style={{ maxWidth: "100%", maxHeight: 200, objectFit: "contain", borderRadius: 8, display: "block" }} />
-                <span style={{ fontSize: 11, color: C.teal[600], fontWeight: 600 }}>✓ Photo preview — this will appear on the ID card</span>
-              </div>
+          <div>
+            {selectedOnboarding.documentation_status === "VERIFIED" ? (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
+                <LuCircleCheck size={14} /> All Documents Verified
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 whitespace-nowrap">
+                <LuClock size={14} /> Verification Pending
+              </span>
             )}
           </div>
+        </div>
+
+        {/* Document Checklist Table (Horizontally scrollable with zero wrapping) */}
+        <div className="border border-slate-200/80 rounded-2xl overflow-hidden">
+          <div className="overflow-x-auto scrollbar-thin">
+            <table className="w-full text-left border-collapse min-w-[850px]">
+              <thead>
+                <tr className="bg-slate-50 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                  <th className="py-3 px-4 whitespace-nowrap min-w-[200px]">Document Type</th>
+                  <th className="py-3 px-4 whitespace-nowrap min-w-[180px]">Document ID / Number</th>
+                  <th className="py-3 px-4 whitespace-nowrap min-w-[150px]">Attachment</th>
+                  <th className="py-3 px-4 whitespace-nowrap min-w-[120px]">Status</th>
+                  <th className="py-3 px-4 whitespace-nowrap text-right min-w-[180px]">HR Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-sm">
+                {docs.map((doc) => (
+                  <tr key={doc.key} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="py-3.5 px-4 whitespace-nowrap">
+                      <div className="font-semibold text-slate-900 whitespace-nowrap">
+                        {doc.label || doc.key}
+                      </div>
+                      <div className="text-xs text-slate-500 whitespace-nowrap">
+                        {doc.remarks || "Mandatory KYC proof"}
+                      </div>
+                    </td>
+
+                    <td className="py-3.5 px-4 whitespace-nowrap">
+                      <span className="font-mono text-xs bg-slate-100 px-2 py-1 rounded border border-slate-200 whitespace-nowrap">
+                        {doc.number || "Not Provided"}
+                      </span>
+                    </td>
+
+                    <td className="py-3.5 px-4 whitespace-nowrap">
+                      {doc.doc_url ? (
+                        <a
+                          href={getUploadUrl(doc.doc_url)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 transition-all whitespace-nowrap cursor-pointer"
+                        >
+                          <LuEye size={13} />
+                          <span>View File</span>
+                        </a>
+                      ) : (
+                        <span className="text-xs text-slate-400 whitespace-nowrap">No file</span>
+                      )}
+                    </td>
+
+                    <td className="py-3.5 px-4 whitespace-nowrap">
+                      {doc.status === "VERIFIED" ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 whitespace-nowrap">
+                          ✓ Verified
+                        </span>
+                      ) : doc.status === "REJECTED" ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-rose-100 text-rose-800 whitespace-nowrap">
+                          ✗ Rejected
+                        </span>
+                      ) : doc.status === "SUBMITTED" ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 whitespace-nowrap">
+                          Submitted
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 whitespace-nowrap">
+                          Pending
+                        </span>
+                      )}
+                    </td>
+
+                    <td className="py-3.5 px-4 whitespace-nowrap text-right">
+                      <div className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                        <button
+                          onClick={() => {
+                            setSelectedDocKey(doc.key);
+                            setDocNumberInput(doc.number || "");
+                            setShowUploadModal(true);
+                          }}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 transition-all whitespace-nowrap cursor-pointer"
+                        >
+                          <LuUpload size={13} /> Upload
+                        </button>
+                        <button
+                          title="Verify Document"
+                          onClick={() => handleVerifyDocument(doc.key, "VERIFIED")}
+                          className="p-1 rounded-lg text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-all cursor-pointer"
+                        >
+                          <LuCheck size={14} />
+                        </button>
+                        <button
+                          title="Reject Document"
+                          onClick={() => handleVerifyDocument(doc.key, "REJECTED")}
+                          className="p-1 rounded-lg text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-all cursor-pointer"
+                        >
+                          <LuCircleX size={14} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Bottom Verification Strip */}
+        <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl bg-slate-50 border border-slate-200/80">
+          <div className="text-xs text-slate-600 whitespace-nowrap">
+            {selectedOnboarding.documentation_verified_by_name ? (
+              <span>
+                Verified by: <strong>{selectedOnboarding.documentation_verified_by_name}</strong> on{" "}
+                {new Date(selectedOnboarding.documentation_completed_at).toLocaleDateString()}
+              </span>
+            ) : (
+              <span>HR verification sign-off pending</span>
+            )}
+          </div>
+
+          <button
+            onClick={handleMarkAllDocsVerified}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-all whitespace-nowrap shadow-sm shadow-blue-500/20 active:scale-95 cursor-pointer"
+          >
+            <LuCircleCheck size={18} />
+            <span>Mark All Verified & Proceed to Training</span>
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  // =========================================================================
+  // STAGE C: 4-STAGE INTRO & TRAINING (HR, ADMIN, POS, DEPT)
+  // =========================================================================
+
+  const renderStageC_Training = () => {
+    const modules = [
+      {
+        key: "hr",
+        num: "(i)",
+        title: "HR Training",
+        icon: LuUsers,
+        color: "#4f46e5",
+        bg: "bg-indigo-50",
+        data: selectedOnboarding.hr_training || {},
+        curriculum: [
+          "Company Culture, History & Core Values",
+          "HR Policies, Attendance & Clock-in Protocol",
+          "Leave Management & Shift Timings",
+          "POSH & Workplace Code of Conduct",
+          "Payroll Cycle & Benefits Overview",
+        ],
+      },
+      {
+        key: "admin",
+        num: "(ii)",
+        title: "Admin Training",
+        icon: LuShieldCheck,
+        color: "#0891b2",
+        bg: "bg-cyan-50",
+        data: selectedOnboarding.admin_training || {},
+        curriculum: [
+          "Office Facilities & Floor Protocol",
+          "Badge Security, Access Keys & Visitor Entry",
+          "Emergency Evacuation & Fire Safety",
+          "Desk Ergonomics & Clean Desk Policy",
+          "Asset Care & Admin Helpdesk",
+        ],
+      },
+      {
+        key: "pos",
+        num: "(iii)",
+        title: "POS Training",
+        icon: LuCreditCard,
+        color: "#ea580c",
+        bg: "bg-orange-50",
+        data: selectedOnboarding.pos_training || {},
+        curriculum: [
+          "Point-of-Sale System Setup & Login",
+          "Billing, Invoicing & Cash Register Mgmt",
+          "Discounts, Returns & Customer Support",
+          "Inventory Sync & Stock Count Audits",
+          "Day-End Reconciliation Reports",
+        ],
+      },
+      {
+        key: "dept",
+        num: "(iv)",
+        title: "Dept. Training",
+        icon: LuLaptop,
+        color: "#7c3aed",
+        bg: "bg-purple-50",
+        data: selectedOnboarding.dept_training || {},
+        curriculum: [
+          "Department Architecture, Tools & Tech Stack",
+          "Standard Operating Procedures (SOP)",
+          "Live Project Setup & Git Repository Access",
+          "Key Result Areas (KRAs) & KPI Overview",
+          "First Milestone & Mentorship Review",
+        ],
+      },
+    ];
+
+    const trSummary = getTrainingsSummary(selectedOnboarding);
+
+    return (
+      <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/80 shadow-xs space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-100">
+          <div>
+            <h4 className="text-lg font-bold text-slate-900 flex items-center gap-2 whitespace-nowrap">
+              <LuGraduationCap className="text-amber-600" /> c) Intro & 4-Stage Training
+            </h4>
+            <p className="text-xs sm:text-sm text-slate-500 mt-0.5 whitespace-nowrap">
+              Mandatory completion of all 4 tracks: (i) HR Training, (ii) Admin Training, (iii) POS Training, and (iv) Dept. Training.
+            </p>
+          </div>
+          <div>
+            <span
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
+                trSummary.count === 4
+                  ? "bg-emerald-100 text-emerald-800"
+                  : "bg-amber-100 text-amber-800"
+              }`}
+            >
+              {trSummary.count} of 4 Modules Done ({trSummary.pct}%)
+            </span>
+          </div>
+        </div>
+
+        {/* 4 Cards Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {modules.map((m) => {
+            const IconC = m.icon;
+            const isCompleted = m.data.status === "COMPLETED";
+            const isInProgress = m.data.status === "IN_PROGRESS";
+
+            return (
+              <div
+                key={m.key}
+                className="p-5 rounded-2xl border border-slate-200/80 bg-white hover:border-slate-300 transition-all flex flex-col justify-between space-y-4"
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-3">
+                    <div className="flex items-center gap-2.5">
+                      <div
+                        className="w-10 h-10 rounded-xl text-white flex items-center justify-center flex-shrink-0 shadow-xs"
+                        style={{ backgroundColor: m.color }}
+                      >
+                        <IconC size={20} />
+                      </div>
+                      <div>
+                        <div className="font-bold text-slate-900 text-base whitespace-nowrap">
+                          <span className="text-slate-400 font-normal mr-1">{m.num}</span>
+                          {m.title}
+                        </div>
+                        <div className="text-xs text-slate-500 whitespace-nowrap">
+                          {m.key === "dept"
+                            ? `Dept: ${m.data.department_name || selectedOnboarding.target_department || "Engineering"}`
+                            : "Foundation Induction Track"}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      {isCompleted ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 whitespace-nowrap">
+                          ✓ Completed
+                        </span>
+                      ) : isInProgress ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 whitespace-nowrap">
+                          In Progress
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 whitespace-nowrap">
+                          Not Started
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Curriculum list */}
+                  <div className="mb-3 space-y-1">
+                    <div className="text-xs font-semibold text-slate-600 whitespace-nowrap mb-1">
+                      Topics Covered:
+                    </div>
+                    {m.curriculum.map((item, i) => (
+                      <div key={i} className="text-xs text-slate-600 flex items-center gap-1.5 whitespace-nowrap">
+                        <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: m.color }} />
+                        <span className="whitespace-nowrap">{item}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Summary Box */}
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/70 text-xs text-slate-600 space-y-1.5">
+                    <div className="flex justify-between whitespace-nowrap">
+                      <span>Trainer / Mentor:</span>
+                      <strong className="text-slate-900 whitespace-nowrap">
+                        {m.data.trainer_name || m.data.mentor_name || "Unassigned"}
+                      </strong>
+                    </div>
+                    <div className="flex justify-between whitespace-nowrap">
+                      <span>Completion Date:</span>
+                      <strong className="text-slate-900 whitespace-nowrap">
+                        {m.data.completed_date || "Pending"}
+                      </strong>
+                    </div>
+                    {m.data.score !== undefined && m.data.score !== null && (
+                      <div className="flex justify-between whitespace-nowrap">
+                        <span>Assessment Score:</span>
+                        <strong className="text-emerald-700 font-bold whitespace-nowrap">
+                          {m.data.score} / 100
+                        </strong>
+                      </div>
+                    )}
+                    {m.data.feedback && (
+                      <div className="pt-1 border-t border-slate-200/60 text-slate-500 italic truncate whitespace-nowrap">
+                        "{m.data.feedback}"
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => openTrainingModal(m.key)}
+                  className={`w-full py-2.5 rounded-xl text-xs font-semibold transition-all whitespace-nowrap cursor-pointer ${
+                    isCompleted
+                      ? "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                      : "bg-blue-600 hover:bg-blue-700 text-white shadow-xs"
+                  }`}
+                >
+                  {isCompleted ? "Edit Training Details" : "Record / Complete Training"}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Transition Alert */}
+        {selectedOnboarding.dept_training?.status === "COMPLETED" ? (
+          <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="whitespace-nowrap">
+              <div className="font-bold text-emerald-900 text-sm whitespace-nowrap">
+                🎉 Department Training Completed!
+              </div>
+              <div className="text-xs text-emerald-700 whitespace-nowrap">
+                Employee is now eligible for formal placement into their respective department.
+              </div>
+            </div>
+            <button
+              onClick={() => setActiveStepTab("DEPT_ASSIGNMENT")}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 transition-all whitespace-nowrap shadow-xs cursor-pointer flex-shrink-0"
+            >
+              <span>Proceed to Dept. Assignment</span>
+              <LuArrowRight size={14} />
+            </button>
+          </div>
         ) : (
-          <div style={{ marginTop: 14, padding: "12px 16px", borderRadius: 10, background: emp.idStatus === "Issued" ? C.teal[50] : C.amber[50], border: `1px solid ${emp.idStatus === "Issued" ? C.teal[200] : C.amber[200]}`, display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ fontSize: 20 }}>{emp.idStatus === "Issued" ? "✅" : "⏳"}</span>
-            <span style={{ fontSize: 13, fontWeight: 600, color: emp.idStatus === "Issued" ? C.teal[600] : C.amber[600] }}>
-              {emp.idStatus === "Issued" ? "ID Card has already been issued — no need to upload a photo." : "ID Card is pending — upload a photo once it is issued."}
+          <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-600 flex items-center gap-2 whitespace-nowrap">
+            <LuCircleAlert size={16} className="text-blue-600 flex-shrink-0" />
+            <span className="whitespace-nowrap">
+              Policy Rule: <strong>Department Training (iv)</strong> must be completed before employee can be assigned to their department.
             </span>
           </div>
         )}
       </div>
-
-      <div style={cardStyle}>
-        <SectionTitle color={C.green[600]}>✅ Welcome Kit Checklist</SectionTitle>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 10 }}>
-          {[
-            { key: "lunch", label: "Lunch arrangement confirmed" },
-            { key: "stationary", label: "Stationary kit provided" },
-            { key: "laptop", label: "Laptop / Bag issued" },
-            { key: "workstation", label: "Workstation assigned" },
-            { key: "credentials", label: "System credentials provided" },
-          ].map(item => (
-            <div key={item.key} onClick={() => setE("checklist_" + item.key, !emp["checklist_" + item.key])} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", border: `1.5px solid ${emp["checklist_" + item.key] ? "#38a169" : "#e2e8f0"}`, borderRadius: 12, cursor: "pointer", background: emp["checklist_" + item.key] ? C.green[50] : "#fff" }}>
-              <div style={{ width: 20, height: 20, borderRadius: 6, flexShrink: 0, border: `2px solid ${emp["checklist_" + item.key] ? "#38a169" : "#cbd5e0"}`, background: emp["checklist_" + item.key] ? "#38a169" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 12 }}>{emp["checklist_" + item.key] ? "✓" : ""}</div>
-              <span style={{ fontSize: 13, color: emp["checklist_" + item.key] ? "#2f855a" : "#4a5568", fontWeight: emp["checklist_" + item.key] ? 600 : 500 }}>{item.label}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </>
-  );
-}
-
-// ── TRAINERS TAB — all fields mandatory ──────────────────────────────────────
-function TabTrainers({ trainers, setTrainers, passConfig, setPassConfig, token }) {
-  const [name, setName] = useState("");
-  const [dept, setDept] = useState("");
-  const [trainerErrors, setTrainerErrors] = useState({});
-  const [saving, setSaving] = useState(false);
-
-  const add = async () => {
-    const errors = {};
-    if (!name.trim()) errors.name = "Trainer name is required";
-    if (!dept) errors.dept = "Department is required";
-    if (Object.keys(errors).length) { setTrainerErrors(errors); return; }
-    setTrainerErrors({});
-
-    const newTrainer = { name: name.trim(), dept };
-    setSaving(true);
-    try {
-      await fetch(`${API}/api/trainers`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ name: newTrainer.name, department: newTrainer.dept }),
-      });
-    } catch { /* silent */ } finally { setSaving(false); }
-
-    setTrainers(p => [...p, newTrainer]);
-    setName(""); setDept("");
+    );
   };
 
-  const remove = async (idx) => {
-    const t = trainers[idx];
-    if (t.id) {
-      try { await fetch(`${API}/api/trainers/${t.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }); } catch { /* silent */ }
-    }
-    setTrainers(p => p.filter((_, i) => i !== idx));
-  };
+  // =========================================================================
+  // STAGE D: DEPARTMENT ASSIGNMENT (Unlocked post Dept Training)
+  // =========================================================================
 
-  return (
-    <>
-      <div style={cardStyle}>
-        <SectionTitle>👥 HR Trainer Roster</SectionTitle>
+  const renderStageD_DeptAssignment = () => {
+    const deptTrainingDone = selectedOnboarding.dept_training?.status === "COMPLETED";
 
-        <div style={{ marginBottom: 16, padding: "10px 14px", background: C.amber[50], border: `1px solid ${C.amber[200]}`, borderRadius: 10, fontSize: 12, color: C.amber[600], fontWeight: 600 }}>
-          ⓘ Both Name and Department are required when adding a trainer
-        </div>
-
-        <div style={{ display: "flex", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
-          <div style={{ flex: 1, minWidth: 180 }}>
-            <input
-              style={trainerErrors.name ? { ...inputErrorStyle } : inputStyle}
-              placeholder="Full name *"
-              value={name}
-              onChange={e => { setName(e.target.value); if (trainerErrors.name) setTrainerErrors(p => ({ ...p, name: "" })); }}
-              onKeyDown={e => e.key === "Enter" && add()}
-            />
-            {trainerErrors.name && <FieldError msg={trainerErrors.name} />}
+    if (!deptTrainingDone) {
+      return (
+        <div className="bg-white rounded-2xl p-8 sm:p-12 border border-slate-200/80 shadow-xs text-center space-y-4">
+          <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
+            <LuLock size={28} />
           </div>
-          <div style={{ width: 200 }}>
-            <select
-              style={trainerErrors.dept ? { ...inputErrorStyle, cursor: "pointer" } : { ...inputStyle, cursor: "pointer" }}
-              value={dept}
-              onChange={e => { setDept(e.target.value); if (trainerErrors.dept) setTrainerErrors(p => ({ ...p, dept: "" })); }}
-            >
-              <option value="">Select department *</option>
-              {["HR", "Training & Development", "Operations", "IT", "Safety & Compliance", "Retail", "Finance"].map(d => <option key={d}>{d}</option>)}
-            </select>
-            {trainerErrors.dept && <FieldError msg={trainerErrors.dept} />}
-          </div>
-          <button onClick={add} disabled={saving} style={{ padding: "9px 18px", background: saving ? "#94a3b8" : C.purple[600], color: "#fff", border: "none", borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: saving ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
-            {saving ? "..." : "+ Add"}
-          </button>
-        </div>
-
-        <div style={{ marginBottom: 16 }} />
-
-        {trainers.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "24px", color: "#a0aec0", border: "1.5px dashed #e2e8f0", borderRadius: 12 }}>
-            <div style={{ fontSize: 32, marginBottom: 8 }}>👤</div>
-            <div style={{ fontSize: 13 }}>No trainers added yet. Add trainers above.</div>
-          </div>
-        ) : (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-            {trainers.map((t, i) => (
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 12px", background: C.purple[50], border: `1px solid ${C.purple[200]}`, borderRadius: 20 }}>
-                <span style={{ fontSize: 13, color: C.purple[800], fontWeight: 600 }}>{t.name}</span>
-                <span style={{ fontSize: 11, color: C.purple[400] }}>· {t.dept}</span>
-                <span onClick={() => remove(i)} style={{ cursor: "pointer", color: "#a0aec0", fontSize: 16, lineHeight: 1 }}>×</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div style={cardStyle}>
-        <SectionTitle>⚙️ Pass Mark Configuration</SectionTitle>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 14 }}>
-          <Field label="Pass Mark (%)" required><input style={inputStyle} type="number" min="0" max="100" value={passConfig.passMark} onChange={e => setPassConfig(p => ({ ...p, passMark: Number(e.target.value) }))} /></Field>
-          <Field label="Max Marks" required><input style={inputStyle} type="number" min="1" value={passConfig.maxMarks} onChange={e => setPassConfig(p => ({ ...p, maxMarks: Number(e.target.value) }))} /></Field>
-          <Field label="Re-attempt" required>
-            <select style={{ ...inputStyle, cursor: "pointer" }} value={passConfig.reattempt} onChange={e => setPassConfig(p => ({ ...p, reattempt: e.target.value }))}>
-              <option>Yes</option><option>No</option>
-            </select>
-          </Field>
-        </div>
-      </div>
-    </>
-  );
-}
-
-// ── MODULE CARD — all fields required for mandatory modules ──────────────────
-function ModuleCard({ config, value, onChange, trainers, passMark, maxMarks, isHR, showErrors }) {
-  const { label, days, group } = config;
-  const g = GROUPS.find(g => g.key === group) || GROUPS[0];
-  const marks = Number(value.marks) || 0;
-  const pct = value.marks ? Math.round((marks / maxMarks) * 100) : null;
-  const isPassed = pct !== null && pct >= passMark;
-  const isFailed = pct !== null && pct < passMark;
-
-  // missing fields for mandatory modules
-  const missingDates = value.mandatory && value.dates.some(d => !d);
-  const missingTrainer = value.mandatory && !value.trainer;
-  const missingQuestions = value.mandatory && !value.questions;
-  const missingResult = value.mandatory && !value.resultSheet;
-  const missingMarks = value.mandatory && !value.marks;
-
-  const hasMissing = showErrors && value.mandatory && (missingDates || missingTrainer || missingQuestions || missingResult || missingMarks);
-
-  return (
-    <div style={{ background: "#fff", border: `1.5px solid ${hasMissing ? C.red[200] : isFailed ? C.red[200] : isPassed ? C.green[200] : value.mandatory ? C.orange[200] : "#edf2f7"}`, borderRadius: 14, padding: "14px", boxShadow: hasMissing ? `0 0 0 3px ${C.red[50]}` : "0 1px 4px rgba(0,0,0,.04)" }}>
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 10, gap: 6 }}>
-        <span style={{ fontWeight: 700, fontSize: 13, color: g.accent, flex: 1 }}>{label}</span>
-        <div style={{ display: "flex", gap: 5, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
-          <span style={{ fontSize: 10, fontWeight: 800, color: "#fff", background: g.accent, padding: "2px 8px", borderRadius: 20 }}>{days}D</span>
-          {value.mandatory && <Badge variant="mandatory">MANDATORY</Badge>}
-          {pct !== null && <Badge variant={isPassed ? "pass" : "fail"}>{isPassed ? "PASS" : "FAIL"}</Badge>}
-        </div>
-      </div>
-
-      {isHR && (
-        <div onClick={() => onChange("mandatory", !value.mandatory)} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, padding: "6px 10px", borderRadius: 8, cursor: "pointer", background: value.mandatory ? C.orange[50] : "#f8fafc", border: `1px solid ${value.mandatory ? C.orange[200] : "#e2e8f0"}` }}>
-          <div style={{ width: 34, height: 18, borderRadius: 9, flexShrink: 0, position: "relative", background: value.mandatory ? C.orange[600] : "#cbd5e0" }}>
-            <div style={{ position: "absolute", top: 2, left: value.mandatory ? 18 : 2, width: 14, height: 14, borderRadius: "50%", background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,.2)" }} />
-          </div>
-          <span style={{ fontSize: 12, fontWeight: 600, color: value.mandatory ? C.orange[600] : "#718096" }}>{value.mandatory ? "Mandatory" : "Optional"}</span>
-        </div>
-      )}
-
-      {/* Dates */}
-      {Array.from({ length: days }, (_, i) => (
-        <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-          <label style={{ fontSize: 11, color: "#718096", minWidth: 42 }}>
-            Day {i + 1}{value.mandatory && <span style={{ color: C.red[600] }}>*</span>}
-          </label>
-          <input
-            type="date"
-            style={{ ...(showErrors && value.mandatory && !value.dates[i] ? { ...inputErrorStyle, padding: "5px 8px", fontSize: 12 } : { ...inputStyle, padding: "5px 8px", fontSize: 12 }) }}
-            value={value.dates[i] || ""}
-            onChange={e => { const d = [...value.dates]; d[i] = e.target.value; onChange("dates", d); }}
-          />
-        </div>
-      ))}
-
-      {/* Trainer */}
-      <div style={{ marginTop: 4 }}>
-        <label style={{ fontSize: 11, color: "#718096", display: "block", marginBottom: 3 }}>
-          Trainer{value.mandatory && <span style={{ color: C.red[600] }}>*</span>}
-        </label>
-        <select
-          style={{ ...(showErrors && missingTrainer ? { ...inputErrorStyle, padding: "5px 8px", fontSize: 12, cursor: "pointer" } : { ...inputStyle, padding: "5px 8px", fontSize: 12, cursor: "pointer" }) }}
-          value={value.trainer}
-          onChange={e => onChange("trainer", e.target.value)}
-        >
-          <option value="">— Assign Trainer —</option>
-          {trainers.length === 0 ? (
-            <option disabled>No trainers added yet</option>
-          ) : (
-            trainers.map((t, i) => {
-              const deptLabel = t.department || t.dept || "";
-              return <option key={i} value={t.name}>{t.name}{deptLabel ? ` · ${deptLabel}` : ""}</option>;
-            })
-          )}
-        </select>
-        {showErrors && missingTrainer && <FieldError msg="Trainer is required for mandatory module" />}
-      </div>
-
-      {/* Files */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginTop: 8 }}>
-        <div>
-          <UploadZone label="📄 Question paper" file={value.questions} accept="image/*,.pdf,.doc,.docx,.ppt,.pptx" required={value.mandatory} missing={showErrors && missingQuestions} onFile={f => onChange("questions", f)} />
-          {showErrors && missingQuestions && <FieldError msg="Required for mandatory module" />}
-          <FilePreview file={value.questions} height={100} />
-        </div>
-        <div>
-          <UploadZone label="📊 Result sheet" file={value.resultSheet} accept="image/*,.pdf,.doc,.docx,.xlsx,.csv" required={value.mandatory} missing={showErrors && missingResult} onFile={f => onChange("resultSheet", f)} />
-          {showErrors && missingResult && <FieldError msg="Required for mandatory module" />}
-          <FilePreview file={value.resultSheet} height={100} />
-        </div>
-      </div>
-
-      {/* Marks */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10 }}>
-        <label style={{ fontSize: 12, color: "#718096" }}>
-          Marks{value.mandatory && <span style={{ color: C.red[600] }}>*</span>}:
-        </label>
-        <input
-          type="number" min="0" max={maxMarks}
-          style={{ ...(showErrors && missingMarks ? { ...inputErrorStyle, width: 70, textAlign: "center", padding: "5px 8px", fontSize: 13 } : { ...inputStyle, width: 70, textAlign: "center", padding: "5px 8px", fontSize: 13 }) }}
-          value={value.marks}
-          onChange={e => onChange("marks", e.target.value)}
-        />
-        <span style={{ fontSize: 12, color: "#a0aec0" }}>/ {maxMarks}</span>
-        {pct !== null && <span style={{ fontSize: 12, fontWeight: 700, color: isPassed ? C.green[600] : C.red[600], marginLeft: "auto" }}>{pct}%</span>}
-      </div>
-      {showErrors && missingMarks && <FieldError msg="Marks are required for mandatory module" />}
-      {pct !== null && <div style={{ height: 5, background: "#edf2f7", borderRadius: 4, marginTop: 8, overflow: "hidden" }}><div style={{ height: "100%", width: `${pct}%`, background: isPassed ? "#639922" : "#E24B4A", borderRadius: 4 }} /></div>}
-    </div>
-  );
-}
-
-function CollapsibleGroup({ group, mods, modules, update, trainers, passConfig, isHR, showErrors }) {
-  const [open, setOpen] = useState(true);
-  const mandatoryCount = mods.filter(m => modules[m.key].mandatory).length;
-  const missingCount = mods.filter(m => {
-    const mv = modules[m.key];
-    return mv.mandatory && (mv.dates.some(d => !d) || !mv.trainer || !mv.questions || !mv.resultSheet || !mv.marks);
-  }).length;
-
-  return (
-    <div style={{ marginBottom: "1.5rem" }}>
-      <div onClick={() => setOpen(o => !o)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 16px", background: group.bg, border: `1px solid ${group.border}`, borderRadius: open ? "12px 12px 0 0" : 12, cursor: "pointer", userSelect: "none" }}>
-        <span style={{ fontSize: 11, color: group.accent, transform: open ? "rotate(90deg)" : "rotate(0deg)", transition: "transform .2s" }}>▶</span>
-        <span style={{ fontSize: 13, fontWeight: 700, color: group.accent, flex: 1 }}>{group.label}</span>
-        <span style={{ fontSize: 11, color: group.accent, opacity: .7 }}>{mods.length} modules</span>
-        {mandatoryCount > 0 && <span style={{ fontSize: 11, fontWeight: 700, color: C.orange[600], background: C.orange[50], padding: "2px 8px", borderRadius: 10 }}>{mandatoryCount} mandatory</span>}
-        {showErrors && missingCount > 0 && <span style={{ fontSize: 11, fontWeight: 700, color: C.red[600], background: C.red[50], padding: "2px 8px", borderRadius: 10 }}>⚠ {missingCount} incomplete</span>}
-      </div>
-      {open && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(230px,1fr))", gap: 10, padding: "12px", background: "#fafafa", border: `1px solid ${group.border}`, borderTop: "none", borderRadius: "0 0 12px 12px" }}>
-          {mods.map(config => (
-            <ModuleCard
-              key={config.key}
-              config={config}
-              value={modules[config.key]}
-              onChange={(field, val) => update(config.key, field, val)}
-              trainers={trainers}
-              passMark={passConfig.passMark}
-              maxMarks={passConfig.maxMarks}
-              isHR={isHR}
-              showErrors={showErrors}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function TabModules({ modules, setModules, trainers, passConfig, isHR, showErrors }) {
-  const update = useCallback((key, field, val) => { setModules(p => ({ ...p, [key]: { ...p[key], [field]: val } })); }, [setModules]);
-  const trained = TRAINING_CONFIG.filter(({ key }) => modules[key]?.dates?.some(Boolean) || modules[key]?.marks).length;
-  const pct = Math.round((trained / TRAINING_CONFIG.length) * 100);
-
-  const totalMandatory = TRAINING_CONFIG.filter(({ key }) => modules[key].mandatory).length;
-  const completedMandatory = TRAINING_CONFIG.filter(({ key }) => {
-    const mv = modules[key];
-    return mv.mandatory && mv.dates.every(d => d) && mv.trainer && mv.questions && mv.resultSheet && mv.marks;
-  }).length;
-
-  return (
-    <>
-      <div style={{ ...cardStyle, padding: "1rem 1.25rem" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 6 }}>
-          <span style={{ color: "#64748b" }}>Overall training progress</span>
-          <span style={{ color: C.purple[600], fontWeight: 700 }}>{pct}%</span>
-        </div>
-        <div style={{ height: 8, background: "#edf2f7", borderRadius: 6, overflow: "hidden" }}><div style={{ height: "100%", width: `${pct}%`, background: C.purple[600], borderRadius: 6, transition: "width .5s" }} /></div>
-        <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 6 }}>{trained} of {TRAINING_CONFIG.length} modules started</div>
-
-        {totalMandatory > 0 && (
-          <div style={{ marginTop: 10, padding: "8px 12px", background: completedMandatory === totalMandatory ? C.green[50] : C.orange[50], borderRadius: 8, border: `1px solid ${completedMandatory === totalMandatory ? C.green[200] : C.orange[200]}`, fontSize: 12, color: completedMandatory === totalMandatory ? C.green[600] : C.orange[600], fontWeight: 600 }}>
-            {completedMandatory === totalMandatory ? "✅" : "⚠️"} Mandatory modules: {completedMandatory}/{totalMandatory} fully completed
-          </div>
-        )}
-      </div>
-
-      {trainers.length === 0 && (
-        <div style={{ marginBottom: 16, padding: "12px 16px", background: C.amber[50], border: `1px solid ${C.amber[200]}`, borderRadius: 12, display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: 20 }}>⚠️</span>
-          <span style={{ fontSize: 13, color: C.amber[600], fontWeight: 600 }}>
-            No trainers added yet. Go to <strong>Trainers</strong> tab to add trainers before assigning modules.
-          </span>
-        </div>
-      )}
-
-      {GROUPS.map(group => (
-        <CollapsibleGroup
-          key={group.key}
-          group={group}
-          mods={TRAINING_CONFIG.filter(m => m.group === group.key)}
-          modules={modules}
-          update={update}
-          trainers={trainers}
-          passConfig={passConfig}
-          isHR={isHR}
-          showErrors={showErrors}
-        />
-      ))}
-    </>
-  );
-}
-
-// ── DOCUMENTS TAB — mandatory upload ─────────────────────────────────────────
-function TabDocuments({ docs, setDocs, showErrors }) {
-  const [title, setTitle] = useState("");
-  const [cat, setCat] = useState("General");
-
-  const add = files => {
-    const newDocs = Array.from(files).map(f => ({
-      id: Date.now() + Math.random(),
-      title: title || f.name,
-      file: f,
-      cat,
-      date: new Date().toLocaleDateString("en-IN"),
-      size: (f.size / 1024).toFixed(1) + " KB",
-    }));
-    setDocs(p => [...p, ...newDocs]);
-    setTitle("");
-  };
-
-  const hasNoDocs = docs.length === 0;
-
-  return (
-    <>
-      <div style={cardStyle}>
-        <SectionTitle>📂 Upload Training Documents</SectionTitle>
-
-        {/* Mandatory notice */}
-        <div style={{ marginBottom: 14, padding: "10px 14px", background: hasNoDocs && showErrors ? C.red[50] : C.teal[50], border: `1px solid ${hasNoDocs && showErrors ? C.red[200] : C.teal[200]}`, borderRadius: 10, fontSize: 12, color: hasNoDocs && showErrors ? C.red[600] : C.teal[600], fontWeight: 600 }}>
-          {hasNoDocs && showErrors
-            ? "⚠ At least one document must be uploaded"
-            : "ⓘ Please upload at least one training document"
-          }
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 180px", gap: 12, marginBottom: 12 }}>
-          <Field label="Document title (optional)">
-            <input style={inputStyle} placeholder="e.g. HR Policy Manual 2026" value={title} onChange={e => setTitle(e.target.value)} />
-          </Field>
-          <Field label="Category">
-            <select style={{ ...inputStyle, cursor: "pointer" }} value={cat} onChange={e => setCat(e.target.value)}>
-              <option>Induction</option><option>Product & Customer</option><option>Safety</option><option>General</option>
-            </select>
-          </Field>
-        </div>
-
-        <label style={{ display: "block", border: `2px dashed ${hasNoDocs && showErrors ? C.red[200] : "#cbd5e0"}`, borderRadius: 12, padding: 18, textAlign: "center", cursor: "pointer", background: hasNoDocs && showErrors ? C.red[50] : "#f8fafc" }}>
-          <input type="file" multiple style={{ display: "none" }} onChange={e => add(e.target.files)} />
-          <div style={{ fontSize: 14, color: C.purple[600], fontWeight: 700 }}>📁 Click to choose files</div>
-          <div style={{ fontSize: 12, color: "#a0aec0", marginTop: 4 }}>PDF, DOCX, PPTX, XLSX, Images — At least 1 file required</div>
-        </label>
-      </div>
-
-      {docs.length > 0 && (
-        <div style={cardStyle}>
-          <SectionTitle>📋 Uploaded Documents ({docs.length})</SectionTitle>
-          {docs.map(d => (
-            <div key={d.id} style={{ marginBottom: 12 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", background: "#f8fafc", border: "1px solid #edf2f7", borderRadius: 10 }}>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>{d.title}</div>
-                  <div style={{ fontSize: 11, color: "#a0aec0" }}>{d.file instanceof File ? d.file.name : d.file} · {d.size} · {d.cat}</div>
-                </div>
-                <button onClick={() => setDocs(p => p.filter(x => x.id !== d.id))} style={{ padding: "4px 10px", fontSize: 12, background: C.red[50], color: C.red[600], border: `1px solid ${C.red[200]}`, borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}>Remove</button>
-              </div>
-              <FilePreview file={d.file} height={140} />
-            </div>
-          ))}
-        </div>
-      )}
-    </>
-  );
-}
-
-// ── ROOT ──────────────────────────────────────────────────────────────────────
-export default function OnboardingForm({ onSubmit }) {
-  const [token, setToken] = useState(() => localStorage.getItem("hr_token") || "");
-  const [hrName, setHrName] = useState(() => localStorage.getItem("hr_fullname") || "");
-  const [page, setPage] = useState("dashboard");
-  const [viewId, setViewId] = useState(null);
-  const [tab, setTab] = useState("employee");
-  const [isHR, setIsHR] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [submitted, setSubmitted] = useState(false);
-  const [showErrors, setShowErrors] = useState(false);
-  const [fieldErrors, setFieldErrors] = useState({});
-
-  const emptyEmp = {
-    name: "", email: "", phone: "", address: "", father: "", mother: "",
-    department: "", designation: "", employeeId: "", idStatus: "Not issued",
-    idCardImage: null, joiningDate: "",
-    checklist_lunch: false, checklist_stationary: false,
-    checklist_laptop: false, checklist_workstation: false, checklist_credentials: false,
-  };
-
-  const [emp, setEmpState] = useState(emptyEmp);
-  const [trainers, setTrainers] = useState([]);
-  const [passConfig, setPassConfig] = useState({ passMark: 70, maxMarks: 100, reattempt: "Yes" });
-  const [modules, setModules] = useState(buildEmptyModules());
-  const [docs, setDocs] = useState([]);
-
-  useEffect(() => {
-    if (!token) return;
-    fetch(`${API}/api/trainers`, { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.json())
-      .then(data => {
-        if (Array.isArray(data) && data.length > 0) {
-          setTrainers(data.map(t => ({ id: t.id, name: t.name, dept: t.department })));
-        }
-      })
-      .catch(() => {
-        setTrainers([
-          { name: "Priya Sen", dept: "HR" },
-          { name: "Arun Kumar", dept: "Training & Development" },
-          { name: "Meera Mukherjee", dept: "Safety & Compliance" },
-        ]);
-      });
-  }, [token]);
-
-  const setE = (k, v) => setEmpState(p => ({ ...p, [k]: v }));
-  const logout = () => { localStorage.removeItem("hr_token"); localStorage.removeItem("hr_fullname"); setToken(""); setHrName(""); };
-
-  if (!token) return <LoginPage onLogin={(t, n) => { setToken(t); setHrName(n); }} />;
-  if (page === "view") return <EmployeeView empId={viewId} token={token} onBack={() => setPage("dashboard")} />;
-  if (page === "dashboard") return (
-    <EmployeeDashboard token={token} hrName={hrName} onLogout={logout}
-      onNewEmployee={() => { setEmpState(emptyEmp); setModules(buildEmptyModules()); setDocs([]); setError(""); setSubmitted(false); setTab("employee"); setShowErrors(false); setFieldErrors({}); setPage("new"); }}
-      onViewEmployee={(id) => { setViewId(id); setPage("view"); }}
-    />
-  );
-
-  // ── Full validation ───────────────────────────────────────────────────────
-  const validateAll = () => {
-    const errors = {};
-
-    // Employee fields
-    if (!emp.name.trim()) errors.name = "Name is required";
-    if (!emp.email.trim()) errors.email = "Email is required";
-    else if (!validateEmail(emp.email)) errors.email = "Only @gmail.com email is accepted (e.g. name@gmail.com)";
-    if (!emp.phone) errors.phone = "Phone number is required";
-    else if (!validatePhone(emp.phone)) errors.phone = "Phone must be exactly 10 digits";
-    if (!emp.father.trim()) errors.father = "Father's name is required";
-    if (!emp.mother.trim()) errors.mother = "Mother's name is required";
-    if (!emp.designation.trim()) errors.designation = "Designation is required";
-    if (!emp.department.trim()) errors.department = "Department is required";
-    if (!emp.joiningDate) errors.joiningDate = "Joining date is required";
-    if (!emp.address.trim()) errors.address = "Address is required";
-    if (!emp.employeeId.trim()) errors.employeeId = "Employee ID is required";
-
-    return errors;
-  };
-
-  // mandatory modules check
-  const mandatoryModuleErrors = TRAINING_CONFIG.filter(({ key }) => {
-    const mv = modules[key];
-    if (!mv.mandatory) return false;
-    return mv.dates.some(d => !d) || !mv.trainer || !mv.questions || !mv.resultSheet || !mv.marks;
-  });
-
-  const hasDocError = docs.length === 0;
-  const hasTrainerError = trainers.length === 0;
-
-  const handleSubmit = async () => {
-    setShowErrors(true);
-    const errors = validateAll();
-    setFieldErrors(errors);
-
-    const allErrors = [];
-    if (Object.keys(errors).length > 0) allErrors.push("Some fields in the Employee Info tab are incomplete");
-    if (hasTrainerError) allErrors.push("Please add at least one trainer");
-    if (mandatoryModuleErrors.length > 0) allErrors.push(`Mandatory modules incomplete: ${mandatoryModuleErrors.map(m => m.label).join(", ")}`);
-    if (hasDocError) allErrors.push("Please upload at least one document");
-
-    if (allErrors.length > 0) {
-      setError(allErrors.join(" | "));
-      return;
-    }
-
-    setLoading(true); setError("");
-
-    try {
-      const fd = new FormData();
-      if (emp.idCardImage instanceof File) fd.append("id_card_image", emp.idCardImage);
-      for (const [key, mv] of Object.entries(modules)) {
-        if (mv.questions instanceof File) fd.append(`questions_${key}`, mv.questions);
-        if (mv.resultSheet instanceof File) fd.append(`result_${key}`, mv.resultSheet);
-      }
-      docs.forEach((d, i) => { if (d.file instanceof File) fd.append(`doc_${i}`, d.file); });
-
-      const payload = {
-        emp: { ...emp, idCardImage: emp.idCardImage instanceof File ? emp.idCardImage.name : null },
-        modules: Object.fromEntries(Object.entries(modules).map(([k, v]) => [k, {
-          ...v,
-          questions: v.questions instanceof File ? v.questions.name : (v.questions || null),
-          resultSheet: v.resultSheet instanceof File ? v.resultSheet.name : (v.resultSheet || null),
-        }])),
-        trainers, passConfig,
-        docs: docs.map((d, i) => ({ title: d.title, cat: d.cat, file: d.file instanceof File ? d.file.name : d.file, index: i })),
-      };
-      fd.append("data", JSON.stringify(payload));
-
-      const res = await fetch(`${API}/api/onboarding`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: fd,
-      });
-
-      if (res.status === 401) { logout(); return; }
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || "Server error");
-      }
-
-      const saved = await res.json();
-      onSubmit?.({ ...payload, id: saved.id });
-      setSubmitted(true);
-      setTimeout(() => { setSubmitted(false); setPage("dashboard"); }, 2000);
-    } catch (e) {
-      setError(e.message || "Failed to save. Please check if the backend is running.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Tab-level error indicators
-  const empTabHasError = showErrors && Object.keys(fieldErrors).length > 0;
-  const trainerTabHasError = showErrors && hasTrainerError;
-  const moduleTabHasError = showErrors && mandatoryModuleErrors.length > 0;
-  const docTabHasError = showErrors && hasDocError;
-
-  return (
-    <div style={{ maxWidth: 980, margin: "auto", padding: "24px 20px", fontFamily: "'Segoe UI',sans-serif" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.5rem", flexWrap: "wrap", gap: 12 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <button onClick={() => setPage("dashboard")} style={{ padding: "8px 14px", background: C.purple[50], color: C.purple[600], border: `1px solid ${C.purple[200]}`, borderRadius: 10, cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "inherit", marginTop:"-40px" }}>← Dashboard</button>
           <div>
-            <h1 style={{ fontSize: 20, fontWeight: 800, color: "#1a202c", margin: 0 }}>New Employee Onboarding</h1>
-            <p style={{ fontSize: 13, color: "#718096", marginTop: 2 }}>Complete all sections to finish onboarding</p>
+            <h5 className="font-bold text-slate-900 text-lg whitespace-nowrap">
+              Department Assignment Locked
+            </h5>
+            <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto mt-1">
+              "After department training employee gets assigned to their respective departments."
+              <br />
+              Please complete <strong>(iv) Dept. Training</strong> under Stage 3 before unlocking this placement step.
+            </p>
+          </div>
+          <button
+            onClick={() => setActiveStepTab("TRAINING")}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 transition-all whitespace-nowrap shadow-xs cursor-pointer"
+          >
+            Go to Training Modules
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/80 shadow-xs space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-100">
+          <div>
+            <h4 className="text-lg font-bold text-slate-900 flex items-center gap-2 whitespace-nowrap">
+              <LuBuilding2 className="text-purple-600" /> d) Department Assignment & 6-Month Probation Window
+            </h4>
+            <p className="text-xs sm:text-sm text-slate-500 mt-0.5 whitespace-nowrap">
+              Formally place the employee into their department and initialize the 6-month probation period.
+            </p>
+          </div>
+          <div>
+            {selectedOnboarding.is_assigned_to_dept ? (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
+                <LuCircleCheck size={14} /> Department Assigned
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 whitespace-nowrap">
+                Ready for Assignment
+              </span>
+            )}
           </div>
         </div>
-        <div onClick={() => setIsHR(v => !v)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", background: isHR ? C.orange[50] : "#f8fafc", border: `1.5px solid ${isHR ? C.orange[200] : "#e2e8f0"}`, borderRadius: 10, cursor: "pointer", userSelect: "none" }}>
-          <div style={{ width: 34, height: 18, borderRadius: 9, position: "relative", background: isHR ? C.orange[600] : "#cbd5e0" }}><div style={{ position: "absolute", top: 2, left: isHR ? 18 : 2, width: 14, height: 14, borderRadius: "50%", background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,.2)" }} /></div>
-          <span style={{ fontSize: 12, fontWeight: 700, color: isHR ? C.orange[600] : "#718096" }}>{isHR ? "HR Mode ON" : "HR Mode"}</span>
-        </div>
-      </div>
 
-      {/* Tab bar with error indicators */}
-      <div style={{ display: "flex", gap: 0, borderBottom: "2px solid #edf2f7", marginBottom: "1.25rem", flexWrap: "wrap" }}>
-        {[
-          { key: "employee",  label: "👤 Employee Info",   hasError: empTabHasError },
-          { key: "trainers",  label: `👥 Trainers ${trainers.length > 0 ? `(${trainers.length})` : ""}`, hasError: trainerTabHasError },
-          { key: "modules",   label: "📋 Training Modules", hasError: moduleTabHasError },
-          { key: "documents", label: "📂 Documents",        hasError: docTabHasError },
-        ].map(t => (
-          <button key={t.key} onClick={() => setTab(t.key)} style={{ padding: "10px 20px", fontSize: 13, fontWeight: tab === t.key ? 700 : 500, color: tab === t.key ? C.purple[600] : t.hasError ? C.red[600] : "#718096", background: "transparent", border: "none", borderBottom: tab === t.key ? `2px solid ${C.purple[600]}` : "2px solid transparent", cursor: "pointer", marginBottom: -2, fontFamily: "inherit", position: "relative" }}>
-            {t.label}
-            {t.hasError && <span style={{ marginLeft: 5, fontSize: 10, color: "#fff", background: C.red[600], padding: "1px 5px", borderRadius: 8, fontWeight: 800 }}>!</span>}
+        <form onSubmit={handleAssignDepartment} className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1 whitespace-nowrap">
+                Assigned Department *
+              </label>
+              <select
+                value={deptAssignForm.assigned_department}
+                onChange={(e) =>
+                  setDeptAssignForm((p) => ({ ...p, assigned_department: e.target.value }))
+                }
+                className="w-full px-3 py-2.5 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 whitespace-nowrap cursor-pointer"
+                required
+              >
+                {DEPARTMENTS.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1 whitespace-nowrap">
+                Formal Assignment Date *
+              </label>
+              <input
+                type="date"
+                value={deptAssignForm.assigned_date}
+                onChange={(e) =>
+                  setDeptAssignForm((p) => ({ ...p, assigned_date: e.target.value }))
+                }
+                className="w-full px-3 py-2.5 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 whitespace-nowrap"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1 whitespace-nowrap">
+                Department Head (HOD) Name
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. Sarah Connor (Head of Engineering)"
+                value={deptAssignForm.assigned_hod_name}
+                onChange={(e) =>
+                  setDeptAssignForm((p) => ({ ...p, assigned_hod_name: e.target.value }))
+                }
+                className="w-full px-3 py-2.5 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 whitespace-nowrap"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1 whitespace-nowrap">
+                Reporting Manager / Mentor
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. David TechLead"
+                value={deptAssignForm.assigned_reporting_manager}
+                onChange={(e) =>
+                  setDeptAssignForm((p) => ({
+                    ...p,
+                    assigned_reporting_manager: e.target.value,
+                  }))
+                }
+                className="w-full px-3 py-2.5 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 whitespace-nowrap"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1 whitespace-nowrap">
+              Department Handover & Assignment Notes
+            </label>
+            <textarea
+              rows={2}
+              placeholder="Initial project allocation, mentor briefing, desk seat location..."
+              value={deptAssignForm.assignment_notes}
+              onChange={(e) =>
+                setDeptAssignForm((p) => ({ ...p, assignment_notes: e.target.value }))
+              }
+              className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            />
+          </div>
+
+          {/* 6-Month Probation Window Banner */}
+          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+            <div className="flex items-center gap-2">
+              <LuClock className="text-amber-600" size={18} />
+              <div className="font-bold text-slate-900 text-sm whitespace-nowrap">
+                Initial 6-Month Probation Window
+              </div>
+            </div>
+            <p className="text-xs text-slate-500 whitespace-nowrap">
+              Department assignment establishes the official 6-month probation period.
+            </p>
+            <div className="flex flex-wrap gap-2.5 pt-1 text-xs">
+              <div className="bg-white px-3 py-1.5 rounded-xl border border-slate-200 whitespace-nowrap">
+                <span className="text-slate-500">Probation Start: </span>
+                <strong className="text-slate-800">{deptAssignForm.assigned_date}</strong>
+              </div>
+              <div className="bg-white px-3 py-1.5 rounded-xl border border-slate-200 whitespace-nowrap">
+                <span className="text-slate-500">Duration: </span>
+                <strong className="text-blue-600">6 Months</strong>
+              </div>
+              <div className="bg-white px-3 py-1.5 rounded-xl border border-slate-200 whitespace-nowrap">
+                <span className="text-slate-500">HOD Target Evaluation Date: </span>
+                <strong className="text-emerald-700">
+                  {(() => {
+                    const d = new Date(deptAssignForm.assigned_date);
+                    d.setMonth(d.getMonth() + 6);
+                    return d.toISOString().split("T")[0];
+                  })()}
+                </strong>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <button
+              type="submit"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-all whitespace-nowrap shadow-sm shadow-blue-500/20 active:scale-95 cursor-pointer"
+            >
+              <LuCheckCheck size={18} />
+              <span>Confirm Department Assignment & Start 6-Month Probation</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    );
+  };
+
+  // =========================================================================
+  // STAGE E: 6-MONTH PROBATION REVIEW & HOD PERMANENT / REJECT DECISION
+  // =========================================================================
+
+  const renderStageE_ProbationReview = () => {
+    if (!selectedOnboarding.is_assigned_to_dept) {
+      return (
+        <div className="bg-white rounded-2xl p-8 sm:p-12 border border-slate-200/80 shadow-xs text-center space-y-4">
+          <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
+            <LuLock size={28} />
+          </div>
+          <div>
+            <h5 className="font-bold text-slate-900 text-lg whitespace-nowrap">
+              Probation Review Unavailable
+            </h5>
+            <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto mt-1">
+              Employee has not been assigned to a department yet. Please complete Stage 4 (Department Assignment) first.
+            </p>
+          </div>
+          <button
+            onClick={() => setActiveStepTab("DEPT_ASSIGNMENT")}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 transition-all whitespace-nowrap shadow-xs cursor-pointer"
+          >
+            Go to Department Assignment
           </button>
-        ))}
+        </div>
+      );
+    }
+
+    const hasDecision = !!selectedOnboarding.hod_analysis_completed;
+    const isPermanent = selectedOnboarding.hod_decision === "PERMANENT";
+    const isRejected = selectedOnboarding.hod_decision === "REJECTED";
+
+    return (
+      <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/80 shadow-xs space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-100">
+          <div>
+            <h4 className="text-lg font-bold text-slate-900 flex items-center gap-2 whitespace-nowrap">
+              <LuScale className="text-emerald-600" /> e) 6-Month Probation Evaluation & HOD Decision
+            </h4>
+            <p className="text-xs sm:text-sm text-slate-500 mt-0.5 whitespace-nowrap">
+              Department analysis by Department Head to choose between <strong>Permanent Confirmation</strong> or <strong>Rejection</strong> after the initial 6 months probation period.
+            </p>
+          </div>
+          <div>
+            {isPermanent ? (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
+                🌟 Confirmed as Permanent Employee
+              </span>
+            ) : isRejected ? (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap">
+                ❌ Probation Rejected / Separated
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 whitespace-nowrap">
+                ⚖️ 6-Month Probation Active
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Timeline Banner */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 rounded-2xl bg-slate-50 border border-slate-200">
+          <div>
+            <div className="text-xs text-slate-500 whitespace-nowrap">Assigned Department</div>
+            <div className="font-bold text-slate-900 text-sm whitespace-nowrap">
+              {selectedOnboarding.assigned_department}
+            </div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500 whitespace-nowrap">Probation Start</div>
+            <div className="font-bold text-slate-900 text-sm whitespace-nowrap">
+              {selectedOnboarding.probation_start_date || "N/A"}
+            </div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500 whitespace-nowrap">6-Month End Date</div>
+            <div className="font-bold text-slate-900 text-sm whitespace-nowrap">
+              {selectedOnboarding.probation_end_date || "N/A"}
+            </div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500 whitespace-nowrap">Review Status</div>
+            <div className="font-bold text-blue-600 text-sm whitespace-nowrap">
+              {selectedOnboarding.probation_status || "IN_PROBATION"}
+            </div>
+          </div>
+        </div>
+
+        {/* If HOD Decision Already Submitted — Show Decision Certificate Stamp */}
+        {hasDecision && (
+          <div
+            className={`p-5 rounded-2xl border space-y-4 ${
+              isPermanent
+                ? "bg-emerald-50/60 border-emerald-200"
+                : isRejected
+                ? "bg-rose-50/60 border-rose-200"
+                : "bg-amber-50/60 border-amber-200"
+            }`}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div
+                  className={`w-10 h-10 rounded-2xl text-white flex items-center justify-center flex-shrink-0 shadow-xs ${
+                    isPermanent ? "bg-emerald-600" : isRejected ? "bg-rose-600" : "bg-amber-600"
+                  }`}
+                >
+                  {isPermanent ? <LuAward size={20} /> : <LuCircleX size={20} />}
+                </div>
+                <div>
+                  <h5 className="font-bold text-slate-900 text-base mb-0.5 whitespace-nowrap">
+                    Official HOD Decision:{" "}
+                    <span
+                      className={
+                        isPermanent
+                          ? "text-emerald-700"
+                          : isRejected
+                          ? "text-rose-700"
+                          : "text-amber-700"
+                      }
+                    >
+                      {selectedOnboarding.hod_decision}
+                    </span>
+                  </h5>
+                  <div className="text-xs text-slate-500 whitespace-nowrap">
+                    Evaluated by {selectedOnboarding.hod_decision_by_name || "Department Head"} on{" "}
+                    {selectedOnboarding.hod_decision_date
+                      ? new Date(selectedOnboarding.hod_decision_date).toLocaleDateString()
+                      : "Recent"}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Ratings 4 Columns (Zero wrapping) */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              <div className="bg-white p-2.5 rounded-xl border border-slate-200 text-center">
+                <div className="text-[11px] text-slate-500 whitespace-nowrap">Performance</div>
+                <div className="font-bold text-slate-900 text-sm whitespace-nowrap mt-0.5">
+                  {selectedOnboarding.hod_performance_rating || "—"} / 5 ⭐
+                </div>
+              </div>
+              <div className="bg-white p-2.5 rounded-xl border border-slate-200 text-center">
+                <div className="text-[11px] text-slate-500 whitespace-nowrap">KPI Achievement</div>
+                <div className="font-bold text-slate-900 text-sm whitespace-nowrap mt-0.5">
+                  {selectedOnboarding.hod_kpi_rating || "—"} / 5 ⭐
+                </div>
+              </div>
+              <div className="bg-white p-2.5 rounded-xl border border-slate-200 text-center">
+                <div className="text-[11px] text-slate-500 whitespace-nowrap">Attendance & Punctuality</div>
+                <div className="font-bold text-slate-900 text-sm whitespace-nowrap mt-0.5">
+                  {selectedOnboarding.hod_discipline_rating || "—"} / 5 ⭐
+                </div>
+              </div>
+              <div className="bg-white p-2.5 rounded-xl border border-slate-200 text-center">
+                <div className="text-[11px] text-slate-500 whitespace-nowrap">Culture & Teamwork</div>
+                <div className="font-bold text-slate-900 text-sm whitespace-nowrap mt-0.5">
+                  {selectedOnboarding.hod_culture_fit_rating || "—"} / 5 ⭐
+                </div>
+              </div>
+            </div>
+
+            {selectedOnboarding.hod_analysis_remarks && (
+              <div className="bg-white p-3 rounded-xl border border-slate-200 text-xs">
+                <strong className="text-slate-800">HOD Analysis Remarks:</strong>
+                <p className="text-slate-600 mt-1 mb-0">{selectedOnboarding.hod_analysis_remarks}</p>
+              </div>
+            )}
+            {selectedOnboarding.hod_decision_reason && (
+              <div className="bg-white p-3 rounded-xl border border-slate-200 text-xs">
+                <strong className="text-slate-800">Decision Justification:</strong>
+                <p className="text-slate-600 mt-1 mb-0">{selectedOnboarding.hod_decision_reason}</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* HOD Analysis Form */}
+        <div className="p-5 rounded-2xl border border-slate-200/80 bg-white space-y-4">
+          <div>
+            <h5 className="font-bold text-slate-900 text-base flex items-center gap-2 whitespace-nowrap">
+              <LuStar className="text-amber-500" /> Conduct Department Analysis & Submit Final Choice
+            </h5>
+            <p className="text-xs text-slate-500 mt-0.5 whitespace-nowrap">
+              Evaluate performance metrics across the 6-month probation and decide whether to confirm as Permanent or Reject.
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmitHodDecision} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1 whitespace-nowrap">
+                  1. Job Execution (1-5 ⭐)
+                </label>
+                <select
+                  value={hodReviewForm.hod_performance_rating}
+                  onChange={(e) =>
+                    setHodReviewForm((p) => ({
+                      ...p,
+                      hod_performance_rating: Number(e.target.value),
+                    }))
+                  }
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 whitespace-nowrap cursor-pointer"
+                >
+                  <option value={5}>5 - Outstanding</option>
+                  <option value={4.5}>4.5 - Exceeds Expectations</option>
+                  <option value={4}>4 - Meets Expectations</option>
+                  <option value={3}>3 - Satisfactory</option>
+                  <option value={2}>2 - Below Average</option>
+                  <option value={1}>1 - Unsatisfactory</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1 whitespace-nowrap">
+                  2. KPI Achievement (1-5 ⭐)
+                </label>
+                <select
+                  value={hodReviewForm.hod_kpi_rating}
+                  onChange={(e) =>
+                    setHodReviewForm((p) => ({
+                      ...p,
+                      hod_kpi_rating: Number(e.target.value),
+                    }))
+                  }
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 whitespace-nowrap cursor-pointer"
+                >
+                  <option value={5}>5 - 100%+ Targets</option>
+                  <option value={4}>4 - 85-99% Targets</option>
+                  <option value={3}>3 - 70-84% Targets</option>
+                  <option value={2}>2 - 50-69% Targets</option>
+                  <option value={1}>1 - &lt;50% Targets</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1 whitespace-nowrap">
+                  3. Attendance & Discipline (1-5 ⭐)
+                </label>
+                <select
+                  value={hodReviewForm.hod_discipline_rating}
+                  onChange={(e) =>
+                    setHodReviewForm((p) => ({
+                      ...p,
+                      hod_discipline_rating: Number(e.target.value),
+                    }))
+                  }
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 whitespace-nowrap cursor-pointer"
+                >
+                  <option value={5}>5 - Punctual & Disciplined</option>
+                  <option value={4}>4 - Good Punctuality</option>
+                  <option value={3}>3 - Acceptable Attendance</option>
+                  <option value={2}>2 - Frequent Tardiness</option>
+                  <option value={1}>1 - Chronic Issues</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1 whitespace-nowrap">
+                  4. Culture & Teamwork (1-5 ⭐)
+                </label>
+                <select
+                  value={hodReviewForm.hod_culture_fit_rating}
+                  onChange={(e) =>
+                    setHodReviewForm((p) => ({
+                      ...p,
+                      hod_culture_fit_rating: Number(e.target.value),
+                    }))
+                  }
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 whitespace-nowrap cursor-pointer"
+                >
+                  <option value={5}>5 - Exemplary Team Player</option>
+                  <option value={4.5}>4.5 - Highly Collaborative</option>
+                  <option value={4}>4 - Good Collaboration</option>
+                  <option value={3}>3 - Average Fit</option>
+                  <option value={2}>2 - Poor Integration</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1 whitespace-nowrap">
+                HOD Qualitative Department Analysis Remarks
+              </label>
+              <textarea
+                rows={2}
+                placeholder="Technical accomplishments during 6-month probation, key project deliveries, overall fit..."
+                value={hodReviewForm.hod_analysis_remarks}
+                onChange={(e) =>
+                  setHodReviewForm((p) => ({
+                    ...p,
+                    hod_analysis_remarks: e.target.value,
+                  }))
+                }
+                className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              />
+            </div>
+
+            {/* Department Head Final Choice Radio Cards */}
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+              <label className="block font-bold text-slate-900 text-sm whitespace-nowrap">
+                Department Head Final Choice:
+              </label>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {/* 1. Permanent */}
+                <label
+                  className={`p-3.5 rounded-xl border transition-all cursor-pointer block ${
+                    hodReviewForm.hod_decision === "PERMANENT"
+                      ? "bg-white border-emerald-500 shadow-xs ring-2 ring-emerald-500/10"
+                      : "bg-white border-slate-200 hover:border-slate-300"
+                  }`}
+                >
+                  <div className="flex items-center gap-2 whitespace-nowrap">
+                    <input
+                      type="radio"
+                      name="hodChoice"
+                      checked={hodReviewForm.hod_decision === "PERMANENT"}
+                      onChange={() =>
+                        setHodReviewForm((p) => ({ ...p, hod_decision: "PERMANENT" }))
+                      }
+                      className="text-emerald-600 focus:ring-emerald-500"
+                    />
+                    <strong className="text-emerald-800 text-sm whitespace-nowrap">
+                      🌟 Keep as Permanent
+                    </strong>
+                  </div>
+                  <div className="text-[11px] text-slate-500 mt-1 pl-5 whitespace-nowrap">
+                    Confirm full-time permanent corporate status.
+                  </div>
+                </label>
+
+                {/* 2. Reject */}
+                <label
+                  className={`p-3.5 rounded-xl border transition-all cursor-pointer block ${
+                    hodReviewForm.hod_decision === "REJECTED"
+                      ? "bg-white border-rose-500 shadow-xs ring-2 ring-rose-500/10"
+                      : "bg-white border-slate-200 hover:border-slate-300"
+                  }`}
+                >
+                  <div className="flex items-center gap-2 whitespace-nowrap">
+                    <input
+                      type="radio"
+                      name="hodChoice"
+                      checked={hodReviewForm.hod_decision === "REJECTED"}
+                      onChange={() =>
+                        setHodReviewForm((p) => ({ ...p, hod_decision: "REJECTED" }))
+                      }
+                      className="text-rose-600 focus:ring-rose-500"
+                    />
+                    <strong className="text-rose-800 text-sm whitespace-nowrap">
+                      ❌ Reject Employee
+                    </strong>
+                  </div>
+                  <div className="text-[11px] text-slate-500 mt-1 pl-5 whitespace-nowrap">
+                    End employment after 6-month probation review.
+                  </div>
+                </label>
+
+                {/* 3. Extend */}
+                <label
+                  className={`p-3.5 rounded-xl border transition-all cursor-pointer block ${
+                    hodReviewForm.hod_decision === "EXTENDED"
+                      ? "bg-white border-amber-500 shadow-xs ring-2 ring-amber-500/10"
+                      : "bg-white border-slate-200 hover:border-slate-300"
+                  }`}
+                >
+                  <div className="flex items-center gap-2 whitespace-nowrap">
+                    <input
+                      type="radio"
+                      name="hodChoice"
+                      checked={hodReviewForm.hod_decision === "EXTENDED"}
+                      onChange={() =>
+                        setHodReviewForm((p) => ({ ...p, hod_decision: "EXTENDED" }))
+                      }
+                      className="text-amber-600 focus:ring-amber-500"
+                    />
+                    <strong className="text-amber-800 text-sm whitespace-nowrap">
+                      ⏱️ Extend Probation
+                    </strong>
+                  </div>
+                  <div className="text-[11px] text-slate-500 mt-1 pl-5 whitespace-nowrap">
+                    Grant 1-3 months grace observation period.
+                  </div>
+                </label>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1 whitespace-nowrap">
+                  Formal Rationale & Official Recommendation
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Official comments for permanent confirmation or probation separation..."
+                  value={hodReviewForm.hod_decision_reason}
+                  onChange={(e) =>
+                    setHodReviewForm((p) => ({
+                      ...p,
+                      hod_decision_reason: e.target.value,
+                    }))
+                  }
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                type="submit"
+                className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-white text-sm font-semibold transition-all whitespace-nowrap shadow-sm active:scale-95 cursor-pointer ${
+                  hodReviewForm.hod_decision === "PERMANENT"
+                    ? "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/20"
+                    : hodReviewForm.hod_decision === "REJECTED"
+                    ? "bg-rose-600 hover:bg-rose-700 shadow-rose-500/20"
+                    : "bg-amber-600 hover:bg-amber-700 shadow-amber-500/20"
+                }`}
+              >
+                <LuCheckCheck size={18} />
+                <span>Submit HOD Final Decision</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  };
+
+  // =========================================================================
+  // MODALS
+  // =========================================================================
+
+  // 1. Initiate Modal
+  const renderInitiateModal = () => {
+    if (!showInitiateModal) return null;
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
+        <div className="bg-white rounded-3xl p-5 sm:p-6 w-full max-w-xl shadow-2xl border border-slate-100 space-y-4 max-h-[90vh] overflow-y-auto">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <h4 className="text-lg font-bold text-slate-900 flex items-center gap-2 whitespace-nowrap">
+              <LuSparkles className="text-blue-600" /> Initiate Employee Onboarding
+            </h4>
+            <button
+              onClick={() => setShowInitiateModal(false)}
+              className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all cursor-pointer"
+            >
+              <LuX size={18} />
+            </button>
+          </div>
+
+          {/* Segmented type buttons */}
+          <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl whitespace-nowrap">
+            <button
+              type="button"
+              onClick={() => setInitiateForm((p) => ({ ...p, type: "candidate" }))}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap cursor-pointer ${
+                initiateForm.type === "candidate"
+                  ? "bg-white text-blue-600 shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              From Candidate
+            </button>
+            <button
+              type="button"
+              onClick={() => setInitiateForm((p) => ({ ...p, type: "employee" }))}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap cursor-pointer ${
+                initiateForm.type === "employee"
+                  ? "bg-white text-blue-600 shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              From Directory
+            </button>
+            <button
+              type="button"
+              onClick={() => setInitiateForm((p) => ({ ...p, type: "direct" }))}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap cursor-pointer ${
+                initiateForm.type === "direct"
+                  ? "bg-white text-blue-600 shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              Direct Entry
+            </button>
+          </div>
+
+          <form onSubmit={handleInitiateSubmit} className="space-y-3.5">
+            {initiateForm.type === "candidate" && (
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1 whitespace-nowrap">
+                  Select Recruited Candidate
+                </label>
+                <select
+                  value={initiateForm.candidate_id}
+                  onChange={(e) => handleCandidateSelect(e.target.value)}
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 whitespace-nowrap cursor-pointer"
+                >
+                  <option value="">-- Choose Candidate --</option>
+                  {candidatesPool.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.candidate_name} ({c.current_designation || "Candidate"})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {initiateForm.type === "employee" && (
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1 whitespace-nowrap">
+                  Select from Employee Directory
+                </label>
+                <select
+                  value={initiateForm.employee_id}
+                  onChange={(e) => handleEmployeeSelect(e.target.value)}
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 whitespace-nowrap cursor-pointer"
+                >
+                  <option value="">-- Choose Employee --</option>
+                  {employeesPool.map((e) => (
+                    <option key={e.employee_id} value={e.employee_id}>
+                      [{e.employee_id}] {e.first_name} {e.last_name} ({e.dept || "General"})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1 whitespace-nowrap">
+                  Full Name *
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Alice Johnson"
+                  value={initiateForm.employee_name}
+                  onChange={(e) =>
+                    setInitiateForm((p) => ({ ...p, employee_name: e.target.value }))
+                  }
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 whitespace-nowrap"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1 whitespace-nowrap">
+                  Personal Email
+                </label>
+                <input
+                  type="email"
+                  placeholder="e.g. alice@gmail.com"
+                  value={initiateForm.personal_email}
+                  onChange={(e) =>
+                    setInitiateForm((p) => ({ ...p, personal_email: e.target.value }))
+                  }
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 whitespace-nowrap"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1 whitespace-nowrap">
+                  Phone Number
+                </label>
+                <input
+                  type="text"
+                  placeholder="+91 9876543210"
+                  value={initiateForm.phone}
+                  onChange={(e) =>
+                    setInitiateForm((p) => ({ ...p, phone: e.target.value }))
+                  }
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 whitespace-nowrap"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1 whitespace-nowrap">
+                  Joining Date
+                </label>
+                <input
+                  type="date"
+                  value={initiateForm.joining_date}
+                  onChange={(e) =>
+                    setInitiateForm((p) => ({ ...p, joining_date: e.target.value }))
+                  }
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 whitespace-nowrap"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1 whitespace-nowrap">
+                  Designation / Role
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Software Engineer"
+                  value={initiateForm.designation}
+                  onChange={(e) =>
+                    setInitiateForm((p) => ({ ...p, designation: e.target.value }))
+                  }
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 whitespace-nowrap"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1 whitespace-nowrap">
+                  Target Department
+                </label>
+                <select
+                  value={initiateForm.target_department}
+                  onChange={(e) =>
+                    setInitiateForm((p) => ({ ...p, target_department: e.target.value }))
+                  }
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 whitespace-nowrap cursor-pointer"
+                >
+                  {DEPARTMENTS.map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setShowInitiateModal(false)}
+                className="px-4 py-2 rounded-xl text-slate-600 text-sm font-medium hover:bg-slate-100 transition-all whitespace-nowrap cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-all whitespace-nowrap shadow-xs cursor-pointer"
+              >
+                Start Onboarding
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  };
+
+  // 2. Upload Document Modal
+  const renderUploadModal = () => {
+    if (!showUploadModal) return null;
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
+        <div className="bg-white rounded-3xl p-5 sm:p-6 w-full max-w-md shadow-2xl border border-slate-100 space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <h4 className="text-base font-bold text-slate-900 flex items-center gap-2 whitespace-nowrap">
+              <LuUpload className="text-blue-600" /> Upload {selectedDocKey.toUpperCase()}
+            </h4>
+            <button
+              onClick={() => setShowUploadModal(false)}
+              className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all cursor-pointer"
+            >
+              <LuX size={18} />
+            </button>
+          </div>
+
+          <form onSubmit={handleUploadDocSubmit} className="space-y-3.5">
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1 whitespace-nowrap">
+                Document Number / Identifier
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. Aadhaar / PAN / Certificate No."
+                value={docNumberInput}
+                onChange={(e) => setDocNumberInput(e.target.value)}
+                className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 whitespace-nowrap"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1 whitespace-nowrap">
+                Choose Document File (PDF, PNG, JPG) *
+              </label>
+              <input
+                type="file"
+                accept=".pdf,.png,.jpg,.jpeg"
+                onChange={(e) => setUploadFile(e.target.files[0])}
+                className="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+                required
+              />
+            </div>
+
+            <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setShowUploadModal(false)}
+                className="px-4 py-2 rounded-xl text-slate-600 text-sm font-medium hover:bg-slate-100 transition-all whitespace-nowrap cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={uploadingDoc}
+                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-all whitespace-nowrap shadow-xs cursor-pointer"
+              >
+                {uploadingDoc ? "Uploading..." : "Upload & Save"}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  };
+
+  // 3. Training Modal
+  const renderTrainingModal = () => {
+    if (!showTrainingModal) return null;
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
+        <div className="bg-white rounded-3xl p-5 sm:p-6 w-full max-w-lg shadow-2xl border border-slate-100 space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <h4 className="text-base font-bold text-slate-900 flex items-center gap-2 whitespace-nowrap">
+              <LuGraduationCap className="text-amber-500" /> Update {editingModuleKey.toUpperCase()} Training
+            </h4>
+            <button
+              onClick={() => setShowTrainingModal(false)}
+              className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all cursor-pointer"
+            >
+              <LuX size={18} />
+            </button>
+          </div>
+
+          <form onSubmit={handleSaveTrainingModule} className="space-y-3.5">
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1 whitespace-nowrap">
+                Training Status
+              </label>
+              <select
+                value={trainingEditForm.status}
+                onChange={(e) =>
+                  setTrainingEditForm((p) => ({ ...p, status: e.target.value }))
+                }
+                className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 whitespace-nowrap cursor-pointer"
+              >
+                <option value="NOT_STARTED">Not Started</option>
+                <option value="IN_PROGRESS">In Progress</option>
+                <option value="COMPLETED">Completed</option>
+              </select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1 whitespace-nowrap">
+                  Trainer / Evaluator
+                </label>
+                <input
+                  type="text"
+                  placeholder="Trainer name"
+                  value={trainingEditForm.trainer_name}
+                  onChange={(e) =>
+                    setTrainingEditForm((p) => ({ ...p, trainer_name: e.target.value }))
+                  }
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 whitespace-nowrap"
+                />
+              </div>
+
+              {editingModuleKey === "dept" ? (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1 whitespace-nowrap">
+                    Assigned Mentor
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Mentor name"
+                    value={trainingEditForm.mentor_name}
+                    onChange={(e) =>
+                      setTrainingEditForm((p) => ({ ...p, mentor_name: e.target.value }))
+                    }
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 whitespace-nowrap"
+                  />
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1 whitespace-nowrap">
+                    Scheduled Date
+                  </label>
+                  <input
+                    type="date"
+                    value={trainingEditForm.scheduled_date}
+                    onChange={(e) =>
+                      setTrainingEditForm((p) => ({ ...p, scheduled_date: e.target.value }))
+                    }
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 whitespace-nowrap"
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1 whitespace-nowrap">
+                  Completion Date
+                </label>
+                <input
+                  type="date"
+                  value={trainingEditForm.completed_date}
+                  onChange={(e) =>
+                    setTrainingEditForm((p) => ({ ...p, completed_date: e.target.value }))
+                  }
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 whitespace-nowrap"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1 whitespace-nowrap">
+                  Assessment Score (0-100)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={trainingEditForm.score}
+                  onChange={(e) =>
+                    setTrainingEditForm((p) => ({ ...p, score: e.target.value }))
+                  }
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 whitespace-nowrap"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1 whitespace-nowrap">
+                Trainer Feedback / Remarks
+              </label>
+              <textarea
+                rows={2}
+                placeholder="Candidate participation, test performance..."
+                value={trainingEditForm.feedback}
+                onChange={(e) =>
+                  setTrainingEditForm((p) => ({ ...p, feedback: e.target.value }))
+                }
+                className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setShowTrainingModal(false)}
+                className="px-4 py-2 rounded-xl text-slate-600 text-sm font-medium hover:bg-slate-100 transition-all whitespace-nowrap cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-all whitespace-nowrap shadow-xs cursor-pointer"
+              >
+                Save Details
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  };
+
+  // =========================================================================
+  // MAIN CONTAINER RENDER
+  // =========================================================================
+
+  return (
+    <div className="min-h-screen bg-slate-50/60 py-5 font-sans">
+      <Toaster position="top-right" reverseOrder={false} />
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-5">
+        {/* Material 3 Top Header Strip (Single-line zero wrapping title and breadcrumb) */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-1">
+          <div>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider bg-blue-50 text-blue-700 border border-blue-100/80 mb-2 whitespace-nowrap">
+              <LuBuilding2 size={13} className="text-blue-600" />
+              <span>Enterprise HR Lifecycle</span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight whitespace-nowrap">
+              Employee Onboarding Hub
+            </h1>
+            {/* Horizontal single-line process breadcrumb with zero wrapping */}
+            <div className="overflow-x-auto scrollbar-none mt-1">
+              <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium whitespace-nowrap">
+                <span>Joining Assets</span>
+                <span className="text-slate-300">➔</span>
+                <span>Documentation</span>
+                <span className="text-slate-300">➔</span>
+                <span>4-Stage Training</span>
+                <span className="text-slate-300">➔</span>
+                <span>Dept. Placement</span>
+                <span className="text-slate-300">➔</span>
+                <span className="text-emerald-700 font-semibold">6-Month Probation Review</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Action buttons on top right */}
+          <div className="flex items-center gap-2 whitespace-nowrap flex-shrink-0 self-start sm:self-center">
+            <button
+              onClick={() => {
+                setRefreshing(true);
+                fetchPipelineData();
+              }}
+              disabled={refreshing}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-full border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-xs transition-all whitespace-nowrap cursor-pointer active:scale-95"
+            >
+              <LuRefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
+              <span>Refresh</span>
+            </button>
+            <button
+              onClick={() => setShowInitiateModal(true)}
+              className="inline-flex items-center gap-1.5 px-4 sm:px-5 py-2.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-semibold shadow-sm shadow-blue-500/20 transition-all whitespace-nowrap cursor-pointer active:scale-95"
+            >
+              <LuPlus size={16} />
+              <span>Initiate Onboarding</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Dynamic View: Pipeline List OR Employee Workspace */}
+        {selectedOnboarding ? renderWorkspaceView() : renderPipelineView()}
       </div>
 
-      {tab === "employee"  && <TabEmployee emp={emp} setE={setE} fieldErrors={showErrors ? fieldErrors : {}} />}
-      {tab === "trainers"  && <TabTrainers trainers={trainers} setTrainers={setTrainers} passConfig={passConfig} setPassConfig={setPassConfig} token={token} />}
-      {tab === "modules"   && <TabModules modules={modules} setModules={setModules} trainers={trainers} passConfig={passConfig} isHR={isHR} showErrors={showErrors} />}
-      {tab === "documents" && <TabDocuments docs={docs} setDocs={setDocs} showErrors={showErrors} />}
-
-      {showErrors && error && (
-        <div style={{ background: C.red[50], border: `1px solid ${C.red[200]}`, borderRadius: 10, padding: "12px 16px", color: C.red[600], fontSize: 13, marginBottom: 12 }}>
-          ❌ {error}
-        </div>
-      )}
-
-      <button onClick={handleSubmit} disabled={loading} style={{ width: "100%", padding: 15, background: loading ? "#94a3b8" : C.purple[600], color: "#fff", border: "none", borderRadius: 12, fontSize: 15, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", fontFamily: "inherit", boxShadow: "0 4px 14px rgba(83,74,183,.3)" }}>
-        {loading ? "Saving..." : "✅ Complete Onboarding Process"}
-      </button>
-
-      {submitted && (
-        <div style={{ background: C.green[50], border: `1px solid ${C.green[200]}`, borderRadius: 12, padding: 16, color: C.green[600], fontSize: 15, marginTop: "1rem", textAlign: "center", fontWeight: 700 }}>
-          🎉 Saved! Redirecting to dashboard...
-        </div>
-      )}
+      {/* Material Modals */}
+      {renderInitiateModal()}
+      {renderUploadModal()}
+      {renderTrainingModal()}
     </div>
   );
 }

@@ -31,68 +31,28 @@ export const parseJwt = (token) => {
 };
 
 /**
- * Check if the stored JWT token is expired (buffers by 10s for clock skew)
+ * Check if the stored JWT token is expired
  */
 export const isTokenExpired = (token) => {
   if (!token) return true;
   const decoded = parseJwt(token);
   if (!decoded || !decoded.exp) return true;
   // exp is in seconds, Date.now() is in milliseconds
-  return decoded.exp * 1000 <= Date.now() + 10000;
-};
-
-/**
- * Dynamic resolution of the backend auth API URL
- */
-const getAuthApiUrl = () => {
-  if (typeof window === "undefined") return "http://localhost:5001/api/auth";
-  const isLocalhost =
-    window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
-  if (isLocalhost) return "http://localhost:5001/api/auth";
-  if (window.location.hostname === "hrms.zentelex.com") return "https://hrms.zentelex.com/api/auth";
-  if (
-    window.location.port &&
-    window.location.port !== "80" &&
-    window.location.port !== "443" &&
-    window.location.port !== "5001"
-  ) {
-    return `${window.location.protocol}//${window.location.hostname}:5001/api/auth`;
-  }
-  return `${window.location.origin}/api/auth`;
+  return decoded.exp * 1000 <= Date.now();
 };
 
 // Global lock to prevent duplicate toast messages and redirection loops
 let isRedirecting = false;
 
 /**
- * Terminate the user's session cleanly and redirect to /login.
- * Proactively triggers automatic clock-out if an employee's shift ended.
+ * Terminate the user's portal session and redirect to /login strictly when the session token expires.
+ * Does NOT clock out the employee or modify attendance records.
  */
-export const handleSessionExpired = async (
-  message = "Your 14-hour session has ended. You have been automatically clocked out and logged out from the portal."
+export const handleSessionExpired = (
+  message = "Your session has expired. Please log in again to continue."
 ) => {
   if (isRedirecting) return;
   isRedirecting = true;
-
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-
-  // Proactively auto clock-out unclosed shift before clearing storage
-  if (token) {
-    try {
-      const apiUrl = getAuthApiUrl();
-      await fetch(`${apiUrl}/attendance/auto-clock-out`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
-        },
-        body: JSON.stringify({ forceIfSessionExpired: true, token }),
-        keepalive: true,
-      });
-    } catch (err) {
-      console.warn("[Session Expiry] Auto clock-out trigger failed:", err);
-    }
-  }
 
   clearAuthSession();
 
@@ -109,20 +69,39 @@ export const handleSessionExpired = async (
   }
 };
 
+let expiryTimer = null;
+
 /**
- * Setup lifecycle listeners (tab focus / visibility) to detect token expiry proactively
+ * Setup lifecycle listeners and precise timer to auto-logout from portal
+ * only when the 14-hour session token expires.
  */
 export const initTokenExpiryWatcher = () => {
   if (typeof window === "undefined") return;
 
   const checkStatus = () => {
     const token = localStorage.getItem("token");
-    if (token && isTokenExpired(token)) {
+    if (!token) return;
+
+    if (isTokenExpired(token)) {
       handleSessionExpired(
-        "Your 14-hour session has ended. You have been automatically clocked out and logged out from the portal."
+        "Your session has expired. Please log in again to continue."
       );
+      return;
+    }
+
+    // Schedule exact timer for token expiration
+    const decoded = parseJwt(token);
+    if (decoded && decoded.exp) {
+      const remainingMs = decoded.exp * 1000 - Date.now();
+      if (remainingMs > 0 && remainingMs < 2147483647) {
+        if (expiryTimer) clearTimeout(expiryTimer);
+        expiryTimer = setTimeout(checkStatus, remainingMs + 500);
+      }
     }
   };
+
+  // Run initial check and schedule expiry timer
+  checkStatus();
 
   // Check whenever user switches back to this tab
   window.addEventListener("focus", checkStatus);
@@ -132,7 +111,6 @@ export const initTokenExpiryWatcher = () => {
     }
   });
 
-  // Check periodically every 30 seconds
+  // Fallback periodic check every 30 seconds
   setInterval(checkStatus, 30000);
 };
-

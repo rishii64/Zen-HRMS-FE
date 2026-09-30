@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { Link, NavLink, useNavigate } from "react-router-dom";
+import { Link, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { CiCircleAlert } from "react-icons/ci";
-import { FiMenu, FiX, FiMail, FiLogOut, FiHash, FiGrid, FiChevronDown, FiSearch } from "react-icons/fi";
+import { FiMenu, FiX, FiMail, FiLogOut, FiHash, FiGrid, FiChevronDown, FiSearch, FiClock } from "react-icons/fi";
 import {
   LuUser,
   LuTrendingUp,
@@ -24,6 +24,7 @@ import {
   LuClipboardList,
   LuSparkles,
   LuReceipt,
+  LuUserCheck,
 } from "react-icons/lu";
 import { SiGoogledocs } from "react-icons/si";
 import { FaListCheck } from "react-icons/fa6";
@@ -33,6 +34,7 @@ import toast from 'react-hot-toast';
 import { TbPassword } from "react-icons/tb";
 import api, { getUploadUrl } from "../../api/axios";
 import ChangePasswordModal from "../common/ChangePasswordModal";
+import DailyAttendanceNoticeModal from "../common/DailyAttendanceNoticeModal";
 
 
 const ALL_APPS = [
@@ -48,7 +50,7 @@ const ALL_APPS = [
     id: "app_profile",
     title: "My Profile",
     icon: <LuUser className="text-indigo-500" />,
-    route: "/employee/profile",
+    route: "/profile",
     roles: ["employee", "hr", "accounts", "payroll", "hod", "admin"],
     keywords: ["profile", "user", "personal", "account", "details", "info"],
   },
@@ -140,21 +142,37 @@ const ALL_APPS = [
     roles: ["hr", "admin", "hod", "accounts"],
     keywords: ["manage", "employees", "directory", "staff", "team", "people", "my teams"],
   },
+  // {
+  //   id: "app_interview",
+  //   title: "Interview Assessment",
+  //   icon: <LuGraduationCap className="text-indigo-600" />,
+  //   route: "/interview",
+  //   roles: ["hr", "admin", "hod", "manager", "hrmanager"],
+  //   keywords: ["interview", "assessment", "evaluation", "candidate", "feedback", "ratings"],
+  // },
+  {
+    id: "app_requisition",
+    title: "Requisition",
+    icon: <LuBriefcase className="text-cyan-600" />,
+    route: "/requisition",
+    roles: ["hr", "admin", "hod", "manager", "teamlead", "ceo", "coo", "hrmanager"],
+    keywords: ["requisition", "hiring", "cv", "resume", "candidates", "jobs", "desk", "requisition", "shortlisting"],
+  },
+  // {
+  //   id: "app_recruitment",
+  //   title: "Recruitment",
+  //   icon: <LuBriefcase className="text-cyan-600" />,
+  //   route: "/recruitment",
+  //   roles: ["hr", "admin", "hod", "manager", "teamlead", "ceo", "coo", "hrmanager"],
+  //   keywords: ["recruitment", "hiring", "cv", "resume", "candidates", "jobs", "desk", "requisition", "shortlisting"],
+  // },
   {
     id: "app_onboarding",
-    title: "Onboarding Portal",
-    icon: <LuGraduationCap className="text-teal-600" />,
+    title: "Onboarding",
+    icon: <LuUserCheck className="text-violet-600" />,
     route: "/onboarding",
-    roles: ["hr", "admin"],
-    keywords: ["onboarding", "induction", "new hire", "joining", "training", "kt"],
-  },
-  {
-    id: "app_recruitment",
-    title: "Recruitment Desk",
-    icon: <LuBriefcase className="text-cyan-600" />,
-    route: "/recruitment",
-    roles: ["hr", "admin"],
-    keywords: ["recruitment", "hiring", "cv", "resume", "candidates", "jobs", "desk"],
+    roles: ["hr", "admin", "hod", "manager", "teamlead", "employee"],
+    keywords: ["onboarding", "joining", "induction", "training", "probation", "assets", "documentation", "permanent"],
   },
   {
     id: "app_interview",
@@ -179,14 +197,6 @@ const ALL_APPS = [
     route: "/accounts/dashboard",
     roles: ["accounts", "payroll", "admin"],
     keywords: ["accounts", "finance", "billing", "dashboard", "ledger"],
-  },
-  {
-    id: "app_hod_dash",
-    title: "HOD Dashboard",
-    icon: <LuTrendingUp className="text-purple-600" />,
-    route: "/hod/dashboard",
-    roles: ["hod"],
-    keywords: ["hod", "department", "head", "dashboard", "overview"],
   },
   {
     id: "app_it_declaration",
@@ -238,54 +248,75 @@ const AppNavbar = () => {
   const [isAppsOpen, setIsAppsOpen] = useState(false);
   const [isMobileAppsOpen, setIsMobileAppsOpen] = useState(false);
   const [appSearch, setAppSearch] = useState("");
+  const [isDailyNoticeOpen, setIsDailyNoticeOpen] = useState(false);
+
+  const location = useLocation();
+
+  // Trigger daily attendance notice popup once per day after logging in
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    if (typeof window === "undefined") return;
+
+    // Do not show on auth pages
+    const path = location.pathname.toLowerCase();
+    if (path === "/login" || path === "/register" || path === "/forgot-password") return;
+
+    try {
+      const userKey =
+        localStorage.getItem("userId") ||
+        localStorage.getItem("employeeCode") ||
+        localStorage.getItem("empId") || "user";
+      const todayStr = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
+      const ackKey = `hrms_daily_notice_ack_${userKey}_${todayStr}`;
+      const isAcknowledged = localStorage.getItem(ackKey) === "true";
+
+      if (!isAcknowledged) {
+        // Small delay so page content smoothly renders first
+        const timer = setTimeout(() => {
+          setIsDailyNoticeOpen(true);
+        }, 400);
+        return () => clearTimeout(timer);
+      }
+    } catch (e) {
+      console.warn("Daily notice check warning:", e);
+    }
+  }, [isLoggedIn, location.pathname]);
+
+  const handleCloseDailyNotice = () => {
+    try {
+      const userKey =
+        localStorage.getItem("userId") ||
+        localStorage.getItem("employeeCode") ||
+        localStorage.getItem("empId") || "user";
+      const todayStr = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
+      const ackKey = `hrms_daily_notice_ack_${userKey}_${todayStr}`;
+      localStorage.setItem(ackKey, "true");
+    } catch (e) {
+      // ignore
+    }
+    setIsDailyNoticeOpen(false);
+  };
 
   // Reset image error state whenever profilePhoto string changes
   useEffect(() => {
     setImgError(false);
   }, [profilePhoto]);
+  const handleLogout = () => {
+    clearAuthSession();
 
-  const formatTime12h = (timeStr) => {
-    if (!timeStr) return "";
-    try {
-      const parts = timeStr.split(":");
-      let hrs = parseInt(parts[0], 10);
-      const mins = parts[1] || "00";
-      const ampm = hrs >= 12 ? "PM" : "AM";
-      hrs = hrs % 12 || 12;
-      return `${hrs}:${mins} ${ampm}`;
-    } catch {
-      return timeStr;
-    }
-  };
+    setRole(null);
+    setIsLoggedIn(false);
+    setUserName("");
+    setEmail("");
+    setEmployeeCode("");
+    setProfilePhoto("");
+    setIsMobileMenuOpen(false);
+    setIsDropdownOpen(false);
+    setIsAppsOpen(false);
+    setIsMobileAppsOpen(false);
 
-  const handleLogout = async () => {
-    try {
-      const res = await api.post("/attendance/portal-logout");
-      if (res.data?.clockedOut && res.data?.check_out) {
-        const timeFormatted = formatTime12h(res.data.check_out);
-        toast.success(`Clocked out at ${timeFormatted}. Logged out!`, { duration: 3500 });
-      } else {
-        toast.success("Logged out!");
-      }
-    } catch (err) {
-      console.warn("Portal logout clock-out note:", err.message);
-      toast.success("Logged out!");
-    } finally {
-      clearAuthSession();
-
-      setRole(null);
-      setIsLoggedIn(false);
-      setUserName("");
-      setEmail("");
-      setEmployeeCode("");
-      setProfilePhoto("");
-      setIsMobileMenuOpen(false);
-      setIsDropdownOpen(false);
-      setIsAppsOpen(false);
-      setIsMobileAppsOpen(false);
-
-      navigate("/login");
-    }
+    toast.success("Logged out!");
+    navigate("/login");
   };
 
   const handleChangePassword = () => {
@@ -388,7 +419,7 @@ const AppNavbar = () => {
 
   // 5 Top Primary Route Tabs per Role
   const getNavLinks = () => {
-    const profRoute = employeeCode ? `/employee/profile/${employeeCode}` : "/employee/profile/me";
+    const profRoute = employeeCode ? `/profile/${employeeCode}` : "/profile/me";
     switch (role) {
       case "employee":
         return [
@@ -402,9 +433,9 @@ const AppNavbar = () => {
         return [
           { to: "/admin/dashboard", label: "Dashboard" },
           { to: "/attendance", label: "Attendance" },
-          { to: "/holidays", label: "Holidays" },
+          { to: "/requisition", label: "Requisition" },
           { to: "/onboarding", label: "Onboarding" },
-          // { to: "/admin/leaves", label: "Leaves" },
+          { to: "/holidays", label: "Holidays" },
         ];
       case "accounts":
       case "payroll":
@@ -419,9 +450,8 @@ const AppNavbar = () => {
         return [
           { to: "/hod/dashboard", label: "Dashboard" },
           { to: "/attendance", label: "Attendance" },
-          { to: "/interview", label: "Candidate Evaluation" },
-          // { to: "/appraisal", label: "Team Appraisal" },
-          // { to: "/resignation", label: "Resignation" },
+          { to: "/requisition", label: "Requisition" },
+          { to: "/onboarding", label: "Onboarding" },
           { to: profRoute, label: "My Profile" },
         ];
       default:
@@ -457,12 +487,11 @@ const AppNavbar = () => {
       else if (userRole === "accounts" || userRole === "payroll") route = "/accounts/dashboard";
       else if (userRole === "hod") route = "/hod/dashboard";
       else route = "/employee/dashboard";
-    } else if (app.id === "app_profile") {
-      route = `/employee/profile/${employeeCode || "me"}`;
-    } else if (app.id === "app_mediclaim") {
-      route = "/mediclaim";
-    } else if (app.id === "app_leave") {
-      route = userRole === "employee" ? "/employee/leave" : (userRole === "hod" ? "/leave" : "/admin/leaves");
+    } else if (app.id === "app_profile") route = `/profile/${employeeCode || "me"}`;
+    else if (app.id === "app_mediclaim") route = "/mediclaim";
+    else if (app.id === "app_leave") {
+      // route = userRole === "employee" ? "/employee/leave" : (userRole === "hod" ? "/leave" : "/admin/leaves");
+      route = userRole === "admin" ? "/admin/leaves" : "/leave";
     }
 
     navigate(route);
@@ -581,7 +610,18 @@ const AppNavbar = () => {
                     )}
                   </div>
 
-                  <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+                  <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1.5">
+                    {/* <button
+                      type="button"
+                      onClick={() => {
+                        setIsDailyNoticeOpen(true);
+                        setIsDropdownOpen(false);
+                      }}
+                      className="flex w-full items-center justify-center gap-2 rounded-lg bg-amber-50/60 px-3 py-2 text-xs font-medium text-amber-800 hover:text-amber-900 transition-colors hover:bg-amber-100/80 dark:bg-amber-950/30 dark:text-amber-300 dark:hover:bg-amber-900/40"
+                    >
+                      <FiClock className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                      Office Timings & Guidelines
+                    </button> */}
                     <button
                       type="button"
                       onClick={handleChangePassword}
@@ -822,6 +862,17 @@ const AppNavbar = () => {
                   )}
 
                   <div className="mt-2 px-3 space-y-1.5">
+                    {/* <button
+                      type="button"
+                      onClick={() => {
+                        setIsDailyNoticeOpen(true);
+                        setIsMobileMenuOpen(false);
+                      }}
+                      className="flex w-full items-center justify-center gap-2 rounded-lg bg-amber-50/70 py-2 text-sm font-medium text-amber-800 hover:text-amber-900 transition-colors hover:bg-amber-100 dark:bg-amber-950/30 dark:text-amber-300"
+                    >
+                      <FiClock className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                      Office Timings & Guidelines
+                    </button> */}
                     <button
                       type="button"
                       onClick={handleChangePassword}
@@ -856,6 +907,12 @@ const AppNavbar = () => {
       <ChangePasswordModal
         isOpen={isChangePasswordOpen}
         onClose={() => setIsChangePasswordOpen(false)}
+      />
+
+      {/* Daily Attendance Guidelines Modal */}
+      <DailyAttendanceNoticeModal
+        isOpen={isDailyNoticeOpen}
+        onClose={handleCloseDailyNotice}
       />
     </nav>
   );

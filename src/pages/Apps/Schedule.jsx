@@ -17,7 +17,8 @@ import {
   LuMoonStar,
   LuUser,
   LuFilter,
-  LuSearch
+  LuSearch,
+  LuRefreshCw
 } from "react-icons/lu";
 import { FaCheckCircle } from "react-icons/fa";
 import toast from "react-hot-toast";
@@ -67,6 +68,7 @@ const Schedule = () => {
 
   // Modals
   const [showAssignModal, setShowAssignModal] = useState(false);
+  const [showRotationalModal, setShowRotationalModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -82,6 +84,20 @@ const Schedule = () => {
     end_time: "19:00",
     date: new Date().toISOString().split("T")[0],
     notes: ""
+  });
+
+  // Form State for Dynamic Rotational Week-Off Assignment
+  const [rotationalForm, setRotationalForm] = useState({
+    target_type: "individual",
+    employee_id: "",
+    rotational_off_day: "Tuesday",
+    shift_name: "General Shift",
+    start_time: "10:00",
+    end_time: "19:00",
+    start_date: new Date().toISOString().split("T")[0],
+    end_date: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().split("T")[0],
+    set_as_default: true,
+    notes: "Rotational Week Off assigned by HOD"
   });
 
   // Form State for Bulk Upload
@@ -200,21 +216,34 @@ const Schedule = () => {
   );
   if (!availableDepts.includes("Design")) availableDepts.push("Design", "Marketing", "Engineering", "HR");
 
-  // Get shift details for a specific employee & date (Sunday = 6-day working week, Sunday Off rule)
+  // Get shift details for a specific employee & date (Dynamic Rotational Week-Off mapping)
   const getEmployeeShiftForDate = (empId, dateStr) => {
+    const cleanId = (empId || "").toLowerCase().trim();
     const record = schedules.find(
-      (s) => (s.employee_id === empId || s.employee_id === empId.replace("EMP-", "")) && s.date === dateStr
+      (s) => {
+        const sId = (s.employee_id || "").toLowerCase().trim();
+        return (sId === cleanId || sId === cleanId.replace("emp-", "") || cleanId === sId.replace("emp-", "")) && s.date === dateStr;
+      }
     );
     if (record) return record;
 
-    // Check if Sunday (0 = Sun) -> 6 Days Working Week (Monday to Saturday), Sunday is Off
-    const isSunday = new Date(dateStr).getDay() === 0;
-    if (isSunday) {
+    // Check employee's dynamic weekly off (rotational week-off preference)
+    const empObj = employees.find((e) => {
+      const eCode = (e.employee_code || e.employee_id || `EMP-${e.id}` || "").toLowerCase().trim();
+      return eCode === cleanId || eCode === cleanId.replace("emp-", "") || cleanId === eCode.replace("emp-", "");
+    });
+
+    const dayNames = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+    const d = new Date(dateStr + "T12:00:00+05:30");
+    const dayOfWeek = dayNames[d.getDay()];
+    const assignedWeeklyOff = (empObj?.weekly_off || "Sunday").toLowerCase().trim();
+
+    if (dayOfWeek === assignedWeeklyOff) {
       return {
         shift_name: "Week Off",
         start_time: "—",
         end_time: "—",
-        isSundayOff: true
+        isRotationalOff: true
       };
     }
 
@@ -274,6 +303,65 @@ const Schedule = () => {
     } catch (err) {
       console.error(err);
       toast.error("An error occurred while saving schedule.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Submit Dynamic Rotational Week-Off Assignment Form (Admin, HR, HOD)
+  const handleAssignRotationalSubmit = async (e) => {
+    e.preventDefault();
+    if (!canCreateSchedule) return;
+    setSaving(true);
+    const token = localStorage.getItem("token");
+
+    const payload = {
+      employee_ids: rotationalForm.target_type === "all_dept" ? "all" : [rotationalForm.employee_id],
+      rotational_off_day: rotationalForm.rotational_off_day,
+      shift_name: rotationalForm.shift_name,
+      start_time: rotationalForm.start_time,
+      end_time: rotationalForm.end_time,
+      start_date: rotationalForm.start_date,
+      end_date: rotationalForm.end_date,
+      set_as_default: rotationalForm.set_as_default,
+      notes: rotationalForm.notes
+    };
+
+    try {
+      const res = await fetch(`${API}/schedule/assign-rotational`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(data.message || "Rotational week-off assigned successfully!");
+        setShowRotationalModal(false);
+
+        // Refresh schedules
+        const refreshRes = await fetch(`${API}/schedule?dept=${selectedDept !== "All" ? selectedDept : ""}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const refreshData = await refreshRes.json();
+        if (refreshData.success) setSchedules(refreshData.data);
+
+        // Refresh employees to reflect any updated weekly_off
+        const empRes = await fetch(`${API}/employees`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const empData = await empRes.json();
+        if (empData.data || empData.employees) {
+          setEmployees(empData.data || empData.employees || []);
+        }
+      } else {
+        toast.error(data.error || "Failed to assign rotational week-off");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("An error occurred while saving rotational schedule.");
     } finally {
       setSaving(false);
     }
@@ -454,7 +542,7 @@ const Schedule = () => {
               )}
             </div>
             <p className="text-xs text-slate-800 font-semibold m-0 mt-0.5">
-              Plan shift rosters, assign work hours (6 Days Working: Mon-Sat, Sunday Off).
+              Plan dynamic shift rosters, assign rotational week-offs & work hours instead of fixed Sunday.
             </p>
           </div>
 
@@ -528,6 +616,28 @@ const Schedule = () => {
                   title="Copy Schedule to Next Week"
                 >
                   <LuCopy className="h-3.5 w-3.5" /> Copy
+                </button>
+
+                <button
+                  onClick={() => {
+                    setRotationalForm({
+                      target_type: "individual",
+                      employee_id: filteredEmployees[0]?.employee_code || filteredEmployees[0]?.employee_id || "",
+                      rotational_off_day: "Tuesday",
+                      shift_name: "General Shift",
+                      start_time: "10:00",
+                      end_time: "19:00",
+                      start_date: currentRosterDates[0]?.dateStr || new Date().toISOString().split("T")[0],
+                      end_date: currentRosterDates[currentRosterDates.length - 1]?.dateStr || new Date().toISOString().split("T")[0],
+                      set_as_default: true,
+                      notes: "Rotational Week Off assigned by HOD"
+                    });
+                    setShowRotationalModal(true);
+                  }}
+                  className="flex items-center gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-bold px-3.5 py-2.5 rounded-xl shadow-xs transition-all"
+                  title="Assign Dynamic Shifts & Rotational Week-Off (override fixed Sunday)"
+                >
+                  <LuRefreshCw className="h-3.5 w-3.5" /> Rotational Week-Off
                 </button>
 
                 <button
@@ -608,7 +718,7 @@ const Schedule = () => {
                 </div>
               </div>
               <div className="text-[11px] font-semibold text-blue-700 mt-3">
-                Mon - Sat (Sunday Off)
+                Dynamic Shifts & Rotational Offs
               </div>
             </div>
           </Col>
@@ -643,7 +753,7 @@ const Schedule = () => {
                 <h3 className="text-base font-bold text-slate-900 m-0 flex items-center gap-2">
                   Shift Roster
                   <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
-                    6 Days Working (Sun Off)
+                    Dynamic Rotational Shifts & Week-Offs
                   </span>
                 </h3>
                 <p className="text-xs text-slate-800 font-semibold m-0 mt-0.5">
@@ -848,26 +958,33 @@ const Schedule = () => {
               </Form.Select>
             </Form.Group>
 
-            <Row className="g-3 mb-3">
-              <Col md={6}>
-                <Form.Label className="small fw-bold text-slate-700">Start Time</Form.Label>
-                <Form.Control
-                  type="time"
-                  value={shiftForm.start_time}
-                  onChange={(e) => setShiftForm({ ...shiftForm, start_time: e.target.value })}
-                  className="text-xs py-2 rounded-xl"
-                />
-              </Col>
-              <Col md={6}>
-                <Form.Label className="small fw-bold text-slate-700">End Time</Form.Label>
-                <Form.Control
-                  type="time"
-                  value={shiftForm.end_time}
-                  onChange={(e) => setShiftForm({ ...shiftForm, end_time: e.target.value })}
-                  className="text-xs py-2 rounded-xl"
-                />
-              </Col>
-            </Row>
+            {shiftForm.shift_name === "Week Off" ? (
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl mb-3 text-xs text-slate-600 font-semibold flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-slate-400"></span>
+                Designated Full Day Week-Off (No operating work hours)
+              </div>
+            ) : (
+              <Row className="g-3 mb-3">
+                <Col md={6}>
+                  <Form.Label className="small fw-bold text-slate-700">Start Time</Form.Label>
+                  <Form.Control
+                    type="time"
+                    value={shiftForm.start_time}
+                    onChange={(e) => setShiftForm({ ...shiftForm, start_time: e.target.value })}
+                    className="text-xs py-2 rounded-xl"
+                  />
+                </Col>
+                <Col md={6}>
+                  <Form.Label className="small fw-bold text-slate-700">End Time</Form.Label>
+                  <Form.Control
+                    type="time"
+                    value={shiftForm.end_time}
+                    onChange={(e) => setShiftForm({ ...shiftForm, end_time: e.target.value })}
+                    className="text-xs py-2 rounded-xl"
+                  />
+                </Col>
+              </Row>
+            )}
 
             <Form.Group className="mb-4">
               <Form.Label className="small fw-bold text-slate-700">Date</Form.Label>
@@ -886,6 +1003,192 @@ const Schedule = () => {
               </Button>
               <Button type="submit" disabled={saving} className="bg-indigo-600 text-xs font-bold rounded-xl border-0">
                 {saving ? "Saving..." : "Save Shift"}
+              </Button>
+            </div>
+          </Form>
+        </Modal.Body>
+      </Modal>
+
+      {/* ASSIGN ROTATIONAL WEEK-OFF & DYNAMIC SHIFT MODAL */}
+      <Modal show={showRotationalModal} onHide={() => setShowRotationalModal(false)} centered size="lg" className="rounded-4">
+        <Modal.Header closeButton className="border-0 pb-0">
+          <Modal.Title className="fw-bold text-slate-900 fs-5 flex items-center gap-2">
+            <LuRefreshCw className="text-blue-600" /> Dynamic Shift & Rotational Week-Off Assigning
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="pt-3">
+          <p className="text-xs text-slate-500 mb-4">
+            Assign designated rotational off days (e.g. Tuesday, Wednesday, etc.) and active shifts for your team members instead of fixed Sunday as week-off. This automatically maps to work rosters, attendance verification, and payroll.
+          </p>
+
+          <Form onSubmit={handleAssignRotationalSubmit}>
+            <Row className="g-3 mb-3">
+              {/* Target Scope */}
+              <Col md={6}>
+                <Form.Label className="small fw-bold text-slate-700">Assign To</Form.Label>
+                <div className="flex items-center gap-3 mb-2">
+                  <Form.Check
+                    type="radio"
+                    id="target-individual"
+                    name="target_type"
+                    label="Single Employee"
+                    checked={rotationalForm.target_type === "individual"}
+                    onChange={() => setRotationalForm({ ...rotationalForm, target_type: "individual" })}
+                    className="text-xs font-semibold"
+                  />
+                  <Form.Check
+                    type="radio"
+                    id="target-all"
+                    name="target_type"
+                    label={`All in ${isHod ? userDepartment : (selectedDept !== "All" ? selectedDept : "Department")}`}
+                    checked={rotationalForm.target_type === "all_dept"}
+                    onChange={() => setRotationalForm({ ...rotationalForm, target_type: "all_dept" })}
+                    className="text-xs font-semibold"
+                  />
+                </div>
+
+                {rotationalForm.target_type === "individual" && (
+                  <Form.Select
+                    value={rotationalForm.employee_id}
+                    onChange={(e) => setRotationalForm({ ...rotationalForm, employee_id: e.target.value })}
+                    required={rotationalForm.target_type === "individual"}
+                    className="text-xs py-2 rounded-xl"
+                  >
+                    <option value="">Select Employee ▾</option>
+                    {filteredEmployees.map((emp) => (
+                      <option key={emp.id} value={emp.employee_code || emp.employee_id}>
+                        {emp.name} ({emp.employee_code || emp.employee_id}) — {emp.dept || userDepartment}
+                      </option>
+                    ))}
+                  </Form.Select>
+                )}
+              </Col>
+
+              {/* Rotational Off Day Picker */}
+              <Col md={6}>
+                <Form.Label className="small fw-bold text-slate-700">Designated Rotational Week-Off Day</Form.Label>
+                <Form.Select
+                  value={rotationalForm.rotational_off_day}
+                  onChange={(e) => setRotationalForm({ ...rotationalForm, rotational_off_day: e.target.value })}
+                  className="text-xs py-2 rounded-xl font-bold text-blue-700 bg-blue-50 border-blue-200"
+                >
+                  <option value="Monday">Monday (Week Off)</option>
+                  <option value="Tuesday">Tuesday (Week Off)</option>
+                  <option value="Wednesday">Wednesday (Week Off)</option>
+                  <option value="Thursday">Thursday (Week Off)</option>
+                  <option value="Friday">Friday (Week Off)</option>
+                  <option value="Saturday">Saturday (Week Off)</option>
+                  <option value="Sunday">Sunday (Standard Off)</option>
+                </Form.Select>
+                <div className="text-[10px] text-slate-400 font-medium mt-1">
+                  On this day, employee has official week-off. On all other days (including Sunday), employee is rostered to work.
+                </div>
+              </Col>
+            </Row>
+
+            {/* Shift for Working Days */}
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 mb-3">
+              <div className="text-xs font-extrabold text-slate-800 mb-2">
+                Shift Timing for Working Days (Non-Off Days)
+              </div>
+              <Row className="g-3">
+                <Col md={4}>
+                  <Form.Label className="text-[11px] font-bold text-slate-600">Shift Name</Form.Label>
+                  <Form.Select
+                    value={rotationalForm.shift_name}
+                    onChange={(e) => {
+                      const s = SHIFT_TYPES.find((t) => t.name === e.target.value);
+                      setRotationalForm({
+                        ...rotationalForm,
+                        shift_name: e.target.value,
+                        start_time: s ? s.start : "10:00",
+                        end_time: s ? s.end : "19:00"
+                      });
+                    }}
+                    className="text-xs py-2 rounded-xl"
+                  >
+                    {SHIFT_TYPES.filter(t => t.name !== "Week Off").map((st) => (
+                      <option key={st.name} value={st.name}>
+                        {st.name} ({st.start} - {st.end})
+                      </option>
+                    ))}
+                  </Form.Select>
+                </Col>
+                <Col md={4}>
+                  <Form.Label className="text-[11px] font-bold text-slate-600">Start Time</Form.Label>
+                  <Form.Control
+                    type="time"
+                    value={rotationalForm.start_time}
+                    onChange={(e) => setRotationalForm({ ...rotationalForm, start_time: e.target.value })}
+                    className="text-xs py-2 rounded-xl"
+                  />
+                </Col>
+                <Col md={4}>
+                  <Form.Label className="text-[11px] font-bold text-slate-600">End Time</Form.Label>
+                  <Form.Control
+                    type="time"
+                    value={rotationalForm.end_time}
+                    onChange={(e) => setRotationalForm({ ...rotationalForm, end_time: e.target.value })}
+                    className="text-xs py-2 rounded-xl"
+                  />
+                </Col>
+              </Row>
+            </div>
+
+            {/* Effective Date Range */}
+            <Row className="g-3 mb-3">
+              <Col md={6}>
+                <Form.Label className="small fw-bold text-slate-700">Roster Effective From</Form.Label>
+                <Form.Control
+                  type="date"
+                  value={rotationalForm.start_date}
+                  onChange={(e) => setRotationalForm({ ...rotationalForm, start_date: e.target.value })}
+                  required
+                  className="text-xs py-2 rounded-xl"
+                />
+              </Col>
+              <Col md={6}>
+                <Form.Label className="small fw-bold text-slate-700">Roster Effective To</Form.Label>
+                <Form.Control
+                  type="date"
+                  value={rotationalForm.end_date}
+                  onChange={(e) => setRotationalForm({ ...rotationalForm, end_date: e.target.value })}
+                  required
+                  className="text-xs py-2 rounded-xl"
+                />
+              </Col>
+            </Row>
+
+            {/* Default mapping checkbox */}
+            <Form.Group className="mb-3">
+              <Form.Check
+                type="checkbox"
+                id="set-default-check"
+                label={`Set ${rotationalForm.rotational_off_day} as primary weekly off in employee profile (affects future attendance directory & payroll)`}
+                checked={rotationalForm.set_as_default}
+                onChange={(e) => setRotationalForm({ ...rotationalForm, set_as_default: e.target.checked })}
+                className="text-xs font-semibold text-slate-700"
+              />
+            </Form.Group>
+
+            {/* Notes */}
+            <Form.Group className="mb-4">
+              <Form.Label className="small fw-bold text-slate-700">Notes / Reason (Optional)</Form.Label>
+              <Form.Control
+                type="text"
+                placeholder="e.g., Q4 Rotational Shift Roster Assignment"
+                value={rotationalForm.notes}
+                onChange={(e) => setRotationalForm({ ...rotationalForm, notes: e.target.value })}
+                className="text-xs py-2 rounded-xl"
+              />
+            </Form.Group>
+
+            <div className="flex justify-end gap-2">
+              <Button variant="light" onClick={() => setShowRotationalModal(false)} className="text-xs font-semibold rounded-xl">
+                Cancel
+              </Button>
+              <Button type="submit" disabled={saving} className="bg-blue-600 hover:bg-blue-700 text-xs font-bold rounded-xl border-0">
+                {saving ? "Applying Roster..." : "Apply Rotational Shift"}
               </Button>
             </div>
           </Form>

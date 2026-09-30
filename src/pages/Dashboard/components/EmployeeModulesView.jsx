@@ -90,7 +90,7 @@ export default function EmployeeModulesView({ employee = {} }) {
       icon: <LuGraduationCap size={24} />,
       iconBg: "rgba(8, 145, 178, 0.08)",
       iconColor: "#0891b2",
-      onClick: () => navigate("/onboarding"),
+      onClick: () => navigate("/policies"),
     },
     {
       id: 8,

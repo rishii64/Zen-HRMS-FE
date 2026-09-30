@@ -51,7 +51,7 @@ const navItems = [
     iconBg: "rgba(234, 88, 12, 0.08)",
     iconColor: "#ea580c",
     accentColor: "#f59e0b",
-    route: "/onboarding",
+    route: "/interview",
     pills: [
       { label: "3 active", bg: "#fef9c3", color: "#854d0e" },
       { label: "Next: Mon", bg: "#e0e7ff", color: "#3730a3" },

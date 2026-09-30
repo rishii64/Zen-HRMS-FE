@@ -67,7 +67,7 @@ export default function UnifiedLogin() {
             toast.error("Invalid role");
             navigate("/");
           }
-        }, 1000);
+        }, 100);
       } else {
         toast.error(data.error || "Login failed. Please check your credentials.");
         // setError(data.error || "Login failed. Please check your credentials.");

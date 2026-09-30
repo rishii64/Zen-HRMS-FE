@@ -71,6 +71,8 @@ const STATUS_BADGES = {
   Late: { bg: "#fffbeb", color: "#f59e0b", border: "#fde68a", label: "Late" },
   Absent: { bg: "#fef2f2", color: "#ef4444", border: "#fecaca", label: "Absent" },
   Leave: { bg: "#f5f3ff", color: "#8b5cf6", border: "#ddd6fe", label: "Leave" },
+  "Week Off": { bg: "#f8fafc", color: "#64748b", border: "#cbd5e1", label: "Week Off" },
+  Scheduled: { bg: "#f0fdf4", color: "#15803d", border: "#bbf7d0", label: "Scheduled" },
   WFH: { bg: "#eff6ff", color: "#3b82f6", border: "#bfdbfe", label: "WFH" },
   "Work from home": { bg: "#eff6ff", color: "#3b82f6", border: "#bfdbfe", label: "WFH" },
   Holiday: { bg: "#f0f9ff", color: "#0ea5e9", border: "#bae6fd", label: "Holiday" },
@@ -199,6 +201,9 @@ const MyAttendance = () => {
     setLoading(true);
     try {
       let url = `${API}/attendance?range=${selectedRange}&date=${selectedDateStr}`;
+      if (fromDate && toDate) {
+        url = `${API}/attendance?from=${fromDate}&to=${toDate}`;
+      }
       if (selectedDept !== "All") {
         url += `&dept=${selectedDept}`;
       }
@@ -222,7 +227,7 @@ const MyAttendance = () => {
 
   useEffect(() => {
     fetchAttendanceList();
-  }, [selectedDateStr, selectedRange, selectedDept]);
+  }, [selectedDateStr, selectedRange, selectedDept, fromDate, toDate]);
 
   // Fetch full month attendance for KPI metrics
   const fetchMonthlyRecords = async () => {
@@ -376,6 +381,7 @@ const MyAttendance = () => {
       if (selectedStatus === "Present" && r.status !== "Present" && r.status !== "On Time") return false;
       if (selectedStatus === "Late" && r.status !== "Late Present" && r.status !== "Late") return false;
       if (selectedStatus === "Absent" && r.status !== "Absent") return false;
+      if (selectedStatus === "Week Off" && r.status !== "Week Off") return false;
       if (selectedStatus === "Leave" && r.status !== "Leave") return false;
       if (selectedStatus === "WFH" && r.status !== "WFH" && r.status !== "Work from home") return false;
     }
@@ -395,20 +401,7 @@ const MyAttendance = () => {
     return true;
   });
 
-  // 1. Total Working Days Month-Wise (Current Month Leaving Sundays)
-  const daysInCurrentMonth = new Date(currentYear, currentMonth, 0).getDate();
-  let totalWorkingDaysMonth = 0;
-  let monthSundaysCount = 0;
-  for (let d = 1; d <= daysInCurrentMonth; d++) {
-    const dayDate = new Date(currentYear, currentMonth - 1, d);
-    if (dayDate.getDay() === 0) {
-      monthSundaysCount++;
-    } else {
-      totalWorkingDaysMonth++;
-    }
-  }
-
-  // 2. Target Employee Resolution for Personal/Employee KPI Widgets
+  // 1. Target Employee Resolution for Personal/Employee KPI Widgets
   const effectiveEmpId = (
     selectedKpiEmpId ||
     (isEmployeeOnly ? userEmpId : (employees.some((e) => (e.employee_code || e.employee_id) === userEmpId) ? userEmpId : (employees[0]?.employee_code || employees[0]?.employee_id || userEmpId)))
@@ -426,6 +419,22 @@ const MyAttendance = () => {
 
   const displayTargetName = targetEmpObj?.name || (effectiveEmpId === userEmpId ? userName : (effectiveEmpId || "Employee"));
   const displayTargetCode = targetEmpObj?.employee_code || targetEmpObj?.employee_id || effectiveEmpId || userEmpId;
+
+  // 2. Total Working Days Month-Wise (Current Month Leaving Rotational Week-Offs)
+  const daysInCurrentMonth = new Date(currentYear, currentMonth, 0).getDate();
+  const dayNamesList = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+  const targetWeeklyOffDay = (targetEmpObj?.weekly_off || "Sunday").toLowerCase().trim();
+  let totalWorkingDaysMonth = 0;
+  let monthWeekOffsCount = 0;
+  for (let d = 1; d <= daysInCurrentMonth; d++) {
+    const dayDate = new Date(currentYear, currentMonth - 1, d);
+    const dayName = dayNamesList[dayDate.getDay()];
+    if (dayName === targetWeeklyOffDay) {
+      monthWeekOffsCount++;
+    } else {
+      totalWorkingDaysMonth++;
+    }
+  }
 
   // 3. Reporting Manager Resolution
   const rawReportingManager = 
@@ -728,13 +737,13 @@ const MyAttendance = () => {
                 </div>
               </div>
 
-              <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between text-[11px]">
+              <div className="pt-3 mt-3 border-t border-slate-200 flex items-center justify-between text-[11px]">
                 <span className="font-semibold text-slate-600 flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
                   {currentDateObj.toLocaleDateString("en-US", { month: "short" })}: {daysInCurrentMonth} Total Days
                 </span>
                 <span className="font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
-                  Excl. {monthSundaysCount} Sundays
+                  Excl. {monthWeekOffsCount} Week-Offs
                 </span>
               </div>
             </div>
@@ -769,7 +778,7 @@ const MyAttendance = () => {
                 </div>
               </div>
 
-              <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between text-[11px]">
+              <div className="pt-3 mt-3 border-t border-slate-200 flex items-center justify-between text-[11px]">
                 <span className="font-bold text-emerald-700 flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                   {Math.round((monthlyPresentDays / (totalWorkingDaysMonth || 1)) * 100)}% Monthly Rate
@@ -810,7 +819,7 @@ const MyAttendance = () => {
                 </div>
               </div>
 
-              <div className="pt-3 mt-3 border-t border-slate-300 flex items-center justify-between text-[11px]">
+              <div className="pt-3 mt-3 border-t border-slate-200 flex items-center justify-between text-[11px]">
                 <span className="font-bold text-amber-700 flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
                   {monthlyApprovedLeaves} Leave{monthlyApprovedLeaves === 1 ? "" : "s"} Taken
@@ -856,7 +865,7 @@ const MyAttendance = () => {
                 </div>
               </div>
 
-              <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between text-[11px]">
+              <div className="pt-3 mt-3 border-t border-slate-200 flex items-center justify-between text-[11px]">
                 <span className="font-semibold text-purple-700 truncate max-w-[170px]" title={managerSubtitle}>
                   {managerSubtitle}
                 </span>
@@ -923,7 +932,13 @@ const MyAttendance = () => {
             <span className="text-xs font-bold text-slate-500">Range:</span>
             <select
               value={selectedRange}
-              onChange={(e) => setSelectedRange(e.target.value)}
+              onChange={(e) => {
+                setSelectedRange(e.target.value);
+                if (fromDate || toDate) {
+                  setFromDate("");
+                  setToDate("");
+                }
+              }}
               className="text-xs font-extrabold bg-transparent text-slate-800 focus:outline-none cursor-pointer"
             >
               <option value="day">Single Day</option>
@@ -946,6 +961,7 @@ const MyAttendance = () => {
               <option value="Present">Present</option>
               <option value="Late">Late</option>
               <option value="Absent">Absent</option>
+              <option value="Week Off">Week Off</option>
               <option value="Leave">Leave</option>
               <option value="WFH">WFH</option>
             </select>
@@ -1098,27 +1114,53 @@ const MyAttendance = () => {
                       </td>
 
                       {/* Check-In */}
-                      <td className="text-xs font-bold text-emerald-600">{r.check_in || "—"}</td>
+                      <td className="text-xs font-bold text-emerald-600">
+                        {r.check_in ? r.check_in : <span className="text-slate-400 font-semibold">—</span>}
+                      </td>
 
                       {/* Check-Out */}
-                      <td className="text-xs font-bold text-slate-700">{r.check_out || "—"}</td>
+                      <td className="text-xs font-bold text-slate-700">
+                        {r.check_out ? r.check_out : <span className="text-slate-400 font-semibold">—</span>}
+                      </td>
 
-                      {/* Working Hours Timeline Format (10:02 AM • —— 8h 58m —— • 07:00 PM) */}
+                      {/* Working Hours Timeline Format */}
                       <td>
-                        <div className="timeline-bar">
-                          <span>{r.check_in || "10:00 AM"}</span>
-                          <div className="timeline-line flex items-center justify-center">
-                            <span className="bg-white px-1.5 text-[9px] font-extrabold text-slate-500">
-                              {r.work_hours ? `${r.work_hours}h` : "8h 00m"}
-                            </span>
+                        {r.status === "Absent" ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                            <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                            Absent (No Check-In)
+                          </span>
+                        ) : r.status === "Week Off" ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                            Rotational Week Off
+                          </span>
+                        ) : r.status === "Scheduled" ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                            Upcoming Scheduled Shift
+                          </span>
+                        ) : r.status === "Leave" ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                            <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
+                            Approved Leave
+                          </span>
+                        ) : (
+                          <div className="timeline-bar">
+                            <span>{r.check_in || "10:00 AM"}</span>
+                            <div className="timeline-line flex items-center justify-center">
+                              <span className="bg-white px-1.5 text-[9px] font-extrabold text-slate-500">
+                                {r.work_hours ? `${r.work_hours}h` : "8h 00m"}
+                              </span>
+                            </div>
+                            <span>{r.check_out || "07:00 PM"}</span>
                           </div>
-                          <span>{r.check_out || "07:00 PM"}</span>
-                        </div>
+                        )}
                       </td>
 
                       {/* Overtime */}
                       <td className="text-xs font-semibold text-slate-600">
-                        {r.work_hours > 9 ? `${(r.work_hours - 9).toFixed(1)}h` : "—"}
+                        {r.work_hours && parseFloat(r.work_hours) > 9 ? `${(parseFloat(r.work_hours) - 9).toFixed(1)}h` : "—"}
                       </td>
 
                       {/* Status Badge */}
@@ -1163,14 +1205,14 @@ const MyAttendance = () => {
                           <button
                             onClick={() => {
                               setMarkForm({
-                                id: r.id || null,
+                                id: typeof r.id === "number" ? r.id : null,
                                 employee_id: r.employee_id,
                                 name: r.name,
                                 dept: r.dept,
                                 date: r.date || selectedDateStr,
                                 check_in: r.check_in || "10:00",
                                 check_out: r.check_out || "19:00",
-                                status: r.status || "Present",
+                                status: r.status === "Absent" || r.status === "Week Off" ? "Present" : (r.status || "Present"),
                                 notes: r.notes || ""
                               });
                               setShowMarkModal(true);

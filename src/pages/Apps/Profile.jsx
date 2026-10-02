@@ -1086,7 +1086,7 @@ export default function Profile() {
                 Track previous career background and monitor organization tenure.
               </span>
             </div>
-            <div className="d-flex align-items-center gap-2">
+            <div className="d-flex align-items-center gap-2 flex-wrap">
               <span className="small text-muted fw-semibold">Total Career Experience:</span>
               <Badge bg="primary" className="px-3 py-2 fs-6 rounded-pill shadow-xs">
                 ✨ {totalExperience}
@@ -1105,7 +1105,7 @@ export default function Profile() {
                   Add previous companies, designations, service duration, and reporting manager details.
                 </small>
               </div>
-              <div className="d-flex align-items-center gap-2">
+              <div className="d-flex align-items-center gap-2 flex-wrap sm:justify-center">
                 <Badge bg="info-subtle" className="text-info-emphasis border border-info-subtle px-2.5 py-1.5 fw-semibold">
                   Recognized Previous Tenure: {computedPreviousExperienceText}
                 </Badge>
@@ -1113,7 +1113,7 @@ export default function Profile() {
                   variant="outline-primary"
                   size="sm"
                   onClick={handleAddPreviousExp}
-                  className="rounded-pill px-3 py-1 shadow-xs fw-semibold"
+                  className="rounded-pill px-3 py-1 shadow-xs fw-semibold d-flex align-items-center gap-1 !text-xs"
                 >
                   <FaPlus className="me-1" size={11} /> Add Previous Company
                 </Button>
@@ -1148,7 +1148,7 @@ export default function Profile() {
                         variant="outline-danger"
                         size="sm"
                         onClick={() => handleRemovePreviousExp(idx)}
-                        className="py-0 px-2 text-xs"
+                        className="py-1 px-2 !text-xs d-flex align-items-center gap-1"
                       >
                         <FaTrash className="me-1" size={11} /> Remove
                       </Button>
@@ -1246,7 +1246,7 @@ export default function Profile() {
                 }}
               >
                 <div>
-                  <div className="d-flex justify-content-between align-items-center mb-2">
+                  <div className="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
                     <h6 className="fw-bold text-dark mb-0 d-flex align-items-center gap-2">
                       <FaBuilding className={isResigned ? "text-danger" : "text-primary"} /> Current Company Tenure
                     </h6>
@@ -1289,11 +1289,11 @@ export default function Profile() {
                 </div>
 
                 <div className="pt-2 border-top d-flex flex-wrap justify-content-between gap-1 small text-muted">
-                  <div>
+                  <div className="d-flex align-items-center gap-1">
                     <FaCalendarAlt className="me-1 text-secondary" />
                     <strong>Joined:</strong> {formatDate(empData?.joining_date)}
                   </div>
-                  <div>
+                  <div className="d-flex align-items-center gap-1">
                     <FaClock className="me-1 text-secondary" />
                     <strong>{isResigned ? "Relieved / Exit:" : "Counted To:"}</strong>{" "}
                     {isResigned ? formatDate(exitDate) : "Today (Present)"}
@@ -1339,11 +1339,11 @@ export default function Profile() {
 
         {/* Section 3: Educational Qualifications */}
         <Card className="p-4 shadow-sm border-0 mb-4 rounded-4">
-          <div className="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+          <div className="d-flex flex-wrap justify-content-between align-items-center border-bottom pb-2 mb-3 gap-3">
             <Card.Title className="fw-bold text-primary mb-0 d-flex align-items-center gap-2">
               <FaGraduationCap className="text-primary" /> Educational Qualifications
             </Card.Title>
-            <Button variant="primary" size="sm" onClick={handleAddEducation} className="rounded-pill px-3 shadow-xs">
+            <Button variant="primary" size="sm" onClick={handleAddEducation} className="rounded-pill px-3 shadow-xs !text-xs">
               + Add Qualification
             </Button>
           </div>
@@ -1438,11 +1438,11 @@ export default function Profile() {
 
         {/* Section 4: Certifications & Professional Training */}
         <Card className="p-4 shadow-sm border-0 mb-4 rounded-4">
-          <div className="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+          <div className="d-flex justify-content-between flex-wrap align-items-center border-bottom pb-2 mb-3 gap-3">
             <Card.Title className="fw-bold text-primary mb-0 d-flex align-items-center gap-2">
               <FaCertificate className="text-primary" /> Certifications & Professional Training
             </Card.Title>
-            <Button variant="outline-primary" size="sm" onClick={handleAddCertification} className="rounded-pill px-3 shadow-xs">
+            <Button variant="outline-primary" size="sm" onClick={handleAddCertification} className="rounded-pill px-3 shadow-xs !text-xs">
               + Add Certification
             </Button>
           </div>
@@ -1653,15 +1653,15 @@ export default function Profile() {
 
           {/* Children Details */}
           <div className="pt-3 border-top">
-            <div className="d-flex justify-content-between align-items-center mb-3">
+            <div className="d-flex justify-content-between flex-wrap align-items-center mb-3 gap-3">
               <h6 className="fw-bold text-secondary mb-0">👶 Children Details (Optional)</h6>
-              <Button variant="outline-secondary" size="sm" onClick={handleAddChild} className="rounded-pill px-3">
+              <Button variant="outline-secondary" size="sm" onClick={handleAddChild} className="rounded-pill px-3 !text-xs">
                 + Add Child
               </Button>
             </div>
 
             {childrenList.length === 0 ? (
-              <p className="text-muted small mb-0">No children details added.</p>
+              <p className="text-muted small mb-0 text-center">No children details added.</p>
             ) : (
               <Table responsive borderless size="sm" className="align-middle">
                 <thead>
@@ -1919,12 +1919,12 @@ export default function Profile() {
             {/* Last Company Details & Documents */}
             <Col md={12}>
               <div className="p-3 border rounded-3 shadow-xs bg-light">
-                <div className="d-flex justify-content-between align-items-center mb-2">
-                  <Form.Label className="small fw-bold mb-0 text-dark d-flex align-items-center gap-1">
+                <div className="d-flex justify-content-between align-items-center mb-2 flex-wrap">
+                  <Form.Label className="small fw-bold mb-0 text-dark d-flex align-items-center flex-wrap gap-1">
                     🏢 Last Company Details & Separation Documents
                     <Badge bg="primary" style={{ fontSize: "10px" }}>Previous Employer</Badge>
                   </Form.Label>
-                  <Badge bg="light" text="dark" className="border small">
+                  <Badge bg="light" text="dark" className="border small mt-2">
                     Multiple Uploads Allowed
                   </Badge>
                 </div>
@@ -2017,9 +2017,9 @@ export default function Profile() {
                     <Form.Label className="small fw-bold text-dark mb-0 d-flex align-items-center gap-1">
                       💵 Last 3 Months Salary Slips
                     </Form.Label>
-                    <Badge bg="success-subtle" className="text-success border border-success-subtle" style={{ fontSize: "10px" }}>
+                    {/* <Badge bg="success-subtle" className="text-success border border-success-subtle" style={{ fontSize: "10px" }}>
                       Multiple Files
-                    </Badge>
+                    </Badge> */}
                   </div>
                   <small className="text-muted d-block mb-2">
                     Upload consecutive payslips from your most recent employer (PDF or images).
@@ -2097,9 +2097,9 @@ export default function Profile() {
                     <Form.Label className="small fw-bold text-dark mb-0 d-flex align-items-center gap-1">
                       📜 Experience Certificate(s)
                     </Form.Label>
-                    <Badge bg="info-subtle" className="text-info border border-info-subtle" style={{ fontSize: "10px" }}>
+                    {/* <Badge bg="info-subtle" className="text-info border border-info-subtle" style={{ fontSize: "10px" }}>
                       Multiple Files
-                    </Badge>
+                    </Badge> */}
                   </div>
                   <small className="text-muted d-block mb-2">
                     Upload official experience letters, service letters, or certificates from prior companies.
@@ -2172,7 +2172,7 @@ export default function Profile() {
             {/* PAN Card Upload */}
             <Col md={6}>
               <div className="p-3 border rounded-3 shadow-xs bg-light">
-                <div className="d-flex justify-content-between align-items-center mb-1">
+                <div className="d-flex justify-content-between align-items-center flex-wrap gap-1 mb-2">
                   <Form.Label className="small fw-bold d-block text-dark mb-0">
                     💳 PAN Card Proof (PDF / Image)
                   </Form.Label>
@@ -2260,7 +2260,7 @@ export default function Profile() {
                       rel="noopener noreferrer"
                       className="text-white text-decoration-none"
                     >
-                      📄 Download/View Current CV <FaExternalLinkAlt size={10} className="ms-1" />
+                      📄 Download/View Current CV
                     </a>
                   </Badge>
                 )}
@@ -2288,7 +2288,7 @@ export default function Profile() {
                       rel="noopener noreferrer"
                       className="text-white text-decoration-none"
                     >
-                      🛂 Download/View Current ID <FaExternalLinkAlt size={10} className="ms-1" />
+                      🛂 Download/View Current ID
                     </a>
                   </Badge>
                 )}
@@ -2316,7 +2316,7 @@ export default function Profile() {
                       rel="noopener noreferrer"
                       className="text-white text-decoration-none"
                     >
-                      🎓 Download/View Certificates <FaExternalLinkAlt size={10} className="ms-1" />
+                      🎓 Download/View Certificates
                     </a>
                   </Badge>
                 )}
@@ -2326,7 +2326,7 @@ export default function Profile() {
         </Card>
 
         {/* Action Button */}
-        <div className="text-end mb-5">
+        <div className="text-center mb-5">
           <Button variant="success" size="lg" type="submit" disabled={saving} className="px-5 fw-bold rounded-pill shadow">
             {saving ? (
               <>

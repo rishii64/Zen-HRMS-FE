@@ -86,6 +86,7 @@ const EMPTY_FORM = {
   request_documents: true,
   job_role: "employee",
   status: "Active",
+  employment_type: "Permanent",
   current_salary: "",
   salary_type: "Monthly (In Hand)",
   reporting_manager: "",
@@ -126,6 +127,14 @@ const SalaryStructureModal = ({
     mediclaim: 0,
     tds: 0,
     lop: 0,
+    employment_type: "Permanent",
+    advance_amount: 0,
+    advance_deduction: 0,
+    loan_amount: 0,
+    loan_emi: 0,
+    insurance_deduction: 0,
+    gratuity_accrual: 0,
+    total_gratuity: 0,
   });
 
   const [loading, setLoading] = useState(false);
@@ -158,6 +167,13 @@ const SalaryStructureModal = ({
             const basicVal = parseFloat(e.basic) || 0;
             const esiVal = parseFloat(d.esi) || 0;
             const mediVal = parseFloat(d.mediclaim) || 0;
+            const grossVal = res.salary.gross_salary != null
+              ? parseFloat(res.salary.gross_salary)
+              : (basicVal + (parseFloat(e.hra) || 0) + (parseFloat(e.allowance) || 0) + (parseFloat(e.conveyance) || 0) + (parseFloat(e.medical) || 0));
+            const isEsi = grossVal <= 21000;
+            const empType = res.salary.employment_type || "Permanent";
+            const isPerm = res.salary.is_permanent ?? (empType.toLowerCase() === "permanent");
+
             const loaded = {
               basic: basicVal,
               hra: parseFloat(e.hra) || 0,
@@ -167,10 +183,18 @@ const SalaryStructureModal = ({
               professional_tax: parseFloat(d.professional_tax) || 0,
               income_tax: parseFloat(d.income_tax) || 0,
               pf: parseFloat(d.pf) || 0,
-              esi: basicVal <= 15000 ? (esiVal || mediVal) : 0,
-              mediclaim: basicVal > 15000 ? (mediVal || esiVal) : 0,
+              esi: isEsi ? (esiVal || mediVal) : 0,
+              mediclaim: !isEsi ? (mediVal || esiVal) : 0,
               tds: parseFloat(d.tds) || 0,
               lop: parseFloat(d.lop) || 0,
+              employment_type: empType,
+              advance_amount: isPerm ? (parseFloat(res.salary.advance_amount) || 0) : 0,
+              advance_deduction: isPerm ? (parseFloat(res.salary.advance_deduction) || 0) : 0,
+              loan_amount: isPerm ? (parseFloat(res.salary.loan_amount) || 0) : 0,
+              loan_emi: isPerm ? (parseFloat(res.salary.loan_emi) || 0) : 0,
+              insurance_deduction: isPerm ? (parseFloat(res.salary.insurance_deduction) || 0) : 0,
+              gratuity_accrual: isPerm ? (parseFloat(res.salary.gratuity_accrual) || 0) : 0,
+              total_gratuity: isPerm ? (parseFloat(res.salary.total_gratuity) || 0) : 0,
             };
             setFormData(loaded);
             setQuickGross(res.salary.gross_salary || "");
@@ -187,15 +211,41 @@ const SalaryStructureModal = ({
   }, [show, employeeCode, role]);
 
   const handleChange = (field, val) => {
+    if (field === "employment_type") {
+      const isNowPerm = (val || "").toLowerCase() === "permanent";
+      setFormData((prev) => ({
+        ...prev,
+        employment_type: val,
+        ...(!isNowPerm
+          ? {
+              advance_amount: 0,
+              advance_deduction: 0,
+              loan_amount: 0,
+              loan_emi: 0,
+              insurance_deduction: 0,
+              gratuity_accrual: 0,
+              total_gratuity: 0,
+            }
+          : {}),
+      }));
+      return;
+    }
+
     const num = val === "" ? "" : Math.max(0, parseFloat(val) || 0);
     setFormData((prev) => {
       const next = { ...prev, [field]: num };
-      if (field === "basic") {
-        const newBasic = parseFloat(num) || 0;
-        if (newBasic > 15000 && prev.esi > 0 && !prev.mediclaim) {
+      const earningFields = ["basic", "hra", "allowance", "conveyance", "medical"];
+      if (earningFields.includes(field)) {
+        const curGross =
+          (parseFloat(next.basic) || 0) +
+          (parseFloat(next.hra) || 0) +
+          (parseFloat(next.allowance) || 0) +
+          (parseFloat(next.conveyance) || 0) +
+          (parseFloat(next.medical) || 0);
+        if (curGross > 21000 && prev.esi > 0 && !prev.mediclaim) {
           next.mediclaim = prev.esi;
           next.esi = 0;
-        } else if (newBasic <= 15000 && prev.mediclaim > 0 && !prev.esi) {
+        } else if (curGross <= 21000 && prev.mediclaim > 0 && !prev.esi) {
           next.esi = prev.mediclaim;
           next.mediclaim = 0;
         }
@@ -217,14 +267,20 @@ const SalaryStructureModal = ({
   const numPT = parseFloat(formData.professional_tax) || 0;
   const numIT = parseFloat(formData.income_tax) || 0;
   const numPf = parseFloat(formData.pf) || 0;
-  const isEsiEligible = numBasic <= 15000;
+  const isEsiEligible = grossSalary <= 21000;
   const numEsi = isEsiEligible ? (parseFloat(formData.esi) || 0) : 0;
   const numMediclaim = !isEsiEligible ? (parseFloat(formData.mediclaim) || 0) : 0;
   const numTds = parseFloat(formData.tds) || 0;
   const numLop = parseFloat(formData.lop) || 0;
 
+  const isPermanent = (formData.employment_type || "Permanent").toLowerCase() === "permanent";
+  const numAdvDed = isPermanent ? (parseFloat(formData.advance_deduction) || 0) : 0;
+  const numLoanEmi = isPermanent ? (parseFloat(formData.loan_emi) || 0) : 0;
+  const numInsurance = isPermanent ? (parseFloat(formData.insurance_deduction) || 0) : 0;
+  const gratuityMonthlyAccrual = isPermanent ? Math.round((numBasic * 15) / (26 * 12)) : 0;
+
   const totalDeductions =
-    numPT + numIT + numPf + (isEsiEligible ? numEsi : numMediclaim) + numTds + numLop;
+    numPT + numIT + numPf + (isEsiEligible ? numEsi : numMediclaim) + numTds + numLop + numAdvDed + numLoanEmi + numInsurance;
   const netSalary = Math.max(0, grossSalary - totalDeductions);
 
   // Quick auto-distribution formula for HR
@@ -240,12 +296,13 @@ const SalaryStructureModal = ({
     const allowance = Math.max(0, gross - assigned);
 
     const pf = Math.round(basic * 0.12);
-    const isEligible = basic <= 15000;
+    const isEligible = gross <= 21000;
     const esi = isEligible ? Math.round(gross * 0.0075) : 0;
     const mediclaim = !isEligible ? (gross > 25000 ? 750 : 500) : 0;
     const pt = gross > 15000 ? 200 : 0;
 
-    setFormData({
+    setFormData((prev) => ({
+      ...prev,
       basic,
       hra,
       allowance,
@@ -258,12 +315,25 @@ const SalaryStructureModal = ({
       mediclaim,
       tds: 0,
       lop: 0,
-    });
+    }));
   };
 
   const handleSave = async () => {
     if (!isHRUser) {
       toast.error("Access denied: Only HR can edit the salary structure.");
+      return;
+    }
+
+    const isPerm = (formData.employment_type || "Permanent").toLowerCase() === "permanent";
+    const advAmount = isPerm ? (parseFloat(formData.advance_amount) || 0) : 0;
+    const loanAmount = isPerm ? (parseFloat(formData.loan_amount) || 0) : 0;
+
+    if (isPerm && advAmount > 100000) {
+      setError("Advance Payment limit exceeded: Maximum allowed is ₹1,00,000 (1 Lakh).");
+      return;
+    }
+    if (isPerm && loanAmount > 0 && (loanAmount < 100000 || loanAmount > 1000000)) {
+      setError("Company Loan amount must be between ₹1,00,000 and ₹10,00,000 (1 to 10 Lakhs).");
       return;
     }
 
@@ -292,6 +362,12 @@ const SalaryStructureModal = ({
           mediclaim: !isEsiEligible ? numMediclaim : 0,
           tds: numTds,
           lop: numLop,
+          employment_type: formData.employment_type || "Permanent",
+          advance_amount: advAmount,
+          advance_deduction: isPerm ? (parseFloat(formData.advance_deduction) || 0) : 0,
+          loan_amount: loanAmount,
+          loan_emi: isPerm ? (parseFloat(formData.loan_emi) || 0) : 0,
+          insurance_deduction: isPerm ? (parseFloat(formData.insurance_deduction) || 0) : 0,
         }),
       });
 
@@ -301,7 +377,7 @@ const SalaryStructureModal = ({
         if (onSalaryUpdated) {
           onSalaryUpdated(data.current_salary || grossSalary);
         }
-        setTimeout(() => setSuccessMsg(null), 3000);
+        setTimeout(() => { setSuccessMsg(null); onHide(); }, 1500);
       } else {
         setError(data.error || "Failed to update salary structure");
       }
@@ -357,9 +433,37 @@ const SalaryStructureModal = ({
               Employee ID: <strong className="text-primary">{employeeCode}</strong> • Effective: {month}
             </small>
           </div>
-          <div className="text-end mt-2 mt-sm-0">
+          <div className="d-flex align-items-center gap-2 mt-2 mt-sm-0">
+            {isHRUser ? (
+              <div className="d-flex align-items-center gap-1.5">
+                <span className="small fw-semibold text-muted">Employment:</span>
+                <Form.Select
+                  size="sm"
+                  style={{ width: "140px", fontWeight: "600" }}
+                  value={formData.employment_type || "Permanent"}
+                  onChange={(e) => handleChange("employment_type", e.target.value)}
+                >
+                  <option value="Permanent">Permanent</option>
+                  <option value="Probation">Probation</option>
+                  <option value="Intern">Intern</option>
+                </Form.Select>
+              </div>
+            ) : (
+              <Badge
+                bg={
+                  formData.employment_type === "Permanent"
+                    ? "success"
+                    : formData.employment_type === "Probation"
+                    ? "warning"
+                    : "secondary"
+                }
+                className="px-2.5 py-1.5"
+              >
+                {formData.employment_type || "Permanent"}
+              </Badge>
+            )}
             <span className="badge bg-light text-dark border px-2 py-1">
-              {isHRUser ? "HR has full edit rights" : "View-only access"}
+              {isHRUser ? "HR Full Rights" : "View-only"}
             </span>
           </div>
         </div>
@@ -644,13 +748,13 @@ const SalaryStructureModal = ({
                         )}
                       </div>
 
-                      {/* Conditional ESI (Basic <= 15000) or Mediclaim (Basic > 15000) */}
+                      {/* Conditional ESI (Total Salary <= 21000) or Mediclaim (Total Salary > 21000) */}
                       {isEsiEligible ? (
                         <div>
                           <div className="d-flex justify-content-between align-items-center">
                             <Form.Label className="small fw-semibold mb-1">Employee State Insurance (ESI)</Form.Label>
                             <Badge bg="info" className="fw-normal" style={{ fontSize: "9.5px" }}>
-                              Basic ≤ ₹15,000
+                              Total Salary ≤ ₹21,000
                             </Badge>
                           </div>
                           {isHRUser ? (
@@ -669,7 +773,7 @@ const SalaryStructureModal = ({
                             <div className="fw-bold text-end p-1 border-bottom">{fmt(formData.esi)}</div>
                           )}
                           <small className="text-muted d-block mt-0.5" style={{ fontSize: "10px" }}>
-                            State insurance scheme for basic pay ₹15,000 or less
+                            State insurance scheme for total salary ₹21,000 or less
                           </small>
                         </div>
                       ) : (
@@ -677,7 +781,7 @@ const SalaryStructureModal = ({
                           <div className="d-flex justify-content-between align-items-center">
                             <Form.Label className="small fw-semibold mb-1">Mediclaim</Form.Label>
                             <Badge bg="primary" className="fw-normal" style={{ fontSize: "9.5px" }}>
-                              Basic &gt; ₹15,000
+                              Total Salary &gt; ₹21,000
                             </Badge>
                           </div>
                           {isHRUser ? (
@@ -696,7 +800,7 @@ const SalaryStructureModal = ({
                             <div className="fw-bold text-end p-1 border-bottom">{fmt(formData.mediclaim)}</div>
                           )}
                           <small className="text-muted d-block mt-0.5" style={{ fontSize: "10px" }}>
-                            Corporate health mediclaim policy deduction for basic pay above ₹15,000
+                            Corporate health mediclaim policy deduction for total salary above ₹21,000
                           </small>
                         </div>
                       )}
@@ -754,6 +858,196 @@ const SalaryStructureModal = ({
                 </Card>
               </Col>
             </Row>
+
+            {/* 3. Permanent Employee Facilities & Adjustments */}
+            <Card className="shadow-sm border-0 mt-3">
+              <Card.Header
+                className="py-2 px-3 fw-bold small d-flex justify-content-between align-items-center"
+                style={{
+                  background: isPermanent ? "#1e3c72" : "#475569",
+                  color: "#ffffff",
+                }}
+              >
+                <div className="d-flex align-items-center gap-2">
+                  <span>🏦 3. Facilities & Statutory Benefits</span>
+                  <Badge
+                    bg={isPermanent ? "success" : "warning"}
+                    className="fw-normal"
+                    style={{ fontSize: "10px" }}
+                  >
+                    {isPermanent ? "Permanent Staff Only" : "Locked for " + (formData.employment_type || "Probation")}
+                  </Badge>
+                </div>
+                <small className="opacity-90">
+                  {isPermanent ? "Advance (≤ ₹1L) • Loan (₹1L-₹10L) • Insurance • Gratuity" : "Not Eligible"}
+                </small>
+              </Card.Header>
+              <Card.Body className="p-3">
+                {!isPermanent ? (
+                  <Alert variant="warning" className="mb-0 d-flex align-items-center gap-2 small">
+                    <span className="fs-5">⚠️</span>
+                    <div>
+                      <strong>Facilities Policy Notice:</strong> Advance Payment (up to ₹1 Lakh), Company Loan (₹1 to 10 Lakhs), Corporate Group Insurance, and Gratuity calculations are strictly reserved for <strong>Permanent Employees</strong> only. This employee is categorized as <strong>{formData.employment_type || "Probation / Intern"}</strong> and cannot avail these benefits.
+                    </div>
+                  </Alert>
+                ) : (
+                  <Row className="g-3">
+                    {/* Advance Payment */}
+                    <Col xs={12} md={6}>
+                      <div className="p-3 rounded border bg-light h-100">
+                        <div className="d-flex justify-content-between align-items-center mb-1">
+                          <strong className="small text-primary">Advance Payment (Up to ₹1,00,000)</strong>
+                          <Badge bg="info" style={{ fontSize: "9px" }}>Max ₹1 Lakh</Badge>
+                        </div>
+                        <div className="text-muted small mb-2" style={{ fontSize: "11px" }}>
+                          Salary advance granted to permanent staff.
+                        </div>
+                        <Row className="g-2">
+                          <Col xs={6}>
+                            <Form.Label className="small mb-1 text-muted" style={{ fontSize: "11px" }}>Principal Advance</Form.Label>
+                            {isHRUser ? (
+                              <InputGroup size="sm">
+                                <InputGroup.Text>₹</InputGroup.Text>
+                                <Form.Control
+                                  type="number"
+                                  min="0"
+                                  max="100000"
+                                  placeholder="Max 1,00,000"
+                                  value={formData.advance_amount === 0 ? 0 : (formData.advance_amount || "")}
+                                  onChange={(e) => handleChange("advance_amount", e.target.value)}
+                                />
+                              </InputGroup>
+                            ) : (
+                              <div className="fw-semibold">{fmt(formData.advance_amount)}</div>
+                            )}
+                          </Col>
+                          <Col xs={6}>
+                            <Form.Label className="small mb-1 text-muted" style={{ fontSize: "11px" }}>Monthly Recovery</Form.Label>
+                            {isHRUser ? (
+                              <InputGroup size="sm">
+                                <InputGroup.Text>₹</InputGroup.Text>
+                                <Form.Control
+                                  type="number"
+                                  min="0"
+                                  placeholder="Recovery"
+                                  value={formData.advance_deduction === 0 ? 0 : (formData.advance_deduction || "")}
+                                  onChange={(e) => handleChange("advance_deduction", e.target.value)}
+                                />
+                              </InputGroup>
+                            ) : (
+                              <div className="fw-semibold text-danger">{fmt(formData.advance_deduction)}</div>
+                            )}
+                          </Col>
+                        </Row>
+                      </div>
+                    </Col>
+
+                    {/* Company Loan */}
+                    <Col xs={12} md={6}>
+                      <div className="p-3 rounded border bg-light h-100">
+                        <div className="d-flex justify-content-between align-items-center mb-1">
+                          <strong className="small text-primary">Company Loan (₹1 to 10 Lakhs)</strong>
+                          <Badge bg="primary" style={{ fontSize: "9px" }}>₹1L – ₹10L</Badge>
+                        </div>
+                        <div className="text-muted small mb-2" style={{ fontSize: "11px" }}>
+                          Long term company loan with monthly EMI deduction.
+                        </div>
+                        <Row className="g-2">
+                          <Col xs={6}>
+                            <Form.Label className="small mb-1 text-muted" style={{ fontSize: "11px" }}>Loan Principal</Form.Label>
+                            {isHRUser ? (
+                              <InputGroup size="sm">
+                                <InputGroup.Text>₹</InputGroup.Text>
+                                <Form.Control
+                                  type="number"
+                                  min="100000"
+                                  max="1000000"
+                                  placeholder="1L - 10L"
+                                  value={formData.loan_amount === 0 ? 0 : (formData.loan_amount || "")}
+                                  onChange={(e) => handleChange("loan_amount", e.target.value)}
+                                />
+                              </InputGroup>
+                            ) : (
+                              <div className="fw-semibold">{fmt(formData.loan_amount)}</div>
+                            )}
+                          </Col>
+                          <Col xs={6}>
+                            <Form.Label className="small mb-1 text-muted" style={{ fontSize: "11px" }}>Monthly EMI</Form.Label>
+                            {isHRUser ? (
+                              <InputGroup size="sm">
+                                <InputGroup.Text>₹</InputGroup.Text>
+                                <Form.Control
+                                  type="number"
+                                  min="0"
+                                  placeholder="Monthly EMI"
+                                  value={formData.loan_emi === 0 ? 0 : (formData.loan_emi || "")}
+                                  onChange={(e) => handleChange("loan_emi", e.target.value)}
+                                />
+                              </InputGroup>
+                            ) : (
+                              <div className="fw-semibold text-danger">{fmt(formData.loan_emi)}</div>
+                            )}
+                          </Col>
+                        </Row>
+                      </div>
+                    </Col>
+
+                    {/* Corporate Group Insurance */}
+                    <Col xs={12} md={6}>
+                      <div className="p-3 rounded border bg-light h-100">
+                        <div className="d-flex justify-content-between align-items-center mb-1">
+                          <strong className="small text-primary">Corporate Group Insurance</strong>
+                          <Badge bg="success" style={{ fontSize: "9px" }}>Health & Life</Badge>
+                        </div>
+                        <div className="text-muted small mb-2" style={{ fontSize: "11px" }}>
+                          Monthly insurance premium deduction for permanent staff coverage.
+                        </div>
+                        <div>
+                          <Form.Label className="small mb-1 text-muted" style={{ fontSize: "11px" }}>Monthly Insurance Deduction</Form.Label>
+                          {isHRUser ? (
+                            <InputGroup size="sm">
+                              <InputGroup.Text>₹</InputGroup.Text>
+                              <Form.Control
+                                type="number"
+                                min="0"
+                                placeholder="Insurance Premium"
+                                value={formData.insurance_deduction === 0 ? 0 : (formData.insurance_deduction || "")}
+                                onChange={(e) => handleChange("insurance_deduction", e.target.value)}
+                              />
+                            </InputGroup>
+                          ) : (
+                            <div className="fw-semibold text-danger">{fmt(formData.insurance_deduction)}</div>
+                          )}
+                        </div>
+                      </div>
+                    </Col>
+
+                    {/* Gratuity Calculation (Act 1972) */}
+                    <Col xs={12} md={6}>
+                      <div className="p-3 rounded border bg-light h-100">
+                        <div className="d-flex justify-content-between align-items-center mb-1">
+                          <strong className="small text-primary">Gratuity Calculation (Act 1972)</strong>
+                          <Badge bg="secondary" style={{ fontSize: "9px" }}>Statutory CTC</Badge>
+                        </div>
+                        <div className="text-muted small mb-2" style={{ fontSize: "11px" }}>
+                          Calculated: (15 × Basic) / (26 × 12) ≈ 4.81% of Basic Monthly.
+                        </div>
+                        <Row className="g-2">
+                          <Col xs={6}>
+                            <div className="small text-muted" style={{ fontSize: "11px" }}>Monthly CTC Accrual:</div>
+                            <div className="fw-bold text-success fs-6 mt-1">{fmt(gratuityMonthlyAccrual)}</div>
+                          </Col>
+                          <Col xs={6}>
+                            <div className="small text-muted" style={{ fontSize: "11px" }}>Total Entitlement:</div>
+                            <div className="fw-bold text-dark fs-6 mt-1">{fmt(formData.total_gratuity || gratuityMonthlyAccrual * 12)}</div>
+                          </Col>
+                        </Row>
+                      </div>
+                    </Col>
+                  </Row>
+                )}
+              </Card.Body>
+            </Card>
 
             {/* Bottom Net Pay Card */}
             <div
@@ -1014,6 +1308,7 @@ const ManageEmployees = () => {
     employee: null,
     selectedTabs: []
   });
+  const [savingTabs, setSavingTabs] = useState(false);
   const [role, setRole] = useState(localStorage.getItem("role") || "admin");
 
   const [viewMode, setViewMode] = useState("grid"); // "grid" | "list"
@@ -1147,6 +1442,7 @@ const ManageEmployees = () => {
       joining_date: emp.joining_date ? emp.joining_date.split("T")[0] : "",
       password: "User@123",
       kpi: emp.kpi || "",
+      employment_type: emp.employment_type || "Permanent",
       tabs_enabled: emp.tabs_enabled || false,
     });
     setShowModal(true);
@@ -1296,6 +1592,7 @@ const ManageEmployees = () => {
   const handleSaveTabs = async () => {
     const empCode = tabsModal.employee?.employee_code;
     if (!empCode) return;
+    setSavingTabs(true);
     try {
       const res = await fetch(`${API}/employees/update-tabs`, {
         method: "POST",
@@ -1312,6 +1609,8 @@ const ManageEmployees = () => {
       }
     } catch (e) {
       toast.error(e.message || "Failed to update tabs");
+    } finally {
+      setSavingTabs(false);
     }
   };
 
@@ -2056,6 +2355,17 @@ const ManageEmployees = () => {
                   <option value="Resigned">Resigned</option>
                 </Form.Select>
               </Col>
+              <Col xs={12} md={4}>
+                <Form.Label className="small fw-bold d-flex align-items-center gap-1">
+                  Employment Type
+                  <Badge bg="primary" style={{ fontSize: "10px", fontWeight: "normal" }}>Facilities</Badge>
+                </Form.Label>
+                <Form.Select size="sm" name="employment_type" value={empForm.employment_type || "Permanent"} onChange={handleChange}>
+                  <option value="Permanent">Permanent (Full Facilities)</option>
+                  <option value="Probation">Probation (Under Evaluation)</option>
+                  <option value="Intern">Intern (Training)</option>
+                </Form.Select>
+              </Col>
 
               {/* Work Email & Personal Email */}
               <Col xs={12} md={6}>
@@ -2384,6 +2694,7 @@ const ManageEmployees = () => {
             <Button
               variant="light"
               size="sm"
+              disabled={savingTabs}
               onClick={() => setTabsModal({ show: false, employee: null, selectedTabs: [] })}
               className="px-3"
             >
@@ -2392,10 +2703,18 @@ const ManageEmployees = () => {
             <Button
               variant="success"
               size="sm"
+              disabled={savingTabs}
               onClick={handleSaveTabs}
-              className="px-4 fw-semibold"
+              className="px-4 fw-semibold d-flex align-items-center gap-1.5"
             >
-              Save Module Permissions
+              {savingTabs ? (
+                <>
+                  <Spinner animation="border" size="sm" />
+                  <span>Saving Module Permissions...</span>
+                </>
+              ) : (
+                "Save Module Permissions"
+              )}
             </Button>
           </Modal.Footer>
         </Modal>
@@ -2634,7 +2953,7 @@ const ManageEmployees = () => {
                               </a>
                             ));
                           }
-                        } catch {}
+                        } catch { }
                         return null;
                       })()}
                       {emp.doc_exp_cert && (() => {
@@ -2654,7 +2973,7 @@ const ManageEmployees = () => {
                               </a>
                             ));
                           }
-                        } catch {}
+                        } catch { }
                         return null;
                       })()}
                       {emp.doc_last_company && (() => {
@@ -2674,7 +2993,7 @@ const ManageEmployees = () => {
                               </a>
                             ));
                           }
-                        } catch {}
+                        } catch { }
                         return null;
                       })()}
                       {!emp.cv_file && !emp.doc_resume && !emp.doc_id && !emp.doc_cert && !emp.doc_pan && !emp.doc_aadhaar && !emp.doc_payslips && !emp.doc_exp_cert && !emp.doc_last_company && (

@@ -1,20 +1,24 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Container, Row, Col, Card } from "react-bootstrap";
 import { LuCalendar, LuList, LuChevronLeft, LuChevronRight } from "react-icons/lu";
 import holidaysImg from "../../assets/holidays.png";
+import { getApiBaseUrl } from "../../api/axios";
 
-// Company Holiday List as requested
+const API = getApiBaseUrl();
+
+// Fallback initial Company Holiday List
 const HOLIDAYS_LIST = [
   { id: 1, name: "New Year Day", day: "Thursday", date: "January 1", dateStr: "2026-01-01", month: "JAN", dayNum: 1, type: "Public" },
   { id: 2, name: "Republic Day", day: "Monday", date: "January 26", dateStr: "2026-01-26", month: "JAN", dayNum: 26, type: "National" },
   { id: 3, name: "Holi Festival", day: "Wednesday", date: "March 25", dateStr: "2026-03-25", month: "MAR", dayNum: 25, type: "Festival" },
   { id: 4, name: "Independence Day", day: "Saturday", date: "August 15", dateStr: "2026-08-15", month: "AUG", dayNum: 15, type: "National" },
   { id: 5, name: "Gandhi Jayanti", day: "Friday", date: "October 2", dateStr: "2026-10-02", month: "OCT", dayNum: 2, type: "National" },
-  { id: 6, name: "Durga Puja (Maha Saptami)", day: "Thursday", date: "October 8", dateStr: "2026-10-08", month: "OCT", dayNum: 8, type: "Festival" },
-  { id: 7, name: "Durga Puja (Maha Ashtami)", day: "Friday", date: "October 9", dateStr: "2026-10-09", month: "OCT", dayNum: 9, type: "Festival" },
-  { id: 8, name: "Durga Puja (Vijaya Dashami)", day: "Saturday", date: "October 10", dateStr: "2026-10-10", month: "OCT", dayNum: 10, type: "Festival" },
-  { id: 9, name: "Diwali / Deepavali", day: "Sunday", date: "November 8", dateStr: "2026-11-08", month: "NOV", dayNum: 8, type: "Festival" },
-  { id: 10, name: "Christmas Day", day: "Friday", date: "December 25", dateStr: "2026-12-25", month: "DEC", dayNum: 25, type: "Public" }
+  { id: 6, name: "Durga Puja (Maha Saptami)", day: "Saturday", date: "October 17", dateStr: "2026-10-17", month: "OCT", dayNum: 17, type: "Festival" },
+  { id: 7, name: "Durga Puja (Maha Ashtami)", day: "Sunday", date: "October 18", dateStr: "2026-10-18", month: "OCT", dayNum: 18, type: "Festival" },
+  { id: 8, name: "Durga Puja (Maha Navami)", day: "Tuesday", date: "October 20", dateStr: "2026-10-20", month: "OCT", dayNum: 20, type: "Festival" },
+  { id: 9, name: "Durga Puja (Bijoya Dashami)", day: "Wednesday", date: "October 21", dateStr: "2026-10-21", month: "OCT", dayNum: 21, type: "Festival" },
+  { id: 10, name: "Diwali / Deepavali", day: "Sunday", date: "November 8", dateStr: "2026-11-08", month: "NOV", dayNum: 8, type: "Festival" },
+  { id: 11, name: "Christmas Day", day: "Friday", date: "December 25", dateStr: "2026-12-25", month: "DEC", dayNum: 25, type: "Public" }
 ];
 
 // Dynamic Month Generator for any month & year
@@ -34,16 +38,62 @@ const getMonthDetails = (year, monthIdx) => {
 
 const Holiday = () => {
   const [viewMode, setViewMode] = useState("calendar"); // "list" or "calendar"
+  const [holidays, setHolidays] = useState(HOLIDAYS_LIST);
 
   // Real-time running date & month
   const now = new Date();
   const currentYear = now.getFullYear();
   const currentMonthIdx = now.getMonth(); // 0-indexed (6 = July)
   const todayDayNum = now.getDate();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const [selectedDateStr, setSelectedDateStr] = useState(todayStr);
 
   // Initialize pairIdx centered on current running month (e.g. Jul/Aug = pairIdx 3)
   const [pairIdx, setPairIdx] = useState(Math.floor(currentMonthIdx / 2));
   const [selectedYear, setSelectedYear] = useState(currentYear);
+
+  // Fetch dynamic holidays from central backend
+  const fetchHolidays = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API}/holidays`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      const data = await res.json();
+      if (data && data.success && Array.isArray(data.data) && data.data.length > 0) {
+        setHolidays(data.data);
+      }
+    } catch (err) {
+      console.error("Error fetching dynamic holidays:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchHolidays();
+
+    // Listen for custom "holiday-updated" event broadcast from Schedule / Roster
+    const handleHolidayUpdate = () => {
+      fetchHolidays();
+    };
+    window.addEventListener("holiday-updated", handleHolidayUpdate);
+
+    // Cross-tab synchronization via localStorage
+    const handleStorageUpdate = (e) => {
+      if (e.key === "holiday_last_updated") {
+        fetchHolidays();
+      }
+    };
+    window.addEventListener("storage", handleStorageUpdate);
+
+    // Periodic live-sync polling (every 6 seconds) so any change made by other managers is immediately reflected
+    const pollInterval = setInterval(fetchHolidays, 6000);
+
+    return () => {
+      window.removeEventListener("holiday-updated", handleHolidayUpdate);
+      window.removeEventListener("storage", handleStorageUpdate);
+      clearInterval(pollInterval);
+    };
+  }, []);
 
   // Generate 12 dynamic months for selectedYear
   const monthsData = Array.from({ length: 12 }, (_, i) => getMonthDetails(selectedYear, i));
@@ -69,39 +119,81 @@ const Holiday = () => {
 
   // Dynamic Today & Upcoming Cards Calculator
   const getTodayHolidayInfo = () => {
-    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-    const todayHoliday = HOLIDAYS_LIST.find((h) => h.dateStr === todayStr);
+    const activeDateStr = selectedDateStr || todayStr;
+    const isToday = activeDateStr === todayStr;
+    const activeHoliday = holidays.find((h) => h.dateStr === activeDateStr);
 
-    const formattedToday = now.toLocaleDateString("en-US", {
+    const dObj = new Date(`${activeDateStr}T12:00:00+05:30`);
+    const formattedDate = dObj.toLocaleDateString("en-US", {
       year: "numeric",
       month: "long",
       day: "2-digit"
     });
 
-    if (todayHoliday) {
+    const prefix = isToday ? "Today" : "Selected";
+
+    if (activeHoliday) {
       return {
-        dateStr: `Today ${formattedToday}`,
-        title: todayHoliday.name,
+        dateStr: `${prefix} ${formattedDate}`,
+        title: activeHoliday.name,
         subtext: "Company branches will be closed today for holiday"
       };
     }
 
     return {
-      dateStr: `Today ${formattedToday}`,
+      dateStr: `${prefix} ${formattedDate}`,
       title: "Regular Working Day",
       subtext: "Company branches are open (09:00 AM to 05:00 PM)"
     };
   };
 
   const getUpcomingHolidayInfo = () => {
-    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-    const sorted = [...HOLIDAYS_LIST].sort((a, b) => a.dateStr.localeCompare(b.dateStr));
-    const upcoming = sorted.find((h) => h.dateStr >= todayStr) || sorted[0];
+    const activeDateStr = selectedDateStr || todayStr;
+    const activeHoliday = holidays.find((h) => h.dateStr === activeDateStr);
+
+    const sorted = [...holidays].sort((a, b) => (a.dateStr || "").localeCompare(b.dateStr || ""));
+
+    // Find the next upcoming holiday strictly AFTER activeDateStr (and strictly not the active holiday)
+    let upcoming = sorted.find((h) => {
+      if (!h.dateStr) return false;
+      if (h.dateStr <= activeDateStr) return false;
+      if (activeHoliday && h.dateStr === activeHoliday.dateStr) return false;
+      return true;
+    });
+
+    // If nothing found strictly after activeDateStr (e.g. selected late date),
+    // search strictly after todayStr:
+    if (!upcoming) {
+      upcoming = sorted.find((h) => {
+        if (!h.dateStr) return false;
+        if (h.dateStr <= todayStr) return false;
+        if (activeHoliday && h.dateStr === activeHoliday.dateStr) return false;
+        return true;
+      });
+    }
+
+    // If still none, loop back to the first holiday that is not the active/selected holiday
+    if (!upcoming && sorted.length > 0) {
+      upcoming = sorted.find((h) => {
+        if (!h.dateStr) return false;
+        if (h.dateStr === activeDateStr) return false;
+        if (activeHoliday && h.dateStr === activeHoliday.dateStr) return false;
+        return true;
+      });
+    }
+
+    if (!upcoming) {
+      return {
+        dateStr: "No Upcoming Holiday",
+        title: "All scheduled holidays completed",
+        subtext: "Regular office timings apply"
+      };
+    }
 
     return {
-      dateStr: `Upcoming ${upcoming.date}`,
+      dateStr: `Upcoming ${upcoming.date || upcoming.dateStr}`,
       title: upcoming.name,
-      subtext: "Company branches will be closed from 09:00 AM to 05:00 PM"
+      subtext: "Company branches will be closed from 09:00 AM to 07:00 PM"
     };
   };
 
@@ -155,21 +247,48 @@ const Holiday = () => {
               );
             }
 
-            // Check if today or holiday
+            // Check if today, selected, or holiday
             const isToday = mInfo.year === currentYear && mInfo.monthIdx === currentMonthIdx && cell.val === todayDayNum;
-            const isHoliday = HOLIDAYS_LIST.some((h) => {
-              const mName = mInfo.name.split(" ")[0];
-              return h.month === mName && h.dayNum === cell.val;
+            const cellDateStr = `${mInfo.year}-${String(mInfo.monthIdx + 1).padStart(2, "0")}-${String(cell.val).padStart(2, "0")}`;
+            const isSelected = selectedDateStr === cellDateStr;
+            const matchedHoliday = holidays.find((h) => {
+              if (h.dateStr && h.dateStr === cellDateStr) return true;
+              const mName = mInfo.name.split(" ")[0].toUpperCase();
+              return (h.month || "").toUpperCase() === mName && Number(h.dayNum) === cell.val;
             });
+            const isHoliday = Boolean(matchedHoliday);
 
             return (
-              <div key={idx} className="py-1.5 flex items-center justify-center relative">
+              <div
+                key={idx}
+                onClick={() => setSelectedDateStr(cellDateStr)}
+                className="py-1.5 flex items-center justify-center relative cursor-pointer"
+              >
                 {isToday ? (
-                  <span className="w-7 h-7 flex items-center justify-center bg-slate-900 text-white font-bold rounded-lg shadow-sm">
+                  <span
+                    className={`w-7 h-7 flex items-center justify-center bg-slate-900 text-white font-bold rounded-lg shadow-sm ${
+                      isSelected ? "ring-2 ring-blue-500 ring-offset-1" : ""
+                    }`}
+                    title={matchedHoliday ? `${matchedHoliday.name} (Today)` : "Today"}
+                  >
+                    {cell.val}
+                  </span>
+                ) : isSelected ? (
+                  <span
+                    className={`w-7 h-7 flex items-center justify-center font-bold rounded-lg shadow-xs ${
+                      isHoliday
+                        ? "bg-rose-100 text-rose-700 ring-2 ring-rose-500"
+                        : "bg-blue-100 text-blue-700 ring-2 ring-blue-500"
+                    }`}
+                    title={matchedHoliday ? `${matchedHoliday.name} (${matchedHoliday.type || "Holiday"})` : undefined}
+                  >
                     {cell.val}
                   </span>
                 ) : isHoliday ? (
-                  <span className="relative font-bold text-slate-900 cursor-pointer">
+                  <span
+                    className="relative font-bold text-rose-600 hover:text-rose-700"
+                    title={`${matchedHoliday?.name || "Holiday"}${matchedHoliday?.type ? ` (${matchedHoliday.type})` : ""}`}
+                  >
                     {cell.val}
                     <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-rose-500 rounded-full"></span>
                   </span>
@@ -245,20 +364,27 @@ const Holiday = () => {
             </p>
           </div>
 
-          {/* Toggle Pill: List / Calendar */}
-          <div className="toggle-btn flex items-center">
-            <button
-              onClick={() => setViewMode("list")}
-              className={`toggle-item flex items-center gap-1.5 ${viewMode === "list" ? "active" : "inactive"}`}
-            >
-              <LuList className="h-4 w-4" /> List
-            </button>
-            <button
-              onClick={() => setViewMode("calendar")}
-              className={`toggle-item flex items-center gap-1.5 ${viewMode === "calendar" ? "active" : "inactive"}`}
-            >
-              <LuCalendar className="h-4 w-4" /> Calendar
-            </button>
+          <div className="flex items-center gap-3">
+            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-full border border-emerald-200 text-[11px] font-bold shadow-2xs">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              Live Synced
+            </div>
+
+            {/* Toggle Pill: List / Calendar */}
+            <div className="toggle-btn flex items-center">
+              <button
+                onClick={() => setViewMode("list")}
+                className={`toggle-item flex items-center gap-1.5 ${viewMode === "list" ? "active" : "inactive"}`}
+              >
+                <LuList className="h-4 w-4" /> List
+              </button>
+              <button
+                onClick={() => setViewMode("calendar")}
+                className={`toggle-item flex items-center gap-1.5 ${viewMode === "calendar" ? "active" : "inactive"}`}
+              >
+                <LuCalendar className="h-4 w-4" /> Calendar
+              </button>
+            </div>
           </div>
         </div>
 
@@ -374,31 +500,47 @@ const Holiday = () => {
                 </div>
 
                 {/* Table List Rows */}
-                <div className="divide-y divide-slate-100/60 mt-1">
-                  {HOLIDAYS_LIST.map((h) => {
-                    const isUpcomingNext = upcomingInfo.title === h.name;
-                    return (
-                      <div
-                        key={h.id}
-                        className="holiday-table-row grid grid-cols-12 items-center py-3.5 px-3"
-                      >
-                        <div className="col-span-6 flex items-center gap-2.5">
-                          {isUpcomingNext ? (
-                            <div className="active-indicator-bar"></div>
-                          ) : (
-                            <div className="w-1 h-6"></div>
-                          )}
-                          <span className="text-xs font-bold text-slate-800">{h.name}</span>
+                <div className="divide-y divide-slate-100/60 mt-1 max-h-[460px] overflow-y-auto pr-1">
+                  {holidays
+                    .slice()
+                    .sort((a, b) => (a.dateStr || "").localeCompare(b.dateStr || ""))
+                    .map((h, idx) => {
+                      const isUpcomingNext = upcomingInfo.title === h.name;
+                      return (
+                        <div
+                          key={h.id || idx}
+                          onClick={() => h.dateStr && setSelectedDateStr(h.dateStr)}
+                          className={`holiday-table-row grid grid-cols-12 items-center py-3.5 px-3 transition-colors cursor-pointer ${
+                            selectedDateStr === h.dateStr ? "bg-rose-50/80 rounded-2xl" : "hover:bg-slate-50"
+                          }`}
+                        >
+                          <div className="col-span-6 flex items-center gap-2.5">
+                            {isUpcomingNext ? (
+                              <div className="active-indicator-bar bg-rose-500"></div>
+                            ) : (
+                              <div className="w-1 h-6"></div>
+                            )}
+                            <div>
+                              <span className="text-xs font-bold text-slate-800">{h.name}</span>
+                              {h.dept && h.dept !== "All" && (
+                                <div className="text-[10px] text-blue-600 font-semibold">
+                                  Dept: {h.dept}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <div className="col-span-3 text-center text-xs text-slate-500 font-medium">
+                            {h.day}
+                          </div>
+                          <div className="col-span-3 text-right">
+                            <div className="text-xs text-slate-700 font-semibold">{h.date}</div>
+                            {h.type && (
+                              <div className="text-[10px] text-rose-500 font-medium">{h.type}</div>
+                            )}
+                          </div>
                         </div>
-                        <div className="col-span-3 text-center text-xs text-slate-500 font-medium">
-                          {h.day}
-                        </div>
-                        <div className="col-span-3 text-right text-xs text-slate-700 font-semibold">
-                          {h.date}
-                        </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
                 </div>
               </div>
             </Col>

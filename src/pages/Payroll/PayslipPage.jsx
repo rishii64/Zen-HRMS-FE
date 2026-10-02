@@ -288,20 +288,26 @@ const PayslipPage = () => {
     const stat = isFinal
       ? sp.statutory_deductions || {}
       : payrollData.defaults?.statutory_deductions || {};
+    const adj = sp?.adjustments || payrollData.adjustments || payrollData.defaults?.adjustments || {};
+    const empType = (payrollData.employee?.employment_type || adj.employment_type || "Permanent").trim();
+    const isPermanent = (adj.is_permanent !== false) && (empType.toLowerCase() === "permanent");
 
     const effectiveOT =
       (parseFloat(vp.overtime) || 0) > 0
         ? parseFloat(vp.overtime)
         : (parseFloat(vp.overtime_hours) || 0) * (parseFloat(vp.overtime_rate) || 0);
 
+    const totalFixedEarnings =
+      (parseFloat(fp.basic) || 0) +
+      (parseFloat(fp.hra) || 0) +
+      (parseFloat(fp.conveyance) || 0) +
+      (parseFloat(fp.medical) || 0) +
+      (parseFloat(fp.allowance) || 0);
+
     const lopCalc =
       (parseFloat(att.lop_days) || 0) > 0
         ? Math.round(
-          (((parseFloat(fp.basic) || 0) +
-            (parseFloat(fp.da) || 0) +
-            (parseFloat(fp.hra) || 0)) /
-            (att.total_days || 30)) *
-          parseFloat(att.lop_days)
+          (totalFixedEarnings / (att.total_days || 30)) * parseFloat(att.lop_days)
         )
         : isFinal
           ? parseFloat(sp.lop_deduction) || 0
@@ -309,7 +315,6 @@ const PayslipPage = () => {
 
     const earnings = [
       { label: "Basic Salary", amount: parseFloat(fp.basic) || 0 },
-      { label: "Dearness Allowance (DA)", amount: parseFloat(fp.da) || 0 },
       { label: "House Rent Allowance (HRA)", amount: parseFloat(fp.hra) || 0 },
       { label: "Conveyance Allowance", amount: parseFloat(fp.conveyance) || 0 },
       { label: "Medical Allowance", amount: parseFloat(fp.medical) || 0 },
@@ -320,9 +325,14 @@ const PayslipPage = () => {
       { label: "Reimbursement", amount: parseFloat(vp.reimbursement) || 0 },
     ].filter((item) => item.amount > 0);
 
+    const isEsiEligible = totalFixedEarnings <= 21000;
+    const healthDeduction = isEsiEligible
+      ? { label: "Employee State Insurance (ESI)", amount: parseFloat(stat.esi) || 0 }
+      : { label: "Mediclaim", amount: parseFloat(stat.esi || stat.mediclaim) || 0 };
+
     const deductions = [
       { label: "Provident Fund (PF)", amount: parseFloat(stat.pf) || 0 },
-      { label: "Employee State Insurance (ESI)", amount: parseFloat(stat.esi) || 0 },
+      healthDeduction,
       { label: "Professional Tax (PT)", amount: parseFloat(stat.pt) || 0 },
       {
         label: "TDS / Income Tax",
@@ -330,21 +340,46 @@ const PayslipPage = () => {
       },
       { label: "Loss of Pay (LOP)", amount: lopCalc },
       { label: "Other Deductions", amount: parseFloat(stat.others) || 0 },
-    ].filter((item) => item.amount > 0);
+    ];
 
+    if (isPermanent) {
+      if (parseFloat(adj.advance_deduction) > 0) {
+        deductions.push({
+          label: "Advance Payment Recovery",
+          amount: parseFloat(adj.advance_deduction) || 0,
+        });
+      }
+      if (parseFloat(adj.loan_emi) > 0) {
+        deductions.push({
+          label: "Company Loan EMI",
+          amount: parseFloat(adj.loan_emi) || 0,
+        });
+      }
+      if (parseFloat(adj.insurance_deduction) > 0) {
+        deductions.push({
+          label: "Corporate Group Insurance",
+          amount: parseFloat(adj.insurance_deduction) || 0,
+        });
+      }
+    }
+
+    const filteredDeductions = deductions.filter((item) => item.amount > 0);
     const gross = earnings.reduce((acc, it) => acc + it.amount, 0);
-    const totalDeds = deductions.reduce((acc, it) => acc + it.amount, 0);
+    const totalDeds = filteredDeductions.reduce((acc, it) => acc + it.amount, 0);
     const net = Math.max(0, gross - totalDeds);
     const status = isFinal ? "Finalized" : "Unpaid";
 
     return {
       earnings,
-      deductions,
+      deductions: filteredDeductions,
       gross,
       totalDeds,
       net,
       status,
       attendance: att,
+      adjustments: adj,
+      isPermanent,
+      employment_type: empType,
     };
   }, [payrollData]);
 
@@ -405,6 +440,12 @@ const PayslipPage = () => {
         currentMonthYear,
         { content: "Pay Status:", styles: { fontStyle: "bold" } },
         slipBreakdown.status === "Finalized" ? "PAID" : "UNPAID",
+      ],
+      [
+        { content: "Employment:", styles: { fontStyle: "bold" } },
+        emp.employment_type || slipBreakdown.employment_type || "Permanent",
+        { content: "Paid Days:", styles: { fontStyle: "bold" } },
+        `${slipBreakdown.attendance?.present_days ?? 24}P + ${slipBreakdown.attendance?.leave_days || slipBreakdown.attendance?.paid_leaves || 0}L + ${slipBreakdown.attendance?.holiday_days || 0}H - ${slipBreakdown.attendance?.absent_days || 0}A = ${slipBreakdown.attendance?.paid_days ?? 24} Paid`,
       ],
     ];
 
@@ -505,6 +546,17 @@ const PayslipPage = () => {
       14,
       finalY + 34
     );
+
+    if (slipBreakdown.isPermanent && parseFloat(slipBreakdown.adjustments?.gratuity_accrual) > 0) {
+      doc.setFontSize(7.5);
+      doc.setTextColor(71, 85, 105);
+      doc.setFont("helvetica", "normal");
+      doc.text(
+        `* Statutory Note: Monthly Gratuity Accrual is Rs. ${formatPdfNum(slipBreakdown.adjustments.gratuity_accrual)} under Payment of Gratuity Act, 1972.`,
+        14,
+        finalY + 41
+      );
+    }
 
     // 6. Signatures
     const signY = finalY + 54;
@@ -912,7 +964,45 @@ const PayslipPage = () => {
                           {slipBreakdown.attendance?.lop_days || 0} days
                         </div>
                       </Col>
+                      <Col xs={12} sm={6} md={3} className="pt-2">
+                        <div className="text-muted" style={{ fontSize: "11px" }}>
+                          EMPLOYMENT
+                        </div>
+                        <div>
+                          <Badge
+                            bg={slipBreakdown.isPermanent ? "success" : "warning"}
+                            className="fw-semibold"
+                            style={{ fontSize: "10px" }}
+                          >
+                            {slipBreakdown.employment_type || "Permanent"}
+                          </Badge>
+                        </div>
+                      </Col>
                     </Row>
+                  </div>
+
+                  {/* Paid Days Calculation Formula Bar */}
+                  <div
+                    className="p-3 rounded-3 mb-4 border d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3"
+                    style={{ background: "#f8fafc", borderColor: "#e2e8f0" }}
+                  >
+                    <div>
+                      <div className="d-flex align-items-center gap-2 mb-1">
+                        <strong className="text-dark small">📅 Paid Days Calculation:</strong>
+                        <Badge bg="primary" style={{ fontSize: "10px" }}>Attendance + Leaves + Holidays − Absents</Badge>
+                      </div>
+                      <div className="text-muted small" style={{ fontSize: "12px" }}>
+                        Formula: <strong>{slipBreakdown.attendance?.present_days ?? 0}</strong> (Present) + <strong>{slipBreakdown.attendance?.leave_days || slipBreakdown.attendance?.paid_leaves || 0}</strong> (Leaves) + <strong>{slipBreakdown.attendance?.holiday_days || 0}</strong> (Holidays) − <strong>{slipBreakdown.attendance?.absent_days || 0}</strong> (Absents) = <strong className="text-success">{slipBreakdown.attendance?.paid_days ?? ((slipBreakdown.attendance?.present_days ?? 0) + (slipBreakdown.attendance?.leave_days || slipBreakdown.attendance?.paid_leaves || 0) + (slipBreakdown.attendance?.holiday_days || 0) - (slipBreakdown.attendance?.absent_days || 0))} Paid Days</strong> (out of {slipBreakdown.attendance?.working_days || 26} Working Days)
+                      </div>
+                    </div>
+                    {slipBreakdown.isPermanent && (parseFloat(slipBreakdown.adjustments?.gratuity_accrual) > 0) && (
+                      <div className="text-md-end border-start-md ps-md-3">
+                        <div className="text-muted" style={{ fontSize: "10px" }}>GRATUITY ACCRUAL (ACT 1972)</div>
+                        <div className="fw-bold text-success small">
+                          {fmt(slipBreakdown.adjustments.gratuity_accrual)} / month
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* 2-Column Financial Table: Earnings vs Deductions */}

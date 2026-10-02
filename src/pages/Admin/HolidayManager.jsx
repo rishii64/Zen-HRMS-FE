@@ -1,20 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Form, Button, Table, Badge } from 'react-bootstrap';
+import { getApiBaseUrl } from '../../api/axios';
 
 const HolidayManager = () => {
   const [holidays, setHolidays] = useState([]);
   const [newHoliday, setNewHoliday] = useState({ name: '', date: '', type: 'Public' });
 
-  // API URL pointing to Port 5019
-  const API_URL = 'http://localhost:5019/api/holidays';
+  // Central backend API URL
+  const API_URL = `${getApiBaseUrl()}/holidays`;
 
   // Function to load data from database
   const fetchHolidays = async () => {
     try {
-      const response = await fetch(API_URL);
+      const token = localStorage.getItem("token");
+      const response = await fetch(API_URL, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
       if (!response.ok) throw new Error('Network response was not ok');
       const data = await response.json();
-      setHolidays(data);
+      setHolidays(Array.isArray(data) ? data : data.data || []);
     } catch (error) {
       console.error("Error loading data:", error);
     }
@@ -28,15 +32,22 @@ const HolidayManager = () => {
   const handleAddHoliday = async (e) => {
     e.preventDefault();
     try {
+      const token = localStorage.getItem("token");
       const response = await fetch(API_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
         body: JSON.stringify(newHoliday),
       });
 
       if (response.ok) {
         setNewHoliday({ name: '', date: '', type: 'Public' });
         fetchHolidays(); // Refresh table after saving
+        // Broadcast live update event
+        window.dispatchEvent(new Event("holiday-updated"));
+        localStorage.setItem("holiday_last_updated", String(Date.now()));
       } else {
         console.error("Server returned an error");
       }
@@ -49,9 +60,16 @@ const HolidayManager = () => {
   const deleteHoliday = async (id) => {
     if (window.confirm("Are you sure you want to delete this holiday?")) {
       try {
-        const response = await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
+        const token = localStorage.getItem("token");
+        const response = await fetch(`${API_URL}/${id}`, {
+          method: 'DELETE',
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        });
         if (response.ok) {
           fetchHolidays();
+          // Broadcast live update event
+          window.dispatchEvent(new Event("holiday-updated"));
+          localStorage.setItem("holiday_last_updated", String(Date.now()));
         }
       } catch (error) {
         console.error("Error deleting holiday:", error);
@@ -126,7 +144,7 @@ const HolidayManager = () => {
                 {holidays.length > 0 ? holidays.map((h) => (
                   <tr key={h.id} className="align-middle">
                     <td className="px-4 fw-bold text-secondary">{h.name}</td>
-                    <td>{new Date(h.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+                    <td>{h.dateStr ? new Date(`${h.dateStr}T12:00:00`).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : h.date}</td>
                     <td>
                       <Badge bg={h.type === 'Public' ? 'success' : h.type === 'Gazetted' ? 'warning' : 'info'}>
                         {h.type}

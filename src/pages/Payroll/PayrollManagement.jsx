@@ -12,6 +12,7 @@ import {
   Modal,
   Dropdown,
   Badge,
+  InputGroup,
 } from "react-bootstrap";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -223,7 +224,6 @@ const PayrollManagement = () => {
   // View modal breakdown state
   const [fixedPay, setFixedPay] = useState({
     basic: 0,
-    da: 0,
     hra: 0,
     conveyance: 0,
     medical: 0,
@@ -245,6 +245,10 @@ const PayrollManagement = () => {
     present_days: 24,
     late_days: 0,
     paid_leaves: 0,
+    leave_days: 0,
+    holiday_days: 0,
+    absent_days: 0,
+    paid_days: 24,
     lop_days: 0,
     overtime_hours: 0,
     is_custom_lop: false,
@@ -274,6 +278,24 @@ const PayrollManagement = () => {
   const [payrollStatus, setPayrollStatus] = useState("Draft");
   const [payrollHistory, setPayrollHistory] = useState([]);
   const [itDeclarationInfo, setItDeclarationInfo] = useState(null);
+  const [adjustments, setAdjustments] = useState({
+    advance_amount: 0,
+    advance_deduction: 0,
+    loan_amount: 0,
+    loan_emi: 0,
+    insurance_deduction: 0,
+    gratuity_accrual: 0,
+    total_gratuity: 0,
+    employment_type: "Permanent",
+    is_permanent: true,
+    calculated_paid_days: 0,
+    present_days: 0,
+    leave_days: 0,
+    holiday_days: 0,
+    absent_days: 0,
+    working_days: 26,
+    days_in_month: 30,
+  });
 
   // Month-Year formatted string
   const currentMonthYear = `${selectedMonth} ${selectedYear}`;
@@ -337,6 +359,9 @@ const PayrollManagement = () => {
 
       if (data.success) {
         const emp = data.employee;
+        const empType = emp.employment_type || data.employment_type || "Permanent";
+        const isPerm = emp.is_permanent ?? data.is_permanent ?? (empType.toLowerCase() === "permanent");
+
         setEmployeeInfo({
           name: emp.name || "Staff",
           employee_code: emp.employee_code || empCode,
@@ -345,6 +370,28 @@ const PayrollManagement = () => {
           email: emp.email || "",
           joining_date: emp.joining_date || "2025-01-01",
           bank_details: emp.bank_details || {},
+          employment_type: empType,
+          is_permanent: isPerm,
+        });
+
+        const adj = data.saved_payroll?.adjustments || data.adjustments || data.defaults?.adjustments || {};
+        setAdjustments({
+          advance_amount: isPerm ? (parseFloat(adj.advance_amount) || 0) : 0,
+          advance_deduction: isPerm ? (parseFloat(adj.advance_deduction) || 0) : 0,
+          loan_amount: isPerm ? (parseFloat(adj.loan_amount) || 0) : 0,
+          loan_emi: isPerm ? (parseFloat(adj.loan_emi) || 0) : 0,
+          insurance_deduction: isPerm ? (parseFloat(adj.insurance_deduction) || 0) : 0,
+          gratuity_accrual: isPerm ? (parseFloat(adj.gratuity_accrual) || 0) : 0,
+          total_gratuity: isPerm ? (parseFloat(adj.total_gratuity) || 0) : 0,
+          employment_type: empType,
+          is_permanent: isPerm,
+          calculated_paid_days: adj.calculated_paid_days || 0,
+          present_days: adj.present_days || 0,
+          leave_days: adj.leave_days || 0,
+          holiday_days: adj.holiday_days || 0,
+          absent_days: adj.absent_days || 0,
+          working_days: adj.working_days || 26,
+          days_in_month: adj.days_in_month || 30,
         });
 
         if (data.saved_payroll) {
@@ -357,7 +404,6 @@ const PayrollManagement = () => {
 
           setFixedPay({
             basic: fpSource.basic || 0,
-            da: fpSource.da || 0,
             hra: fpSource.hra || 0,
             conveyance: fpSource.conveyance || 0,
             medical: fpSource.medical || 0,
@@ -373,25 +419,34 @@ const PayrollManagement = () => {
             incentive: sp.variable_pay?.incentive || 0,
             reimbursement: sp.variable_pay?.reimbursement || 0,
           });
+          const attSum = sp.attendance_summary || data.defaults?.attendance_summary || {};
+          const pDays = attSum.present_days ?? 24;
+          const lDays = attSum.leave_days || attSum.paid_leaves || 0;
+          const hDays = attSum.holiday_days || 0;
+          const aDays = attSum.absent_days || 0;
+          const calcPaid = attSum.paid_days != null ? attSum.paid_days : Math.max(0, pDays + lDays + hDays - aDays);
+
           setAttendance({
             total_days:
-              sp.attendance_summary?.total_days ||
+              attSum.total_days ||
               (data.defaults?.attendance_summary?.total_days || 30),
             working_days:
-              sp.attendance_summary?.working_days ||
+              attSum.working_days ||
               (data.defaults?.attendance_summary?.working_days || 26),
-            present_days:
-              sp.attendance_summary?.present_days ??
-              (data.defaults?.attendance_summary?.present_days ?? 24),
+            present_days: pDays,
             late_days:
-              sp.attendance_summary?.late_days ??
+              attSum.late_days ??
               (data.defaults?.attendance_summary?.late_days ?? 0),
-            paid_leaves: sp.attendance_summary?.paid_leaves || 0,
+            paid_leaves: lDays,
+            leave_days: lDays,
+            holiday_days: hDays,
+            absent_days: aDays,
+            paid_days: calcPaid,
             lop_days:
-              sp.attendance_summary?.lop_days ??
+              attSum.lop_days ??
               (data.defaults?.attendance_summary?.lop_days ?? 0),
             overtime_hours:
-              sp.attendance_summary?.overtime_hours ??
+              attSum.overtime_hours ??
               (parseFloat(sp.variable_pay?.overtime_hours) ||
                 (data.defaults?.attendance_summary?.overtime_hours ?? 0)),
             is_custom_lop: !useLatest,
@@ -431,7 +486,6 @@ const PayrollManagement = () => {
           const fp = data.latest_salary_structure || df.fixed_pay || {};
           setFixedPay({
             basic: fp.basic || 0,
-            da: fp.da || 0,
             hra: fp.hra || 0,
             conveyance: fp.conveyance || 0,
             medical: fp.medical || 0,
@@ -445,14 +499,25 @@ const PayrollManagement = () => {
             incentive: 0,
             reimbursement: 0,
           });
+          const attSum = df.attendance_summary || {};
+          const pDays = attSum.present_days ?? 24;
+          const lDays = attSum.leave_days || 0;
+          const hDays = attSum.holiday_days || 0;
+          const aDays = attSum.absent_days || 0;
+          const calcPaid = attSum.paid_days != null ? attSum.paid_days : Math.max(0, pDays + lDays + hDays - aDays);
+
           setAttendance({
-            total_days: df.attendance_summary?.total_days || 30,
-            working_days: df.attendance_summary?.working_days || 26,
-            present_days: df.attendance_summary?.present_days ?? 24,
-            late_days: df.attendance_summary?.late_days ?? 0,
-            paid_leaves: 0,
-            lop_days: df.attendance_summary?.lop_days || 0,
-            overtime_hours: df.attendance_summary?.overtime_hours || 0,
+            total_days: attSum.total_days || 30,
+            working_days: attSum.working_days || 26,
+            present_days: pDays,
+            late_days: attSum.late_days ?? 0,
+            paid_leaves: lDays,
+            leave_days: lDays,
+            holiday_days: hDays,
+            absent_days: aDays,
+            paid_days: calcPaid,
+            lop_days: attSum.lop_days || 0,
+            overtime_hours: attSum.overtime_hours || 0,
             is_custom_lop: false,
             custom_lop_amount: 0,
           });
@@ -554,7 +619,6 @@ const PayrollManagement = () => {
           const d = ss?.deductions || {};
           basePay =
             (parseFloat(e.basic) || 0) +
-            (parseFloat(e.da) || 0) +
             (parseFloat(e.hra) || 0) +
             (parseFloat(e.conveyance) || 0) +
             (parseFloat(e.medical) || 0) +
@@ -871,27 +935,40 @@ const PayrollManagement = () => {
     const deductions = ss.deductions || {};
     const curSal = parseFloat(emp.current_salary) || 25000;
     const initialBasic = earnings.basic != null ? parseFloat(earnings.basic) : Math.round(curSal * 0.45);
+    const initialHra = earnings.hra != null ? parseFloat(earnings.hra) : Math.round(curSal * 0.4);
+    const initialAllowance = earnings.allowance != null ? parseFloat(earnings.allowance) : Math.round(curSal * 0.1);
+    const initialConveyance = earnings.conveyance != null ? parseFloat(earnings.conveyance) : 1600;
+    const initialMedical = earnings.medical != null ? parseFloat(earnings.medical) : 1250;
+    const initialGross = initialBasic + initialHra + initialAllowance + initialConveyance + initialMedical || curSal;
+    const initialIsEsi = initialGross <= 21000;
     const initialEsi = deductions.esi != null ? parseFloat(deductions.esi) : 0;
-    const initialMedi = deductions.mediclaim != null ? parseFloat(deductions.mediclaim) : 0;
+    const empType = emp.employment_type || "Permanent";
+    const isPerm = (empType.toLowerCase() === "permanent");
 
     // Initial populate from cached employee object
     setEditStructureData({
       basic: initialBasic,
       da: 0,
-      hra: earnings.hra != null ? parseFloat(earnings.hra) : Math.round(curSal * 0.4),
-      allowance: earnings.allowance != null ? parseFloat(earnings.allowance) : Math.round(curSal * 0.1),
-      conveyance: earnings.conveyance != null ? parseFloat(earnings.conveyance) : 1600,
-      medical: earnings.medical != null ? parseFloat(earnings.medical) : 1250,
+      hra: initialHra,
+      allowance: initialAllowance,
+      conveyance: initialConveyance,
+      medical: initialMedical,
       professional_tax: deductions.professional_tax != null ? parseFloat(deductions.professional_tax) : 200,
       income_tax: deductions.income_tax != null ? parseFloat(deductions.income_tax) : 0,
       pf:
         deductions.pf != null
           ? parseFloat(deductions.pf)
           : Math.round(initialBasic * 0.12),
-      esi: initialBasic <= 15000 ? (initialEsi || initialMedi) : 0,
-      mediclaim: initialBasic > 15000 ? (initialMedi || initialEsi) : 0,
+      esi: initialIsEsi ? (initialEsi || initialMedi) : 0,
+      mediclaim: !initialIsEsi ? (initialMedi || initialEsi) : 0,
       tds: deductions.tds != null ? parseFloat(deductions.tds) : 0,
       lop: deductions.lop != null ? parseFloat(deductions.lop) : 0,
+      employment_type: empType,
+      advance_amount: isPerm ? (parseFloat(emp.advance_amount) || 0) : 0,
+      advance_deduction: isPerm ? (parseFloat(emp.advance_deduction) || 0) : 0,
+      loan_amount: isPerm ? (parseFloat(emp.loan_amount) || 0) : 0,
+      loan_emi: isPerm ? (parseFloat(emp.loan_emi) || 0) : 0,
+      insurance_deduction: isPerm ? (parseFloat(emp.insurance_deduction) || 0) : 0,
     });
 
     // Fetch live real-time salary structure from database
@@ -903,22 +980,39 @@ const PayrollManagement = () => {
         const liveEarnings = data.salary.earnings || {};
         const liveDeductions = data.salary.deductions || {};
         const liveBasic = liveEarnings.basic != null ? parseFloat(liveEarnings.basic) : 0;
+        const liveHra = liveEarnings.hra != null ? parseFloat(liveEarnings.hra) : 0;
+        const liveAllowance = liveEarnings.allowance != null ? parseFloat(liveEarnings.allowance) : 0;
+        const liveConveyance = liveEarnings.conveyance != null ? parseFloat(liveEarnings.conveyance) : 0;
+        const liveMedical = liveEarnings.medical != null ? parseFloat(liveEarnings.medical) : 0;
+        const liveGross = data.salary.gross_salary != null
+          ? parseFloat(data.salary.gross_salary)
+          : (liveBasic + liveHra + liveAllowance + liveConveyance + liveMedical);
+        const liveIsEsi = liveGross <= 21000;
         const liveEsi = liveDeductions.esi != null ? parseFloat(liveDeductions.esi) : 0;
         const liveMedi = liveDeductions.mediclaim != null ? parseFloat(liveDeductions.mediclaim) : 0;
+        const liveEmpType = data.salary.employment_type || empType || "Permanent";
+        const liveIsPerm = data.salary.is_permanent ?? (liveEmpType.toLowerCase() === "permanent");
+
         setEditStructureData({
           basic: liveBasic,
           da: 0,
-          hra: liveEarnings.hra != null ? parseFloat(liveEarnings.hra) : 0,
-          allowance: liveEarnings.allowance != null ? parseFloat(liveEarnings.allowance) : 0,
-          conveyance: liveEarnings.conveyance != null ? parseFloat(liveEarnings.conveyance) : 0,
-          medical: liveEarnings.medical != null ? parseFloat(liveEarnings.medical) : 0,
+          hra: liveHra,
+          allowance: liveAllowance,
+          conveyance: liveConveyance,
+          medical: liveMedical,
           professional_tax: liveDeductions.professional_tax != null ? parseFloat(liveDeductions.professional_tax) : 0,
           income_tax: liveDeductions.income_tax != null ? parseFloat(liveDeductions.income_tax) : 0,
           pf: liveDeductions.pf != null ? parseFloat(liveDeductions.pf) : 0,
-          esi: liveBasic <= 15000 ? (liveEsi || liveMedi) : 0,
-          mediclaim: liveBasic > 15000 ? (liveMedi || liveEsi) : 0,
+          esi: liveIsEsi ? (liveEsi || liveMedi) : 0,
+          mediclaim: !liveIsEsi ? (liveMedi || liveEsi) : 0,
           tds: liveDeductions.tds != null ? parseFloat(liveDeductions.tds) : 0,
           lop: liveDeductions.lop != null ? parseFloat(liveDeductions.lop) : 0,
+          employment_type: liveEmpType,
+          advance_amount: liveIsPerm ? (parseFloat(data.salary.advance_amount) || 0) : 0,
+          advance_deduction: liveIsPerm ? (parseFloat(data.salary.advance_deduction) || 0) : 0,
+          loan_amount: liveIsPerm ? (parseFloat(data.salary.loan_amount) || 0) : 0,
+          loan_emi: liveIsPerm ? (parseFloat(data.salary.loan_emi) || 0) : 0,
+          insurance_deduction: liveIsPerm ? (parseFloat(data.salary.insurance_deduction) || 0) : 0,
         });
       }
     } catch (err) {
@@ -938,17 +1032,25 @@ const PayrollManagement = () => {
   }, [editStructureData]);
 
   const computedEditDeductions = useMemo(() => {
-    const isEsi = (parseFloat(editStructureData.basic) || 0) <= 15000;
+    const isEsi = computedEditGross <= 21000;
     const healthDeduction = isEsi ? (parseFloat(editStructureData.esi) || 0) : (parseFloat(editStructureData.mediclaim) || 0);
+    const isPerm = (editStructureData.employment_type || "Permanent").toLowerCase() === "permanent";
+    const advDed = isPerm ? (parseFloat(editStructureData.advance_deduction) || 0) : 0;
+    const loanEmi = isPerm ? (parseFloat(editStructureData.loan_emi) || 0) : 0;
+    const insDed = isPerm ? (parseFloat(editStructureData.insurance_deduction) || 0) : 0;
+
     return (
       (parseFloat(editStructureData.professional_tax) || 0) +
       (parseFloat(editStructureData.income_tax) || 0) +
       (parseFloat(editStructureData.pf) || 0) +
       healthDeduction +
       (parseFloat(editStructureData.tds) || 0) +
-      (parseFloat(editStructureData.lop) || 0)
+      (parseFloat(editStructureData.lop) || 0) +
+      advDed +
+      loanEmi +
+      insDed
     );
-  }, [editStructureData]);
+  }, [editStructureData, computedEditGross]);
 
   const computedEditNet = useMemo(() => {
     return Math.max(0, computedEditGross - computedEditDeductions);
@@ -957,13 +1059,32 @@ const PayrollManagement = () => {
   // Save Salary Structure via API
   const handleSaveSalaryStructure = async () => {
     if (!editingEmp) return;
+
+    const isPerm = (editStructureData.employment_type || "Permanent").toLowerCase() === "permanent";
+    const advAmount = isPerm ? (parseFloat(editStructureData.advance_amount) || 0) : 0;
+    const loanAmount = isPerm ? (parseFloat(editStructureData.loan_amount) || 0) : 0;
+
+    if (isPerm && advAmount > 100000) {
+      setAlertMsg({
+        type: "danger",
+        text: "Advance Payment limit exceeded: Maximum allowed is ₹1,00,000 (1 Lakh).",
+      });
+      return;
+    }
+    if (isPerm && loanAmount > 0 && (loanAmount < 100000 || loanAmount > 1000000)) {
+      setAlertMsg({
+        type: "danger",
+        text: "Company Loan amount must be between ₹1,00,000 and ₹10,00,000 (1 to 10 Lakhs).",
+      });
+      return;
+    }
+
     setSavingStructure(true);
     try {
       const empId = editingEmp.employee_code || editingEmp.id;
       const userRole = (localStorage.getItem("role") || "admin").toLowerCase();
       const token = localStorage.getItem("token");
-      const curBasic = parseFloat(editStructureData.basic) || 0;
-      const isEsi = curBasic <= 15000;
+      const isEsi = computedEditGross <= 21000;
 
       const res = await fetch(`${API}/employees/${empId}/salary`, {
         method: "POST",
@@ -977,6 +1098,12 @@ const PayrollManagement = () => {
           da: 0,
           esi: isEsi ? (parseFloat(editStructureData.esi) || 0) : 0,
           mediclaim: !isEsi ? (parseFloat(editStructureData.mediclaim) || 0) : 0,
+          employment_type: editStructureData.employment_type || "Permanent",
+          advance_amount: advAmount,
+          advance_deduction: isPerm ? (parseFloat(editStructureData.advance_deduction) || 0) : 0,
+          loan_amount: loanAmount,
+          loan_emi: isPerm ? (parseFloat(editStructureData.loan_emi) || 0) : 0,
+          insurance_deduction: isPerm ? (parseFloat(editStructureData.insurance_deduction) || 0) : 0,
           role: userRole || "admin",
         }),
       });
@@ -1015,7 +1142,6 @@ const PayrollManagement = () => {
 
     const grossCalc =
       (parseFloat(fixedPay.basic) || 0) +
-      (parseFloat(fixedPay.da) || 0) +
       (parseFloat(fixedPay.hra) || 0) +
       (parseFloat(fixedPay.conveyance) || 0) +
       (parseFloat(fixedPay.medical) || 0) +
@@ -1026,12 +1152,20 @@ const PayrollManagement = () => {
         ? Math.round((grossCalc / (attendance.total_days || 30)) * attendance.lop_days)
         : 0;
 
+    const isPermanent = employeeInfo.is_permanent !== false && adjustments.is_permanent !== false;
+    const advDed = isPermanent ? (parseFloat(adjustments.advance_deduction) || 0) : 0;
+    const loanEmi = isPermanent ? (parseFloat(adjustments.loan_emi) || 0) : 0;
+    const insDed = isPermanent ? (parseFloat(adjustments.insurance_deduction) || 0) : 0;
+
     const deductionsCalc =
       (parseFloat(statutory.pf) || 0) +
       (parseFloat(statutory.esi) || 0) +
       (parseFloat(statutory.pt) || 0) +
       (parseFloat(taxData.tds) || 0) +
-      lopCalc;
+      lopCalc +
+      advDed +
+      loanEmi +
+      insDed;
 
     const netCalc = Math.max(0, grossCalc - deductionsCalc);
 
@@ -1040,7 +1174,6 @@ const PayrollManagement = () => {
       month_year: currentMonthYear,
       fixed_pay: {
         basic: parseFloat(fixedPay.basic) || 0,
-        da: parseFloat(fixedPay.da) || 0,
         hra: parseFloat(fixedPay.hra) || 0,
         conveyance: parseFloat(fixedPay.conveyance) || 0,
         medical: parseFloat(fixedPay.medical) || 0,
@@ -1061,6 +1194,19 @@ const PayrollManagement = () => {
       lop_deduction: lopCalc,
       tax_deductions: taxData,
       statutory_deductions: statutory,
+      adjustments: {
+        ...adjustments,
+        is_permanent: isPermanent,
+        employment_type: employeeInfo.employment_type || adjustments.employment_type || "Permanent",
+        advance_deduction: advDed,
+        loan_emi: loanEmi,
+        insurance_deduction: insDed,
+      },
+      other_deductions: {
+        advance_deduction: advDed,
+        loan_emi: loanEmi,
+        insurance_deduction: insDed,
+      },
       total_deductions: deductionsCalc,
       net_salary: netCalc,
       status: targetStatus,
@@ -1247,17 +1393,15 @@ const PayrollManagement = () => {
       attendance.lop_days > 0
         ? Math.round(
           (((parseFloat(fixedPay.basic) || 0) +
-            (parseFloat(fixedPay.da) || 0) +
             (parseFloat(fixedPay.hra) || 0)) /
             (attendance.total_days || 30)) *
           attendance.lop_days
         )
         : 0;
 
-    // Filter positive earnings only
+    // Filter positive earnings only (DA removed)
     const earningsList = [
       { label: "Basic Salary", amount: parseFloat(fixedPay.basic) || 0 },
-      { label: "Dearness Allowance (DA)", amount: parseFloat(fixedPay.da) || 0 },
       {
         label: "House Rent Allowance (HRA)",
         amount: parseFloat(fixedPay.hra) || 0,
@@ -1283,19 +1427,29 @@ const PayrollManagement = () => {
       },
     ].filter((item) => item.amount > 0);
 
+    const totalGross = earningsList.reduce((acc, it) => acc + it.amount, 0);
+    const isEsi = totalGross <= 21000;
+    const isPermanent = employeeInfo.is_permanent !== false && adjustments.is_permanent !== false;
+
     // Filter positive deductions only
     const deductionsList = [
       { label: "Provident Fund (PF)", amount: parseFloat(statutory.pf) || 0 },
-      {
-        label: "Employee State Insurance (ESI)",
-        amount: parseFloat(statutory.esi) || 0,
-      },
+      isEsi
+        ? { label: "Employee State Insurance (ESI)", amount: parseFloat(statutory.esi) || 0 }
+        : { label: "Mediclaim", amount: parseFloat(statutory.esi || statutory.mediclaim) || 0 },
       { label: "Professional Tax (PT)", amount: parseFloat(statutory.pt) || 0 },
       { label: "TDS / Income Tax", amount: parseFloat(taxData.tds) || 0 },
       { label: "Loss of Pay (LOP)", amount: lopCalc },
+      ...(isPermanent && parseFloat(adjustments.advance_deduction) > 0
+        ? [{ label: "Advance Payment Recovery", amount: parseFloat(adjustments.advance_deduction) || 0 }]
+        : []),
+      ...(isPermanent && parseFloat(adjustments.loan_emi) > 0
+        ? [{ label: "Company Loan EMI", amount: parseFloat(adjustments.loan_emi) || 0 }]
+        : []),
+      ...(isPermanent && parseFloat(adjustments.insurance_deduction) > 0
+        ? [{ label: "Corporate Insurance Premium", amount: parseFloat(adjustments.insurance_deduction) || 0 }]
+        : []),
     ].filter((item) => item.amount > 0);
-
-    const totalGross = earningsList.reduce((acc, it) => acc + it.amount, 0);
     const totalDeds = deductionsList.reduce((acc, it) => acc + it.amount, 0);
     const netPayable = Math.max(0, totalGross - totalDeds);
 
@@ -1449,11 +1603,10 @@ const PayrollManagement = () => {
     doc.save(`Payroll_Summary_${selectedMonth}_${selectedYear}.pdf`);
   };
 
-  // Calculate non-zero view breakdown items for View Modal
+  // Calculate non-zero view breakdown items for View Modal (DA removed)
   const viewEarningsItems = useMemo(() => {
     return [
       { label: "Basic Salary", amount: parseFloat(fixedPay.basic) || 0, type: "Base" },
-      { label: "Dearness Allowance (DA)", amount: parseFloat(fixedPay.da) || 0, type: "Base" },
       { label: "House Rent Allowance (HRA)", amount: parseFloat(fixedPay.hra) || 0, type: "Base" },
       { label: "Conveyance Allowance", amount: parseFloat(fixedPay.conveyance) || 0, type: "Fixed" },
       { label: "Medical Allowance", amount: parseFloat(fixedPay.medical) || 0, type: "Fixed" },
@@ -1465,30 +1618,66 @@ const PayrollManagement = () => {
     ].filter((it) => it.amount > 0);
   }, [fixedPay, variablePay]);
 
+  const viewGrossTotal = useMemo(() => {
+    return viewEarningsItems.reduce((acc, it) => acc + it.amount, 0);
+  }, [viewEarningsItems]);
+
   const viewDeductionsItems = useMemo(() => {
+    const isEsi = viewGrossTotal <= 21000;
+    const isPermanent = employeeInfo.is_permanent !== false && adjustments.is_permanent !== false;
+
     const lopCalc =
       attendance.lop_days > 0
         ? Math.round(
           (((parseFloat(fixedPay.basic) || 0) +
-            (parseFloat(fixedPay.da) || 0) +
-            (parseFloat(fixedPay.hra) || 0)) /
+            (parseFloat(fixedPay.hra) || 0) +
+            (parseFloat(fixedPay.conveyance) || 0) +
+            (parseFloat(fixedPay.medical) || 0) +
+            (parseFloat(fixedPay.allowance) || 0)) /
             (attendance.total_days || 30)) *
           attendance.lop_days
         )
         : 0;
 
-    return [
+    const items = [
       { label: "Provident Fund (PF)", amount: parseFloat(statutory.pf) || 0 },
-      { label: "Employee State Insurance (ESI)", amount: parseFloat(statutory.esi) || 0 },
+      isEsi
+        ? { label: "Employee State Insurance (ESI)", amount: parseFloat(statutory.esi) || 0 }
+        : { label: "Mediclaim", amount: parseFloat(statutory.esi || statutory.mediclaim) || 0 },
       { label: "Professional Tax (PT)", amount: parseFloat(statutory.pt) || 0 },
       { label: "TDS / Income Tax", amount: parseFloat(taxData.tds) || 0 },
       { label: "Loss of Pay (LOP)", amount: lopCalc },
       { label: "Other Deductions", amount: parseFloat(statutory.others) || 0 },
-    ].filter((it) => it.amount > 0);
-  }, [statutory, taxData, attendance, fixedPay]);
+    ];
 
-  const viewGrossTotal = viewEarningsItems.reduce((acc, it) => acc + it.amount, 0);
-  const viewDeductionsTotal = viewDeductionsItems.reduce((acc, it) => acc + it.amount, 0);
+    if (isPermanent) {
+      if (parseFloat(adjustments.advance_deduction) > 0) {
+        items.push({
+          label: "Advance Payment Recovery",
+          amount: parseFloat(adjustments.advance_deduction) || 0,
+        });
+      }
+      if (parseFloat(adjustments.loan_emi) > 0) {
+        items.push({
+          label: "Company Loan EMI",
+          amount: parseFloat(adjustments.loan_emi) || 0,
+        });
+      }
+      if (parseFloat(adjustments.insurance_deduction) > 0) {
+        items.push({
+          label: "Corporate Group Insurance",
+          amount: parseFloat(adjustments.insurance_deduction) || 0,
+        });
+      }
+    }
+
+    return items.filter((it) => it.amount > 0);
+  }, [statutory, taxData, attendance, fixedPay, adjustments, employeeInfo, viewGrossTotal]);
+
+  const viewDeductionsTotal = useMemo(() => {
+    return viewDeductionsItems.reduce((acc, it) => acc + it.amount, 0);
+  }, [viewDeductionsItems]);
+
   const viewNetSalary = Math.max(0, viewGrossTotal - viewDeductionsTotal);
 
   // ══ REGULAR EMPLOYEE VIEW: SHOW SALARY STRUCTURE ══
@@ -1649,10 +1838,6 @@ const PayrollManagement = () => {
                   <span className="fw-semibold text-dark">{fmt(fixedPay.basic)}</span>
                 </div>
                 <div className="d-flex justify-content-between small">
-                  <span className="text-muted">Dearness Allowance (DA)</span>
-                  <span className="fw-semibold text-dark">{fmt(fixedPay.da)}</span>
-                </div>
-                <div className="d-flex justify-content-between small">
                   <span className="text-muted">House Rent Allowance (HRA)</span>
                   <span className="fw-semibold text-dark">{fmt(fixedPay.hra)}</span>
                 </div>
@@ -1691,8 +1876,10 @@ const PayrollManagement = () => {
                   <span className="fw-semibold text-danger">{fmt(statutory.pf)}</span>
                 </div>
                 <div className="d-flex justify-content-between small">
-                  <span className="text-muted">Employee State Insurance (ESI)</span>
-                  <span className="fw-semibold text-danger">{fmt(statutory.esi)}</span>
+                  <span className="text-muted">
+                    {viewGrossTotal <= 21000 ? "Employee State Insurance (ESI)" : "Mediclaim Health Coverage"}
+                  </span>
+                  <span className="fw-semibold text-danger">{fmt(statutory.esi || statutory.mediclaim)}</span>
                 </div>
                 <div className="d-flex justify-content-between small">
                   <span className="text-muted">Professional Tax (PT)</span>
@@ -1715,6 +1902,24 @@ const PayrollManagement = () => {
                     {fmt(parseFloat(taxData.tds) + parseFloat(taxData.other_tax || 0))}
                   </span>
                 </div>
+                {parseFloat(adjustments.advance_deduction) > 0 && (
+                  <div className="d-flex justify-content-between small">
+                    <span className="text-muted">Advance Payment Recovery</span>
+                    <span className="fw-semibold text-danger">{fmt(adjustments.advance_deduction)}</span>
+                  </div>
+                )}
+                {parseFloat(adjustments.loan_emi) > 0 && (
+                  <div className="d-flex justify-content-between small">
+                    <span className="text-muted">Company Loan EMI</span>
+                    <span className="fw-semibold text-danger">{fmt(adjustments.loan_emi)}</span>
+                  </div>
+                )}
+                {parseFloat(adjustments.insurance_deduction) > 0 && (
+                  <div className="d-flex justify-content-between small">
+                    <span className="text-muted">Corporate Group Insurance</span>
+                    <span className="fw-semibold text-danger">{fmt(adjustments.insurance_deduction)}</span>
+                  </div>
+                )}
                 <div className="d-flex justify-content-between small">
                   <span className="text-muted">Loss of Pay (LOP Policy)</span>
                   <span className="fw-semibold text-muted">Applicable on unpaid absence</span>
@@ -2480,12 +2685,38 @@ const PayrollManagement = () => {
               {editingEmp?.designation || editingEmp?.dept}
             </small>
           </div>
-          <button
-            className="btn btn-sm btn-light border rounded p-1"
-            onClick={() => setShowEditStructureModal(false)}
-          >
-            ✕
-          </button>
+          <div className="d-flex align-items-center gap-3">
+            <div className="d-flex align-items-center gap-2">
+              <label className="small fw-semibold text-muted mb-0">Status:</label>
+              <Form.Select
+                size="sm"
+                className="fw-bold"
+                style={{
+                  width: "135px",
+                  borderColor: (editStructureData.employment_type || "Permanent").toLowerCase() === "permanent" ? "#10b981" : "#f59e0b",
+                  color: (editStructureData.employment_type || "Permanent").toLowerCase() === "permanent" ? "#065f46" : "#b45309",
+                  background: (editStructureData.employment_type || "Permanent").toLowerCase() === "permanent" ? "#ecfdf5" : "#fffbeb",
+                }}
+                value={editStructureData.employment_type || "Permanent"}
+                onChange={(e) =>
+                  setEditStructureData({
+                    ...editStructureData,
+                    employment_type: e.target.value,
+                  })
+                }
+              >
+                <option value="Permanent">Permanent</option>
+                <option value="Probation">Probation</option>
+                <option value="Intern">Intern</option>
+              </Form.Select>
+            </div>
+            <button
+              className="btn btn-sm btn-light border rounded p-1"
+              onClick={() => setShowEditStructureModal(false)}
+            >
+              ✕
+            </button>
+          </div>
         </Modal.Header>
 
         <Modal.Body className="p-4 bg-light bg-opacity-50">
@@ -2621,25 +2852,26 @@ const PayrollManagement = () => {
                   />
                 </div>
 
-                {(parseFloat(editStructureData.basic) || 0) <= 15000 ? (
+                {computedEditGross <= 21000 ? (
                   <div className="mb-2">
                     <div className="d-flex justify-content-between align-items-center mb-1">
                       <label className="form-label small text-muted mb-0">
                         Employee State Insurance (ESI)
                       </label>
                       <Badge bg="info" className="fw-normal" style={{ fontSize: "9px" }}>
-                        Basic ≤ ₹15,000
+                        Total Salary ≤ ₹21,000
                       </Badge>
                     </div>
                     <Form.Control
                       type="number"
                       size="sm"
                       className="fw-semibold"
-                      value={editStructureData.esi === 0 ? 0 : (editStructureData.esi ?? "")}
+                      value={editStructureData.esi === 0 ? 0 : (editStructureData.esi || editStructureData.mediclaim || "")}
                       onChange={(e) =>
                         setEditStructureData({
                           ...editStructureData,
                           esi: e.target.value === "" ? "" : (parseFloat(e.target.value) || 0),
+                          mediclaim: 0,
                         })
                       }
                       placeholder="0.00"
@@ -2652,18 +2884,19 @@ const PayrollManagement = () => {
                         Mediclaim
                       </label>
                       <Badge bg="primary" className="fw-normal" style={{ fontSize: "9px" }}>
-                        Basic &gt; ₹15,000
+                        Total Salary &gt; ₹21,000
                       </Badge>
                     </div>
                     <Form.Control
                       type="number"
                       size="sm"
                       className="fw-semibold"
-                      value={editStructureData.mediclaim === 0 ? 0 : (editStructureData.mediclaim ?? "")}
+                      value={editStructureData.mediclaim === 0 ? 0 : (editStructureData.mediclaim || editStructureData.esi || "")}
                       onChange={(e) =>
                         setEditStructureData({
                           ...editStructureData,
                           mediclaim: e.target.value === "" ? "" : (parseFloat(e.target.value) || 0),
+                          esi: 0,
                         })
                       }
                       placeholder="0.00"
@@ -2735,6 +2968,217 @@ const PayrollManagement = () => {
               </Card>
             </Col>
           </Row>
+
+          {/* Section 3: Facilities & Statutory Benefits */}
+          {(() => {
+            const isPerm = (editStructureData.employment_type || "Permanent").toLowerCase() === "permanent";
+            const gratuityMonthly = isPerm
+              ? Math.round(((parseFloat(editStructureData.basic) || 0) * 15) / (26 * 12))
+              : 0;
+
+            return (
+              <Card className="border-0 shadow-xs rounded-3 mt-3 overflow-hidden">
+                <Card.Header
+                  className="py-2.5 px-3 fw-bold small d-flex justify-content-between align-items-center"
+                  style={{
+                    background: isPerm ? "#1e3c72" : "#475569",
+                    color: "#ffffff",
+                  }}
+                >
+                  <div className="d-flex align-items-center gap-2">
+                    <span>🏦 Facilities & Statutory Benefits</span>
+                    <Badge
+                      bg={isPerm ? "success" : "warning"}
+                      className="fw-normal"
+                      style={{ fontSize: "10px" }}
+                    >
+                      {isPerm ? "Permanent Staff Only" : "Locked for " + (editStructureData.employment_type || "Probation")}
+                    </Badge>
+                  </div>
+                  <small className="opacity-90">
+                    {isPerm
+                      ? "Advance (≤ ₹1L) • Loan (₹1L-₹10L) • Insurance • Gratuity"
+                      : "Not Eligible"}
+                  </small>
+                </Card.Header>
+                <Card.Body className="p-3 bg-white">
+                  {!isPerm ? (
+                    <Alert variant="warning" className="mb-0 d-flex align-items-center gap-2 small">
+                      <span className="fs-5">⚠️</span>
+                      <div>
+                        <strong>Facilities Policy Notice:</strong> Advance Payment (up to ₹1 Lakh), Company Loan (₹1 to 10 Lakhs), Corporate Group Insurance, and Gratuity calculations are strictly reserved for <strong>Permanent Employees</strong> only. This employee is categorized as <strong>{editStructureData.employment_type || "Probation / Intern"}</strong> and cannot avail these benefits.
+                      </div>
+                    </Alert>
+                  ) : (
+                    <Row className="g-3">
+                      {/* Advance Payment */}
+                      <Col xs={12} md={6}>
+                        <div className="p-3 rounded border bg-light h-100">
+                          <div className="d-flex justify-content-between align-items-center mb-1">
+                            <strong className="small text-primary">Advance Payment (Up to ₹1,00,000)</strong>
+                            <Badge bg="info" style={{ fontSize: "9px" }}>Max ₹1 Lakh</Badge>
+                          </div>
+                          <div className="text-muted small mb-2" style={{ fontSize: "11px" }}>
+                            Advance granted to permanent employee.
+                          </div>
+                          <Row className="g-2">
+                            <Col xs={6}>
+                              <label className="small mb-1 text-muted" style={{ fontSize: "11px" }}>Principal Advance</label>
+                              <InputGroup size="sm">
+                                <InputGroup.Text>₹</InputGroup.Text>
+                                <Form.Control
+                                  type="number"
+                                  min="0"
+                                  max="100000"
+                                  placeholder="Max 1,00,000"
+                                  value={editStructureData.advance_amount === 0 ? 0 : (editStructureData.advance_amount || "")}
+                                  onChange={(e) => {
+                                    const val = e.target.value === "" ? "" : parseFloat(e.target.value) || 0;
+                                    setEditStructureData({
+                                      ...editStructureData,
+                                      advance_amount: val,
+                                    });
+                                  }}
+                                />
+                              </InputGroup>
+                            </Col>
+                            <Col xs={6}>
+                              <label className="small mb-1 text-muted" style={{ fontSize: "11px" }}>Monthly Recovery</label>
+                              <InputGroup size="sm">
+                                <InputGroup.Text>₹</InputGroup.Text>
+                                <Form.Control
+                                  type="number"
+                                  min="0"
+                                  placeholder="Recovery"
+                                  value={editStructureData.advance_deduction === 0 ? 0 : (editStructureData.advance_deduction || "")}
+                                  onChange={(e) => {
+                                    const val = e.target.value === "" ? "" : parseFloat(e.target.value) || 0;
+                                    setEditStructureData({
+                                      ...editStructureData,
+                                      advance_deduction: val,
+                                    });
+                                  }}
+                                />
+                              </InputGroup>
+                            </Col>
+                          </Row>
+                        </div>
+                      </Col>
+
+                      {/* Company Loan */}
+                      <Col xs={12} md={6}>
+                        <div className="p-3 rounded border bg-light h-100">
+                          <div className="d-flex justify-content-between align-items-center mb-1">
+                            <strong className="small text-primary">Company Loan (₹1 to 10 Lakhs)</strong>
+                            <Badge bg="primary" style={{ fontSize: "9px" }}>₹1L – ₹10L</Badge>
+                          </div>
+                          <div className="text-muted small mb-2" style={{ fontSize: "11px" }}>
+                            Company loan with monthly EMI deduction.
+                          </div>
+                          <Row className="g-2">
+                            <Col xs={6}>
+                              <label className="small mb-1 text-muted" style={{ fontSize: "11px" }}>Loan Principal</label>
+                              <InputGroup size="sm">
+                                <InputGroup.Text>₹</InputGroup.Text>
+                                <Form.Control
+                                  type="number"
+                                  min="100000"
+                                  max="1000000"
+                                  placeholder="1L - 10L"
+                                  value={editStructureData.loan_amount === 0 ? 0 : (editStructureData.loan_amount || "")}
+                                  onChange={(e) => {
+                                    const val = e.target.value === "" ? "" : parseFloat(e.target.value) || 0;
+                                    setEditStructureData({
+                                      ...editStructureData,
+                                      loan_amount: val,
+                                    });
+                                  }}
+                                />
+                              </InputGroup>
+                            </Col>
+                            <Col xs={6}>
+                              <label className="small mb-1 text-muted" style={{ fontSize: "11px" }}>Monthly EMI</label>
+                              <InputGroup size="sm">
+                                <InputGroup.Text>₹</InputGroup.Text>
+                                <Form.Control
+                                  type="number"
+                                  min="0"
+                                  placeholder="Monthly EMI"
+                                  value={editStructureData.loan_emi === 0 ? 0 : (editStructureData.loan_emi || "")}
+                                  onChange={(e) => {
+                                    const val = e.target.value === "" ? "" : parseFloat(e.target.value) || 0;
+                                    setEditStructureData({
+                                      ...editStructureData,
+                                      loan_emi: val,
+                                    });
+                                  }}
+                                />
+                              </InputGroup>
+                            </Col>
+                          </Row>
+                        </div>
+                      </Col>
+
+                      {/* Corporate Group Insurance */}
+                      <Col xs={12} md={6}>
+                        <div className="p-3 rounded border bg-light h-100">
+                          <div className="d-flex justify-content-between align-items-center mb-1">
+                            <strong className="small text-primary">Corporate Group Insurance</strong>
+                            <Badge bg="success" style={{ fontSize: "9px" }}>Health & Life</Badge>
+                          </div>
+                          <div className="text-muted small mb-2" style={{ fontSize: "11px" }}>
+                            Monthly premium deduction for permanent staff coverage.
+                          </div>
+                          <div>
+                            <label className="small mb-1 text-muted" style={{ fontSize: "11px" }}>Monthly Insurance Deduction</label>
+                            <InputGroup size="sm">
+                              <InputGroup.Text>₹</InputGroup.Text>
+                              <Form.Control
+                                type="number"
+                                min="0"
+                                placeholder="Insurance Premium"
+                                value={editStructureData.insurance_deduction === 0 ? 0 : (editStructureData.insurance_deduction || "")}
+                                onChange={(e) => {
+                                  const val = e.target.value === "" ? "" : parseFloat(e.target.value) || 0;
+                                  setEditStructureData({
+                                    ...editStructureData,
+                                    insurance_deduction: val,
+                                  });
+                                }}
+                              />
+                            </InputGroup>
+                          </div>
+                        </div>
+                      </Col>
+
+                      {/* Gratuity Calculation (Payment of Gratuity Act, 1972) */}
+                      <Col xs={12} md={6}>
+                        <div className="p-3 rounded border bg-light h-100">
+                          <div className="d-flex justify-content-between align-items-center mb-1">
+                            <strong className="small text-primary">Gratuity Calculation (Act 1972)</strong>
+                            <Badge bg="secondary" style={{ fontSize: "9px" }}>Statutory CTC</Badge>
+                          </div>
+                          <div className="text-muted small mb-2" style={{ fontSize: "11px" }}>
+                            Formula: (15 × Basic) / (26 × 12) ≈ 4.81% of Basic Monthly.
+                          </div>
+                          <Row className="g-2">
+                            <Col xs={6}>
+                              <div className="small text-muted" style={{ fontSize: "11px" }}>Monthly CTC Accrual:</div>
+                              <div className="fw-bold text-success fs-6 mt-1">{fmt(gratuityMonthly)}</div>
+                            </Col>
+                            <Col xs={6}>
+                              <div className="small text-muted" style={{ fontSize: "11px" }}>Annual Accrual Est.:</div>
+                              <div className="fw-bold text-dark fs-6 mt-1">{fmt(gratuityMonthly * 12)}</div>
+                            </Col>
+                          </Row>
+                        </div>
+                      </Col>
+                    </Row>
+                  )}
+                </Card.Body>
+              </Card>
+            );
+          })()}
 
           {/* Bottom Live Net Salary Highlight Strip */}
           <div
@@ -3009,6 +3453,136 @@ const PayrollManagement = () => {
                   </div>
                 </Col>
               </Row>
+
+              {/* Paid Days Calculation Card */}
+              <div className="bg-white rounded-3 p-3 border shadow-xs mb-3">
+                <div className="d-flex justify-content-between align-items-center mb-2 pb-1 border-bottom">
+                  <div className="d-flex align-items-center gap-2">
+                    <span className="fw-bold small text-dark">📅 Paid Days Calculation</span>
+                    <Badge bg="primary" style={{ fontSize: "10px" }}>Formula Driven</Badge>
+                  </div>
+                  <span className="small text-muted" style={{ fontSize: "11px" }}>
+                    Attendance + Leaves + Holidays − Absents
+                  </span>
+                </div>
+
+                <div className="p-2.5 rounded-2 bg-light mb-2 font-monospace text-center small text-dark fw-bold border">
+                  Paid Days = {attendance.present_days ?? 0} (Present) + {attendance.leave_days || attendance.paid_leaves || 0} (Leaves) + {attendance.holiday_days || 0} (Holidays) − {attendance.absent_days || 0} (Absents)
+                </div>
+
+                <Row className="g-2 text-center">
+                  <Col xs={3}>
+                    <div className="p-1 rounded bg-success bg-opacity-10 border border-success border-opacity-25">
+                      <div className="text-muted" style={{ fontSize: "10px" }}>PRESENT</div>
+                      <div className="fw-bold text-success fs-6">{attendance.present_days ?? 0}</div>
+                    </div>
+                  </Col>
+                  <Col xs={3}>
+                    <div className="p-1 rounded bg-primary bg-opacity-10 border border-primary border-opacity-25">
+                      <div className="text-muted" style={{ fontSize: "10px" }}>LEAVES</div>
+                      <div className="fw-bold text-primary fs-6">{attendance.leave_days || attendance.paid_leaves || 0}</div>
+                    </div>
+                  </Col>
+                  <Col xs={3}>
+                    <div className="p-1 rounded bg-info bg-opacity-10 border border-info border-opacity-25">
+                      <div className="text-muted" style={{ fontSize: "10px" }}>HOLIDAYS</div>
+                      <div className="fw-bold text-info fs-6">{attendance.holiday_days || 0}</div>
+                    </div>
+                  </Col>
+                  <Col xs={3}>
+                    <div className="p-1 rounded bg-danger bg-opacity-10 border border-danger border-opacity-25">
+                      <div className="text-muted" style={{ fontSize: "10px" }}>ABSENTS</div>
+                      <div className="fw-bold text-danger fs-6">{attendance.absent_days || 0}</div>
+                    </div>
+                  </Col>
+                </Row>
+
+                <div className="mt-2 pt-2 border-top d-flex justify-content-between align-items-center small">
+                  <div>
+                    <span className="text-muted">Total Paid Days: </span>
+                    <strong className="text-success fs-6">
+                      {attendance.paid_days != null
+                        ? attendance.paid_days
+                        : Math.max(0, (attendance.present_days ?? 0) + (attendance.leave_days || attendance.paid_leaves || 0) + (attendance.holiday_days || 0) - (attendance.absent_days || 0))}
+                    </strong>
+                    <span className="text-muted"> / {attendance.working_days || 26} Working Days</span>
+                  </div>
+                  <div>
+                    <span className="text-muted">LOP Deduction: </span>
+                    <strong className="text-danger">
+                      {attendance.lop_days || 0} {(attendance.lop_days || 0) === 1 ? "day" : "days"}
+                    </strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* Facilities & Benefits Card (Permanent Staff Only) */}
+              <div className="bg-white rounded-3 p-3 border shadow-xs mb-3">
+                <div className="d-flex justify-content-between align-items-center mb-2 pb-1 border-bottom">
+                  <div className="d-flex align-items-center gap-2">
+                    <span className="fw-bold small text-dark">🏦 Facilities & Statutory Benefits</span>
+                    <Badge
+                      bg={employeeInfo.is_permanent !== false && adjustments.is_permanent !== false ? "success" : "warning"}
+                      style={{ fontSize: "10px" }}
+                    >
+                      {employeeInfo.is_permanent !== false && adjustments.is_permanent !== false
+                        ? "Permanent Staff"
+                        : "Locked: " + (employeeInfo.employment_type || "Probation/Intern")}
+                    </Badge>
+                  </div>
+                  <span className="small text-muted" style={{ fontSize: "11px" }}>
+                    Advance • Loan • Insurance • Gratuity
+                  </span>
+                </div>
+
+                {employeeInfo.is_permanent === false || adjustments.is_permanent === false ? (
+                  <Alert variant="warning" className="mb-0 py-2 small d-flex align-items-center gap-2">
+                    <span>⚠️</span>
+                    <div>
+                      Advance Payment, Company Loan, Insurance, and Gratuity facilities are strictly reserved for <strong>Permanent Employees</strong>. This employee is on <strong>{employeeInfo.employment_type || "Probation / Intern"}</strong>.
+                    </div>
+                  </Alert>
+                ) : (
+                  <Row className="g-2 small">
+                    <Col xs={6}>
+                      <div className="p-2 rounded bg-light border">
+                        <div className="text-muted" style={{ fontSize: "11px" }}>Advance Payment (≤ ₹1L)</div>
+                        <div className="d-flex justify-content-between align-items-center mt-1">
+                          <span className="text-secondary">Principal: {fmt(adjustments.advance_amount)}</span>
+                          <span className="fw-semibold text-danger">Recovery: {fmt(adjustments.advance_deduction)}</span>
+                        </div>
+                      </div>
+                    </Col>
+                    <Col xs={6}>
+                      <div className="p-2 rounded bg-light border">
+                        <div className="text-muted" style={{ fontSize: "11px" }}>Company Loan (₹1L - ₹10L)</div>
+                        <div className="d-flex justify-content-between align-items-center mt-1">
+                          <span className="text-secondary">Loan: {fmt(adjustments.loan_amount)}</span>
+                          <span className="fw-semibold text-danger">EMI: {fmt(adjustments.loan_emi)}</span>
+                        </div>
+                      </div>
+                    </Col>
+                    <Col xs={6}>
+                      <div className="p-2 rounded bg-light border">
+                        <div className="text-muted" style={{ fontSize: "11px" }}>Corporate Group Insurance</div>
+                        <div className="d-flex justify-content-between align-items-center mt-1">
+                          <span className="text-secondary">Coverage Active</span>
+                          <span className="fw-semibold text-danger">Deduction: {fmt(adjustments.insurance_deduction)}</span>
+                        </div>
+                      </div>
+                    </Col>
+                    <Col xs={6}>
+                      <div className="p-2 rounded bg-light border">
+                        <div className="text-muted" style={{ fontSize: "11px" }}>Gratuity Accrual (Act 1972)</div>
+                        <div className="d-flex justify-content-between align-items-center mt-1">
+                          <span className="fw-semibold text-success">Monthly: {fmt(adjustments.gratuity_accrual)}</span>
+                          <span className="text-secondary">Total: {fmt(adjustments.total_gratuity)}</span>
+                        </div>
+                      </div>
+                    </Col>
+                  </Row>
+                )}
+              </div>
 
               {/* Attendance Shift Timing Card */}
               <div className="bg-white rounded-3 p-3 border shadow-xs mb-3">

@@ -23,7 +23,9 @@ import {
   LuEllipsisVertical,
   LuPencil,
   LuShieldCheck,
-  LuUser
+  LuUser,
+  LuArrowUp,
+  LuArrowDown
 } from "react-icons/lu";
 import { MdEdit } from "react-icons/md";
 import { getApiBaseUrl, getUploadUrl } from "../../api/axios";
@@ -118,6 +120,10 @@ const MyAttendance = () => {
   const [selectedStatus, setSelectedStatus] = useState("All");
   const [selectedShift, setSelectedShift] = useState("All");
   const [selectedRange, setSelectedRange] = useState("day"); // "day", "week", "month", "year"
+  const [dateSortOrder, setDateSortOrder] = useState(null); // null = auto by range, "asc" or "desc"
+
+  // Automatically sort ascending for month and year range, or use explicit sort order
+  const effectiveDateSort = dateSortOrder || ((selectedRange === "month" || selectedRange === "year") ? "asc" : "desc");
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -204,6 +210,9 @@ const MyAttendance = () => {
       if (fromDate && toDate) {
         url = `${API}/attendance?from=${fromDate}&to=${toDate}`;
       }
+      if (selectedRange === "month" || selectedRange === "year" || effectiveDateSort === "asc") {
+        url += `&order=${effectiveDateSort}`;
+      }
       if (selectedDept !== "All") {
         url += `&dept=${selectedDept}`;
       }
@@ -227,7 +236,25 @@ const MyAttendance = () => {
 
   useEffect(() => {
     fetchAttendanceList();
-  }, [selectedDateStr, selectedRange, selectedDept, fromDate, toDate]);
+
+    const handleHolidayUpdate = () => {
+      fetchAttendanceList();
+      fetchMonthlyRecords();
+    };
+    window.addEventListener("holiday-updated", handleHolidayUpdate);
+    const handleStorageUpdate = (e) => {
+      if (e.key === "holiday_last_updated") {
+        fetchAttendanceList();
+        fetchMonthlyRecords();
+      }
+    };
+    window.addEventListener("storage", handleStorageUpdate);
+
+    return () => {
+      window.removeEventListener("holiday-updated", handleHolidayUpdate);
+      window.removeEventListener("storage", handleStorageUpdate);
+    };
+  }, [selectedDateStr, selectedRange, selectedDept, fromDate, toDate, effectiveDateSort]);
 
   // Fetch full month attendance for KPI metrics
   const fetchMonthlyRecords = async () => {
@@ -399,6 +426,22 @@ const MyAttendance = () => {
     }
 
     return true;
+  })
+  .sort((a, b) => {
+    const isAsc = effectiveDateSort === "asc";
+    const dateA = a.date || "";
+    const dateB = b.date || "";
+    if (dateA !== dateB) {
+      return isAsc ? dateA.localeCompare(dateB) : dateB.localeCompare(dateA);
+    }
+    const empA = a.employee_id || "";
+    const empB = b.employee_id || "";
+    if (empA !== empB) {
+      return empA.localeCompare(empB);
+    }
+    const inA = a.check_in || "";
+    const inB = b.check_in || "";
+    return inA.localeCompare(inB);
   });
 
   // 1. Target Employee Resolution for Personal/Employee KPI Widgets
@@ -934,6 +977,8 @@ const MyAttendance = () => {
               value={selectedRange}
               onChange={(e) => {
                 setSelectedRange(e.target.value);
+                setDateSortOrder(null);
+                setCurrentPage(1);
                 if (fromDate || toDate) {
                   setFromDate("");
                   setToDate("");
@@ -1003,7 +1048,35 @@ const MyAttendance = () => {
               <tr>
                 <th style={{ minWidth: "220px" }}>Employee Name</th>
                 <th style={{ minWidth: "110px" }}>Employee ID</th>
-                <th style={{ minWidth: "125px" }}>Date</th>
+                <th
+                  style={{ minWidth: "135px" }}
+                  className="cursor-pointer select-none hover:text-blue-600 transition-colors"
+                  onClick={() => {
+                    setDateSortOrder(effectiveDateSort === "asc" ? "desc" : "asc");
+                  }}
+                  title="Click to toggle Date sort order"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span>Date</span>
+                    <span
+                      className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-extrabold transition-colors ${
+                        effectiveDateSort === "asc"
+                          ? "bg-blue-50 text-blue-600 border border-blue-200"
+                          : "bg-slate-100 text-slate-500 border border-slate-200"
+                      }`}
+                    >
+                      {effectiveDateSort === "asc" ? (
+                        <>
+                          <LuArrowUp className="h-3 w-3" /> ASC
+                        </>
+                      ) : (
+                        <>
+                          <LuArrowDown className="h-3 w-3" /> DESC
+                        </>
+                      )}
+                    </span>
+                  </div>
+                </th>
                 <th style={{ minWidth: "120px" }}>Department</th>
                 <th style={{ minWidth: "150px" }}>Designation</th>
                 <th style={{ minWidth: "110px" }}>Shift</th>

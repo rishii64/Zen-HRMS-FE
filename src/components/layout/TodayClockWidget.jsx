@@ -37,13 +37,57 @@ export default function TodayClockWidget({ onStatusChange }) {
     fetchTodayStatus();
   }, []);
 
+  // Safely parses a shift time string (24h or 12h or with fallbacks) into valid { h, m }
+  const parseShiftTime = (timeStr, defaultH = 10, defaultM = 0) => {
+    if (!timeStr || typeof timeStr !== "string") {
+      return { h: defaultH, m: defaultM };
+    }
+    const trimmed = timeStr.trim();
+    if (trimmed === "—" || trimmed === "-" || !trimmed.includes(":")) {
+      return { h: defaultH, m: defaultM };
+    }
+
+    const isPM = /pm/i.test(trimmed);
+    const isAM = /am/i.test(trimmed);
+    const clean = trimmed.replace(/[^\d:]/g, "").trim();
+    const parts = clean.split(":");
+    let h = parseInt(parts[0], 10);
+    let m = parseInt(parts[1], 10);
+
+    if (isNaN(h)) h = defaultH;
+    if (isNaN(m)) m = defaultM;
+
+    if (isPM && h < 12) h += 12;
+    if (isAM && h === 12) h = 0;
+
+    return { h, m };
+  };
+
+  // Format check-in time string to 12-hour format e.g. "10:15 AM"
+  const formatCheckInTime = (timeStr) => {
+    if (!timeStr || timeStr === "—" || typeof timeStr !== "string") return null;
+    try {
+      const { h, m } = parseShiftTime(timeStr, 10, 0);
+      const ampm = h >= 12 ? "PM" : "AM";
+      const displayH = h % 12 || 12;
+      const displayM = String(m).padStart(2, "0");
+      return `${displayH}:${displayM} ${ampm}`;
+    } catch {
+      return timeStr;
+    }
+  };
+
   // Calculate office time remaining based on assigned shift (e.g. 10:00 to 19:00)
   const getCheckInTimeLeft = () => {
-    const shiftStart = todayRecord?.shift_start || schedule?.start_time || "10:00";
-    const shiftEnd = todayRecord?.shift_end || schedule?.end_time || "19:00";
+    if (todayRecord?.check_out && todayRecord.check_out !== "—") {
+      return "Shift completed";
+    }
 
-    const [startH, startM] = shiftStart.split(":").map((v) => parseInt(v, 10) || 0);
-    const [endH, endM] = shiftEnd.split(":").map((v) => parseInt(v, 10) || 0);
+    const rawShiftStart = todayRecord?.shift_start || schedule?.start_time;
+    const rawShiftEnd = todayRecord?.shift_end || schedule?.end_time;
+
+    const { h: startH, m: startM } = parseShiftTime(rawShiftStart, 10, 0);
+    const { h: endH, m: endM } = parseShiftTime(rawShiftEnd, 19, 0);
 
     const start = new Date(now);
     start.setHours(startH, startM, 0, 0);
@@ -61,11 +105,12 @@ export default function TodayClockWidget({ onStatusChange }) {
     }
 
     if (now < start) {
-      return `Office starts at ${formatCheckInTime(shiftStart)}`;
+      const displayStart = formatCheckInTime(rawShiftStart) || "10:00 AM";
+      return `Office starts at ${displayStart}`;
     }
 
-    const diffMs = end - now;
-    if (diffMs <= 0) {
+    const diffMs = end.getTime() - now.getTime();
+    if (isNaN(diffMs) || diffMs <= 0) {
       return "Office hours completed";
     }
 
@@ -73,22 +118,11 @@ export default function TodayClockWidget({ onStatusChange }) {
     const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
     const secs = Math.floor((diffMs % (1000 * 60)) / 1000);
 
-    return `${hrs}h ${mins}m ${secs}s`;
-  };
-
-  // Format check-in time string to 12-hour format e.g. "10:15 AM"
-  const formatCheckInTime = (timeStr) => {
-    if (!timeStr || timeStr === "—") return null;
-    try {
-      const parts = timeStr.split(":");
-      let hrs = parseInt(parts[0], 10);
-      const mins = parts[1] || "00";
-      const ampm = hrs >= 12 ? "PM" : "AM";
-      hrs = hrs % 12 || 12;
-      return `${hrs}:${mins} ${ampm}`;
-    } catch {
-      return timeStr;
+    if (isNaN(hrs) || isNaN(mins) || isNaN(secs)) {
+      return "Office hours completed";
     }
+
+    return `${hrs}h ${mins}m ${secs}s`;
   };
 
   const isMarked = Boolean(todayRecord && todayRecord.check_in && todayRecord.check_in !== "—" && todayRecord.status !== "Absent");
@@ -100,26 +134,39 @@ export default function TodayClockWidget({ onStatusChange }) {
     }
 
     const recordDate = todayRecord.date || new Date().toISOString().split("T")[0];
-    const checkInTime = new Date(`${recordDate}T${todayRecord.check_in}`);
-    const checkOutTime = (todayRecord.check_out && todayRecord.check_out !== "—")
-      ? new Date(`${recordDate}T${todayRecord.check_out}`)
-      : now;
+    let checkInTime = new Date(`${recordDate}T${todayRecord.check_in}`);
+    if (isNaN(checkInTime.getTime())) {
+      const { h: ciH, m: ciM } = parseShiftTime(todayRecord.check_in, 10, 0);
+      checkInTime = new Date(now);
+      checkInTime.setHours(ciH, ciM, 0, 0);
+    }
 
-    const diffMs = Math.max(0, checkOutTime - checkInTime);
-    const workedHours = diffMs / (1000 * 60 * 60);
+    let checkOutTime = now;
+    if (todayRecord.check_out && todayRecord.check_out !== "—") {
+      checkOutTime = new Date(`${recordDate}T${todayRecord.check_out}`);
+      if (isNaN(checkOutTime.getTime())) {
+        const { h: coH, m: coM } = parseShiftTime(todayRecord.check_out, 19, 0);
+        checkOutTime = new Date(now);
+        checkOutTime.setHours(coH, coM, 0, 0);
+      }
+    }
 
-    const shiftStart = todayRecord.shift_start || schedule?.start_time || "10:00";
-    const shiftEnd = todayRecord.shift_end || schedule?.end_time || "19:00";
-    const [sH, sM] = shiftStart.split(":").map((v) => parseInt(v, 10) || 0);
-    const [eH, eM] = shiftEnd.split(":").map((v) => parseInt(v, 10) || 0);
+    const diffMs = Math.max(0, checkOutTime.getTime() - checkInTime.getTime());
+    const workedHours = isNaN(diffMs) ? 0 : diffMs / (1000 * 60 * 60);
+
+    const rawShiftStart = todayRecord.shift_start || schedule?.start_time;
+    const rawShiftEnd = todayRecord.shift_end || schedule?.end_time;
+    const { h: sH, m: sM } = parseShiftTime(rawShiftStart, 10, 0);
+    const { h: eH, m: eM } = parseShiftTime(rawShiftEnd, 19, 0);
+
     let totalShiftHours = ((eH * 60 + eM) - (sH * 60 + sM)) / 60;
     if (totalShiftHours <= 0) totalShiftHours += 24;
     if (isNaN(totalShiftHours) || totalShiftHours <= 0) totalShiftHours = 9;
 
-    const percent = Math.min(100, Math.round((workedHours / totalShiftHours) * 100));
+    const percent = Math.min(100, Math.max(0, Math.round((workedHours / totalShiftHours) * 100)));
 
     return {
-      percent,
+      percent: isNaN(percent) ? 0 : percent,
       label: percent >= 70 ? "AVERAGE" : "IN PROGRESS"
     };
   };

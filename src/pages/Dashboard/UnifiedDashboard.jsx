@@ -118,9 +118,6 @@ export default function UnifiedDashboard() {
     } catch {
       setPendingLeavesCount(0);
     }
-
-    // 4. Fetch Company Celebrations (Birthdays & 1-Year Work Anniversaries)
-    await loadCelebrations();
   };
 
   const loadCelebrations = async () => {
@@ -200,6 +197,7 @@ export default function UnifiedDashboard() {
 
   useEffect(() => {
     fetchDashboardData();
+    loadCelebrations();
   }, []);
 
   // Determine active view based on role

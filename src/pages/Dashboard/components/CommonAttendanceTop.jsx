@@ -14,10 +14,7 @@ export default function CommonAttendanceTop({
   attendanceLogs = [],
   tickingTime = new Date(),
   pendingLeavesCount = 0,
-  onStatusChange,
-  celebrationsData = {},
-  celebrationsLoading = false,
-  onOpenBirthdayModal
+  onStatusChange
 }) {
   // Resolve authenticated user employee ID for strict personal log filtering
   const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
@@ -186,185 +183,23 @@ export default function CommonAttendanceTop({
 
   return (
     <div className="common-attendance-section mb-5">
-      {/* Keyframes for Engaging Celebrations Loader */}
-      <style>{`
-        @keyframes festive-pulse {
-          0%, 100% {
-            transform: scale(1);
-            box-shadow: 0 2px 8px rgba(236, 72, 153, 0.28);
-          }
-          50% {
-            transform: scale(1.06);
-            box-shadow: 0 4px 14px rgba(245, 158, 11, 0.45);
-          }
-        }
-        @keyframes cake-wiggle {
-          0%, 100% {
-            transform: rotate(0deg);
-          }
-          20% {
-            transform: rotate(-10deg) scale(1.08);
-          }
-          40% {
-            transform: rotate(10deg) scale(1.08);
-          }
-          60% {
-            transform: rotate(-6deg);
-          }
-          80% {
-            transform: rotate(6deg);
-          }
-        }
-        @keyframes celebration-shimmer {
-          0% {
-            transform: translateX(-150%);
-          }
-          100% {
-            transform: translateX(150%);
-          }
-        }
-      `}</style>
-
       {/* TOP HEADER & GREETINGS ROW */}
       <Row className="mb-4 align-items-center g-3">
-        <Col xs={12} md={6}>
-          <div className="d-flex align-items-center gap-2 flex-wrap">
-            <h2
-              className="fw-bold text-dark m-0 text-[26px] md:text-[28px]"
-              style={{ letterSpacing: "-0.5px" }}
-            >
-              {getGreeting()}
-            </h2>
-            <Badge bg="primary-subtle" className="text-primary rounded-pill px-2.5 py-1 text-[10px] font-bold" >
-              {currentRole === "hr" ? "HR" : currentRole === "accounts" ? "Accounts" : currentRole === "hod" ? "HOD" : currentRole === "admin" ? "Admin" : "Employee"}
-            </Badge>
-          </div>
+        <Col xs={12} md={8}>
+          <h2
+            className="fw-bold text-dark m-0 text-[26px] md:text-[28px]"
+            style={{ letterSpacing: "-0.5px" }}
+          >
+            {getGreeting()}
+          </h2>
+          <Badge bg="primary-subtle" className="text-primary rounded-pill px-2.5 py-1 text-[10px] font-bold" >
+            {currentRole === "hr" ? "HR" : currentRole === "accounts" ? "Accounts" : currentRole === "hod" ? "HOD" : currentRole === "admin" ? "Admin" : "Employee"}
+          </Badge>
           {/* <p className="text-dark mb-0 mt-1 text-[14px] font-medium">
             You have {pendingLeavesCount} leave request pending.
           </p> */}
         </Col>
-        <Col xs={12} md={6} className="d-flex justify-content-md-end align-items-center gap-2.5 flex-wrap">
-          {/* Company Celebrations Widget: Engaging Loader vs Loaded Button */}
-          {celebrationsLoading || !celebrationsData ? (
-            <div
-              className="border-0 shadow-sm rounded-4 px-3.5 py-2 bg-white d-flex align-items-center gap-2.5 position-relative overflow-hidden"
-              style={{
-                height: "54px",
-                minWidth: "165px",
-                border: "1px solid #e2e8f0"
-              }}
-              title="Loading company celebrations..."
-            >
-              <div
-                className="position-absolute top-0 bottom-0 w-100"
-                style={{
-                  background:
-                    "linear-gradient(90deg, transparent 0%, rgba(244, 63, 94, 0.08) 50%, transparent 100%)",
-                  animation: "celebration-shimmer 1.8s infinite",
-                  pointerEvents: "none"
-                }}
-              />
-              <div
-                className="rounded-circle d-flex align-items-center justify-content-center text-white flex-shrink-0"
-                style={{
-                  width: "36px",
-                  height: "36px",
-                  background: "linear-gradient(135deg, #f59e0b 0%, #ec4899 100%)",
-                  boxShadow: "0 2px 8px rgba(236, 72, 153, 0.35)",
-                  animation: "festive-pulse 1.4s ease-in-out infinite"
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: "16px",
-                    display: "inline-block",
-                    animation: "cake-wiggle 1.4s ease-in-out infinite"
-                  }}
-                >
-                  🎂
-                </span>
-              </div>
-              <div className="d-flex flex-column justify-content-center">
-                <div
-                  className="d-flex align-items-center gap-1.5"
-                  style={{ fontSize: "11px", fontWeight: "700", color: "#ec4899" }}
-                >
-                  <span>Birthdays</span>
-                  <span
-                    className="spinner-grow spinner-grow-sm text-danger"
-                    style={{ width: "6px", height: "6px" }}
-                  />
-                </div>
-                <div
-                  className="text-slate-500 d-flex align-items-center gap-1"
-                  style={{ fontSize: "11.5px", fontWeight: "600" }}
-                >
-                  <span>Checking...</span>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={onOpenBirthdayModal}
-              className="border-0 shadow-sm rounded-4 px-3.5 py-2 bg-white d-flex align-items-center gap-2.5 hover:shadow-md transition-all text-start"
-              style={{
-                cursor: "pointer",
-                height: "54px",
-                border:
-                  (celebrationsData?.todaysBirthdays?.length > 0 ||
-                    celebrationsData?.todaysAnniversaries?.length > 0)
-                    ? "1.5px solid #f59e0b"
-                    : "1px solid #e2e8f0"
-              }}
-            >
-            <div
-              className="rounded-circle d-flex align-items-center justify-content-center text-white"
-              style={{
-                width: "36px",
-                height: "36px",
-                background:
-                  (celebrationsData?.todaysBirthdays?.length > 0 ||
-                    celebrationsData?.todaysAnniversaries?.length > 0)
-                    ? "linear-gradient(135deg, #f59e0b 0%, #ef4444 100%)"
-                    : "linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%)",
-                fontSize: "16px"
-              }}
-            >
-              🎂
-            </div>
-            <div>
-              <div
-                style={{
-                  fontSize: "11px",
-                  fontWeight: "700",
-                  color:
-                    (celebrationsData?.todaysBirthdays?.length > 0 ||
-                      celebrationsData?.todaysAnniversaries?.length > 0)
-                      ? "#d97706"
-                      : "#64748b"
-                }}
-                className="d-flex align-items-center gap-1"
-              >
-                <span>Birthdays</span>
-                {(celebrationsData?.todaysBirthdays?.length > 0 ||
-                  celebrationsData?.todaysAnniversaries?.length > 0) && (
-                  <span className="badge bg-amber-500 text-white rounded-pill px-1 text-[9px] animate-pulse">
-                    Today!
-                  </span>
-                )}
-              </div>
-              <div
-                className="fw-bold text-dark text-nowrap"
-                style={{ fontSize: "13px", color: "#1e293b" }}
-              >
-                {celebrationsData?.totalCount || celebrationsData?.birthdays?.length || 12} Members
-              </div>
-            </div>
-          </button>
-          )}
-
-          {/* Current Time Card */}
+        <Col xs={12} md={4} className="d-flex justify-content-md-end">
           <Card className="border-0 shadow-sm rounded-4 px-3.5 py-2 bg-white d-flex flex-row align-items-center gap-3">
             <div>
               <div

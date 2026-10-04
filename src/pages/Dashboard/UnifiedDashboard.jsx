@@ -5,9 +5,6 @@ import EmployeeModulesView from "./components/EmployeeModulesView";
 import HRAdminDashboardView from "./components/HRAdminDashboardView";
 import AccountsDashboardView from "./components/AccountsDashboardView";
 import HODDashboardView from "./components/HODDashboardView";
-import BirthdayCelebrationModal from "./components/BirthdayCelebrationModal";
-import CelebrationPopup from "./components/CelebrationPopup";
-import toast from "react-hot-toast";
 import api, { getUploadUrl } from "../../api/axios";
 
 export default function UnifiedDashboard() {
@@ -16,12 +13,6 @@ export default function UnifiedDashboard() {
   const [attendanceLogs, setAttendanceLogs] = useState([]);
   const [pendingLeavesCount, setPendingLeavesCount] = useState(0);
   const [tickingTime, setTickingTime] = useState(new Date());
-
-  // Company Celebrations: Birthdays & Work Anniversaries
-  const [celebrationsData, setCelebrationsData] = useState(null);
-  const [celebrationsLoading, setCelebrationsLoading] = useState(true);
-  const [showBirthdayModal, setShowBirthdayModal] = useState(false);
-  const [celebrationPopupData, setCelebrationPopupData] = useState({ show: false, data: null });
 
   // Determine role: default from localStorage
   const storedRole = (localStorage.getItem("role") || "employee").toLowerCase();
@@ -117,84 +108,6 @@ export default function UnifiedDashboard() {
       }
     } catch {
       setPendingLeavesCount(0);
-    }
-
-    // 4. Fetch Company Celebrations (Birthdays & 1-Year Work Anniversaries)
-    await loadCelebrations();
-  };
-
-  const loadCelebrations = async () => {
-    setCelebrationsLoading(true);
-    try {
-      const res = await api.get("/celebrations");
-      if (res.data?.success) {
-        const cData = res.data.data;
-        setCelebrationsData(cData);
-
-        // Priority 1: Active Celebration Broadcast from another user/admin
-        if (cData.activeBroadcast) {
-          const bId = cData.activeBroadcast.id;
-          const shownBroadcastKey = `broadcast_shown_${bId}`;
-          if (!sessionStorage.getItem(shownBroadcastKey)) {
-            setCelebrationPopupData({
-              show: true,
-              data: {
-                type: cData.activeBroadcast.type || "birthday",
-                name: cData.activeBroadcast.employee_name,
-                dateStr: cData.activeBroadcast.event_date,
-                message: cData.activeBroadcast.message,
-                tenureYears: 1
-              }
-            });
-            sessionStorage.setItem(shownBroadcastKey, "true");
-            return;
-          }
-        }
-
-        // Priority 2: Today's Birthday popup notification
-        if (cData.todaysBirthdays && cData.todaysBirthdays.length > 0) {
-          const bDay = cData.todaysBirthdays[0];
-          const bKey = `bday_popup_${bDay.id}_${new Date().toISOString().split("T")[0]}`;
-          if (!sessionStorage.getItem(bKey)) {
-            setCelebrationPopupData({
-              show: true,
-              data: {
-                type: "birthday",
-                name: bDay.name,
-                department: bDay.department,
-                designation: bDay.designation,
-                dateStr: bDay.dateStr
-              }
-            });
-            sessionStorage.setItem(bKey, "true");
-            return;
-          }
-        }
-
-        // Priority 3: 1-Year Work Anniversary milestone popup notification
-        if (cData.todaysAnniversaries && cData.todaysAnniversaries.length > 0) {
-          const anniv = cData.todaysAnniversaries[0];
-          const aKey = `anniv_popup_${anniv.id}_${new Date().toISOString().split("T")[0]}`;
-          if (!sessionStorage.getItem(aKey)) {
-            setCelebrationPopupData({
-              show: true,
-              data: {
-                type: "anniversary",
-                name: anniv.name,
-                department: anniv.department,
-                designation: anniv.designation,
-                dateStr: anniv.joiningDate,
-                tenureYears: anniv.tenureYears || 1
-              }
-            });
-            sessionStorage.setItem(aKey, "true");
-          }
-        }
-      }
-    } catch (cErr) {
-      console.warn("Could not fetch celebrations:", cErr.message);
-    } finally {
-      setCelebrationsLoading(false);
     }
   };
 
@@ -310,9 +223,6 @@ export default function UnifiedDashboard() {
           attendanceLogs={attendanceLogs}
           tickingTime={tickingTime}
           onStatusChange={fetchDashboardData}
-          celebrationsData={celebrationsData}
-          celebrationsLoading={celebrationsLoading}
-          onOpenBirthdayModal={() => setShowBirthdayModal(true)}
         />
 
         {/* ============================================================ */}
@@ -330,30 +240,6 @@ export default function UnifiedDashboard() {
 
         {/* 4. HOD / DEPT HEAD: Approval Center + Team Overview + Shifts + OKRs + Direct Reports */}
         {isHod && <HODDashboardView />}
-
-        {/* ============================================================ */}
-        {/* COMPANY CELEBRATION MODALS & BROADCAST POPUPS               */}
-        {/* ============================================================ */}
-        <BirthdayCelebrationModal
-          show={showBirthdayModal}
-          onHide={() => setShowBirthdayModal(false)}
-          celebrationsData={celebrationsData}
-          onBroadcastSuccess={(broadcast) => {
-            loadCelebrations();
-          }}
-          onTriggerPopup={(popupData) => {
-            setCelebrationPopupData({ show: true, data: popupData });
-          }}
-        />
-
-        <CelebrationPopup
-          show={celebrationPopupData.show}
-          onHide={() => setCelebrationPopupData({ show: false, data: null })}
-          celebrationData={celebrationPopupData.data}
-          onSendWish={(name, wish) => {
-            toast.success(`🎉 Cheerful wish sent to ${name}: "${wish}"!`, { duration: 4000 });
-          }}
-        />
       </Container>
     </div>
   );

@@ -1,6 +1,13 @@
 import { useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
-import { isTokenExpired, clearAuthSession, initTokenExpiryWatcher, handleSessionExpired } from "../utils/auth";
+import {
+  isTokenExpired,
+  clearAuthSession,
+  initTokenExpiryWatcher,
+  handleSessionExpired,
+  getAuthToken,
+  getAuthRole,
+} from "../utils/auth";
 
 // Auth Pages
 import UnifiedLogin from "../pages/auth/UnifiedLogin";
@@ -52,8 +59,9 @@ import Appraisal from "../pages/Apps/Apprasial";
 
 // ✅ ProtectedRoute — checks token presence, expiry validity, and role authorization
 const ProtectedRoute = ({ children, allowedRoles }) => {
-  const token = localStorage.getItem("token");
-  const role = localStorage.getItem("role");
+  const token = getAuthToken() || localStorage.getItem("token");
+  const rawRole = getAuthRole() || localStorage.getItem("role") || "";
+  const role = rawRole.toLowerCase().trim();
 
   // Check if token is absent or has expired
   if (!token || isTokenExpired(token)) {
@@ -63,9 +71,12 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     return <Navigate to="/login" replace />;
   }
 
-  if (allowedRoles && !allowedRoles.includes(role)) {
-    // If not authorized for this role, redirect to Home page
-    return <Navigate to="/" replace />;
+  if (allowedRoles) {
+    const normalizedAllowed = allowedRoles.map((r) => r.toLowerCase().trim());
+    if (!normalizedAllowed.includes(role)) {
+      // If not authorized for this role, redirect to Home page
+      return <Navigate to="/" replace />;
+    }
   }
 
   return children;
@@ -98,12 +109,12 @@ export default function AppRoute() {
       <Route path="/admin/manage-employees" element={<ProtectedRoute allowedRoles={["hr", "admin", "hod", "accounts"]}> <ManageEmployees /> </ProtectedRoute>} />
       <Route path="/admin/register-employee" element={<ProtectedRoute allowedRoles={["hr"]}> <Register /> </ProtectedRoute>} />
 
-      <Route path="/requisition" element={<ProtectedRoute allowedRoles={["hr", "admin", "hod", "manager", "teamlead", "ceo", "coo", "hrmanager"]}> <Requisition /> </ProtectedRoute>} />
+      <Route path="/requisition" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "ceo", "coo", "hrmanager"]}> <Requisition /> </ProtectedRoute>} />
       <Route path="/onboarding" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager", "ceo", "coo"]}> <Onboarding /> </ProtectedRoute>} />
       <Route path="/onboarding/:id" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager", "ceo", "coo"]}> <Onboarding /> </ProtectedRoute>} />
       {/* <Route path="/recruitment" element={<ProtectedRoute allowedRoles={["hr", "admin", "hod", "manager", "teamlead", "ceo", "coo", "hrmanager"]}> <Recruitment /> </ProtectedRoute>} /> */}
-      <Route path="/interview" element={<ProtectedRoute allowedRoles={["hod", "hr", "admin", "manager", "hrmanager"]}> <InterviewForm /> </ProtectedRoute>} />
-      <Route path="/interview/:candidateId" element={<ProtectedRoute allowedRoles={["hod", "hr", "admin", "manager", "hrmanager"]}> <InterviewForm /> </ProtectedRoute>} />
+      <Route path="/interview" element={<ProtectedRoute allowedRoles={["employee", "hod", "hr", "admin", "manager", "hrmanager"]}> <InterviewForm /> </ProtectedRoute>} />
+      <Route path="/interview/:candidateId" element={<ProtectedRoute allowedRoles={["employee", "hod", "hr", "admin", "manager", "hrmanager"]}> <InterviewForm /> </ProtectedRoute>} />
       <Route path="/manage-employee" element={<ProtectedRoute allowedRoles={["hr", "admin", "hod", "accounts"]}> <ManageEmployees /> </ProtectedRoute>} />
       <Route path="/admin/manage-employee" element={<ProtectedRoute allowedRoles={["hr", "admin", "hod", "accounts"]}> <ManageEmployees /> </ProtectedRoute>} />
       <Route path="/holidaymanager" element={<ProtectedRoute allowedRoles={["hr"]}> <HolidayManager /> </ProtectedRoute>} />

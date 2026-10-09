@@ -41,6 +41,7 @@ import {
   LuShieldAlert,
 } from "react-icons/lu";
 import api, { getUploadUrl } from "../../api";
+import ProbationAppraisalReviews from "./ProbationAppraisalReviews";
 
 // Available cycles
 const CYCLES = ["Q1 2026", "Q2 2026", "Q3 2026", "Q4 2026", "Annual 2025-2026"];
@@ -697,7 +698,7 @@ export default function PerformanceKPI() {
 
   return (
     <div className="performance-kpi-container max-w-7xl mx-auto py-4 bg-slate-50 min-h-screen">
-      <Container fluid="xl">
+      <Container fluid="2xl px-4">
         {/* Top Header Banner */}
         <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-slate-200 mb-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="d-flex align-items-center gap-3">
@@ -759,10 +760,30 @@ export default function PerformanceKPI() {
         </div>
 
         {/* Tab Navigation Navigation Bar */}
-        <div className="bg-white rounded-2xl p-1.5 shadow-sm border border-slate-200 mb-4 d-flex flex-wrap justify-between align-items-center gap-1">
+        <div className="bg-white rounded-2xl p-1.5 shadow-sm border border-slate-200 mb-4 d-flex flex-wrap justify-around align-items-center gap-1">
+          <button
+            onClick={() => setActiveTab("probation_appraisals")}
+            className={`px-2 py-2 rounded-xl text-xs font-semibold d-flex align-items-center gap-1 transition-all ${
+              activeTab === "probation_appraisals"
+                ? "bg-indigo-600 text-white shadow-sm"
+                : "text-slate-600 hover:bg-slate-100"
+            }`}
+          >
+            <LuAward size={15} /> 6M Probation & Appraisal Reviews
+            <span
+              className={`ml-1 text-[10px] px-1 py-0.2 rounded-full font-bold ${
+                activeTab === "probation_appraisals"
+                  ? "bg-white/20 text-white"
+                  : "bg-amber-100 text-amber-800"
+              }`}
+            >
+              Questionnaires
+            </span>
+          </button>
+
           <button
             onClick={() => setActiveTab("my_kpi")}
-            className={`px-3 py-2 rounded-xl text-xs font-semibold d-flex align-items-center gap-2 transition-all ${
+            className={`px-2 py-2 rounded-xl text-xs font-semibold d-flex align-items-center gap-1 transition-all ${
               activeTab === "my_kpi"
                 ? "bg-indigo-600 text-white shadow-sm"
                 : "text-slate-600 hover:bg-slate-100"
@@ -785,7 +806,7 @@ export default function PerformanceKPI() {
           {(isHOD || isHRorAdmin) && (
             <button
               onClick={() => setActiveTab("team_reviews")}
-              className={`px-3 py-2 rounded-xl text-xs font-semibold d-flex align-items-center gap-2 transition-all ${
+              className={`px-2 py-2 rounded-xl text-xs font-semibold d-flex align-items-center gap-1 transition-all ${
                 activeTab === "team_reviews"
                   ? "bg-indigo-600 text-white shadow-sm"
                   : "text-slate-600 hover:bg-slate-100"
@@ -809,7 +830,7 @@ export default function PerformanceKPI() {
           {isHRorAdmin && (
             <button
               onClick={() => setActiveTab("calibration")}
-              className={`px-3 py-2 rounded-xl text-xs font-semibold d-flex align-items-center gap-2 transition-all ${
+              className={`px-2 py-2 rounded-xl text-xs font-semibold d-flex align-items-center gap-1 transition-all ${
                 activeTab === "calibration"
                   ? "bg-indigo-600 text-white shadow-sm"
                   : "text-slate-600 hover:bg-slate-100"
@@ -833,7 +854,7 @@ export default function PerformanceKPI() {
           {(isHRorAdmin || isHOD) && (
             <button
               onClick={() => setActiveTab("templates")}
-              className={`px-3 py-2 rounded-xl text-xs font-semibold d-flex align-items-center gap-2 transition-all ${
+              className={`px-2 py-2 rounded-xl text-xs font-semibold d-flex align-items-center gap-1 transition-all ${
                 activeTab === "templates"
                   ? "bg-indigo-600 text-white shadow-sm"
                   : "text-slate-600 hover:bg-slate-100"
@@ -852,6 +873,13 @@ export default function PerformanceKPI() {
             </button>
           )}
         </div>
+
+        {/* ============================================================= */}
+        {/* TAB 0: 6-MONTH PROBATION & ANNUAL APPRAISAL REVIEWS */}
+        {/* ============================================================= */}
+        {activeTab === "probation_appraisals" && (
+          <ProbationAppraisalReviews />
+        )}
 
         {/* ============================================================= */}
         {/* TAB 1: MY SCORECARD & SELF-ASSESSMENT */}
@@ -1453,7 +1481,7 @@ export default function PerformanceKPI() {
 
             {/* Filter Controls */}
             <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 mb-4 d-flex flex-wrap align-items-center justify-between gap-3">
-              <div className="d-flex align-items-center gap-2 flex-wrap flex-grow-1 max-w-xl">
+              <div className="d-flex align-items-center gap-2 flex-wrap flex-grow-1">
                 <div className="relative flex-grow-1">
                   <LuSearch className="absolute left-3 top-2.5 text-slate-400" size={14} />
                   <Form.Control
@@ -1462,7 +1490,7 @@ export default function PerformanceKPI() {
                     value={hrSearchQuery}
                     onChange={(e) => setHrSearchQuery(e.target.value)}
                     placeholder="Search by employee name, ID, or designation..."
-                    className="pl-9 rounded-lg text-xs border-slate-300"
+                    className="!pl-8 rounded-lg text-xs border-slate-300 !w-[350px]"
                   />
                 </div>
 
@@ -1600,7 +1628,7 @@ export default function PerformanceKPI() {
                             <Button
                               variant={asg.status === "HR_Approved" ? "outline-secondary" : "primary"}
                               size="sm"
-                              className={`rounded-lg text-xs font-semibold px-3 py-1 ${
+                              className={`rounded-lg !text-xs font-semibold px-3 py-1 ${
                                 asg.status !== "HR_Approved" ? "bg-indigo-600 border-indigo-600" : ""
                               }`}
                               onClick={() => openCalibrateModal(asg)}

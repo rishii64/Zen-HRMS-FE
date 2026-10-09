@@ -29,7 +29,7 @@ import {
 import { SiGoogledocs } from "react-icons/si";
 import { FaListCheck } from "react-icons/fa6";
 import logo from "../../assets/zentelex-logo.png";
-import { clearAuthSession } from "../../utils/auth";
+import { clearAuthSession, getCookie, setCookie, getAuthToken, getAuthRole, getAuthUser } from "../../utils/auth";
 import toast from 'react-hot-toast';
 import { TbPassword } from "react-icons/tb";
 import api, { getUploadUrl } from "../../api/axios";
@@ -41,6 +41,7 @@ const ALL_APPS = [
   {
     id: "app_dashboard",
     title: "Dashboard",
+    tabId: null,
     icon: <LuTrendingUp className="text-blue-500" />,
     route: "/employee/dashboard",
     roles: ["employee", "hr", "accounts", "payroll", "hod", "admin"],
@@ -49,6 +50,7 @@ const ALL_APPS = [
   {
     id: "app_profile",
     title: "My Profile",
+    tabId: 4,
     icon: <LuUser className="text-indigo-500" />,
     route: "/profile",
     roles: ["employee", "hr", "accounts", "payroll", "hod", "admin"],
@@ -57,6 +59,7 @@ const ALL_APPS = [
   {
     id: "app_attendance",
     title: "Attendance Tracking",
+    tabId: 1,
     icon: <LuCalendar className="text-emerald-500" />,
     route: "/attendance",
     roles: ["employee", "hr", "accounts", "payroll", "hod", "admin"],
@@ -65,38 +68,25 @@ const ALL_APPS = [
   {
     id: "app_leave",
     title: "Leave Management",
+    tabId: 2,
     icon: <LuFileText className="text-teal-500" />,
     route: "/leave",
     roles: ["employee", "hr", "accounts", "payroll", "hod", "admin"],
     keywords: ["leave", "apply leave", "vacation", "pto", "holiday leave", "time off", "absence"],
   },
   {
-    id: "app_holidays",
-    title: "Holiday Calendar",
-    icon: <LuCalendar className="text-rose-500" />,
-    route: "/holidays",
-    roles: ["employee", "hr", "accounts", "payroll", "hod", "admin"],
-    keywords: ["holiday", "calendar", "festival", "off days", "events"],
-  },
-  {
-    id: "app_policies",
-    title: "Company Policies",
-    icon: <LuShieldCheck className="text-blue-600" />,
-    route: "/policies",
-    roles: ["employee", "hr", "accounts", "payroll", "hod", "admin"],
-    keywords: ["policy", "policies", "rules", "compliance", "handbook", "guidelines", "terms"],
-  },
-  {
     id: "app_schedule",
-    title: "Schedule",
+    title: "Work Schedule & Roster",
+    tabId: 16,
     icon: <LuClock className="text-orange-500" />,
     route: "/schedule",
     roles: ["employee", "hr", "accounts", "payroll", "hod", "admin"],
-    keywords: ["schedule", "duty", "roaster", "shift", "shift timings", "timetable"],
+    keywords: ["schedule", "duty", "roster", "shift", "shift timings", "timetable"],
   },
   {
     id: "app_payslip",
     title: "Salary Slips",
+    tabId: 14,
     icon: <LuFileCheck className="text-purple-600" />,
     route: "/payslip",
     roles: ["employee", "hr", "accounts", "payroll", "hod", "admin"],
@@ -105,22 +95,25 @@ const ALL_APPS = [
   {
     id: "app_payroll_mgmt",
     title: "Payroll Management",
+    tabId: 3,
     icon: <LuWallet className="text-emerald-600" />,
     route: "/payroll",
     roles: ["employee", "hr", "accounts", "payroll", "hod", "admin"],
-    keywords: ["payroll", "tax", "it declaration", "compensation", "salary structure", "ctc"],
+    keywords: ["payroll", "tax", "compensation", "salary structure", "ctc"],
   },
   {
-    id: "app_resignation",
-    title: "Separation",
-    icon: <LuLogOut className="text-red-500" />,
-    route: "/resignation",
+    id: "app_it_declaration",
+    title: "IT Declaration",
+    tabId: 8,
+    icon: <LuReceipt className="text-blue-600" />,
+    route: "/it-declaration",
     roles: ["employee", "hr", "accounts", "payroll", "hod", "admin"],
-    keywords: ["resignation", "separation", "exit", "quit", "clearance"],
+    keywords: ["it declaration", "income tax", "tds", "tax saving", "regime", "80c", "form 16", "investments", "tax"],
   },
   {
     id: "app_id_card",
     title: "ID-Card & Documents",
+    tabId: 9,
     icon: <LuBadgeCheck className="text-cyan-600" />,
     route: "/id-card",
     roles: ["employee", "hr", "accounts", "payroll", "hod", "admin"],
@@ -129,82 +122,110 @@ const ALL_APPS = [
   {
     id: "app_mediclaim",
     title: "Mediclaim & Insurance",
+    tabId: 10,
     icon: <LuStethoscope className="text-rose-600" />,
     route: "/mediclaim",
     roles: ["employee", "hr", "accounts", "payroll", "hod", "admin", "manager", "teamlead"],
     keywords: ["mediclaim", "medical", "insurance", "health", "hospital", "claims", "coverage", "card"],
   },
   {
-    id: "app_manage_emp",
-    title: "Employee Directory",
-    icon: <LuUsers className="text-blue-600" />,
-    route: "/admin/manage-employees",
-    roles: ["hr", "admin", "hod", "accounts"],
-    keywords: ["manage", "employees", "directory", "staff", "team", "people", "my teams"],
-  },
-  // {
-  //   id: "app_interview",
-  //   title: "Interview Assessment",
-  //   icon: <LuGraduationCap className="text-indigo-600" />,
-  //   route: "/interview",
-  //   roles: ["hr", "admin", "hod", "manager", "hrmanager"],
-  //   keywords: ["interview", "assessment", "evaluation", "candidate", "feedback", "ratings"],
-  // },
-  {
-    id: "app_requisition",
-    title: "Requisition",
-    icon: <LuBriefcase className="text-cyan-600" />,
-    route: "/requisition",
-    roles: ["hr", "admin", "hod", "manager", "teamlead", "ceo", "coo", "hrmanager"],
-    keywords: ["requisition", "hiring", "cv", "resume", "candidates", "jobs", "desk", "requisition", "shortlisting"],
-  },
-  // {
-  //   id: "app_recruitment",
-  //   title: "Recruitment",
-  //   icon: <LuBriefcase className="text-cyan-600" />,
-  //   route: "/recruitment",
-  //   roles: ["hr", "admin", "hod", "manager", "teamlead", "ceo", "coo", "hrmanager"],
-  //   keywords: ["recruitment", "hiring", "cv", "resume", "candidates", "jobs", "desk", "requisition", "shortlisting"],
-  // },
-  {
-    id: "app_onboarding",
-    title: "Onboarding",
-    icon: <LuUserCheck className="text-violet-600" />,
-    route: "/onboarding",
-    roles: ["hr", "admin", "hod", "manager", "teamlead", "employee"],
-    keywords: ["onboarding", "joining", "induction", "training", "probation", "assets", "documentation", "permanent"],
+    id: "app_holidays",
+    title: "Holiday Calendar",
+    tabId: 11,
+    icon: <LuCalendar className="text-rose-500" />,
+    route: "/holidays",
+    roles: ["employee", "hr", "accounts", "payroll", "hod", "admin"],
+    keywords: ["holiday", "calendar", "festival", "off days", "events"],
   },
   {
-    id: "app_interview",
-    title: "Candidate Evaluation",
-    icon: <SiGoogledocs className="text-indigo-600" />,
-    route: "/interview",
-    roles: ["hr", "hod", "admin"],
-    keywords: ["interview", "candidate", "evaluation", "assessment", "question bank"],
+    id: "app_policies",
+    title: "Company Policies",
+    tabId: 12,
+    icon: <LuShieldCheck className="text-blue-600" />,
+    route: "/policies",
+    roles: ["employee", "hr", "accounts", "payroll", "hod", "admin"],
+    keywords: ["policy", "policies", "rules", "compliance", "handbook", "guidelines", "terms"],
+  },
+  {
+    id: "app_training",
+    title: "Training Modules",
+    tabId: 7,
+    icon: <LuGraduationCap className="text-cyan-600" />,
+    route: "/policies",
+    roles: ["hr", "accounts", "payroll", "hod", "admin"],
+    keywords: ["training", "learning", "modules", "induction", "skills", "onboarding courses"],
   },
   {
     id: "app_kpi_hub",
-    title: "KPI",
+    title: "KPI & Goal Tracker",
+    tabId: 15,
     icon: <LuAward className="text-amber-600" />,
     route: "/kpi",
     roles: ["employee", "hr", "accounts", "payroll", "hod", "admin", "manager", "teamlead"],
     keywords: ["kpi", "goals", "appraisal", "performance", "pms", "progression", "review", "rating", "scorecard", "evaluation"],
   },
   {
+    id: "app_appraisal",
+    title: "Performance Appraisal",
+    tabId: 6,
+    icon: <LuTrendingUp className="text-indigo-500" />,
+    route: "/appraisal",
+    roles: ["employee", "hr", "accounts", "payroll", "hod", "admin", "manager"],
+    keywords: ["appraisal", "performance", "review", "scorecard", "evaluation", "rating"],
+  },
+  {
+    id: "app_resignation",
+    title: "Separation & Resignation",
+    tabId: 13,
+    icon: <LuLogOut className="text-red-500" />,
+    route: "/resignation",
+    roles: ["employee", "hr", "accounts", "payroll", "hod", "admin"],
+    keywords: ["resignation", "separation", "exit", "quit", "clearance"],
+  },
+  {
+    id: "app_requisition",
+    title: "Requisition Desk",
+    tabId: 17,
+    icon: <LuBriefcase className="text-cyan-600" />,
+    route: "/requisition",
+    roles: ["hr", "admin", "hod", "manager", "teamlead", "ceo", "coo", "hrmanager"],
+    keywords: ["requisition", "hiring", "cv", "resume", "candidates", "jobs", "desk", "shortlisting"],
+  },
+  {
+    id: "app_onboarding",
+    title: "Employee Onboarding",
+    tabId: 18,
+    icon: <LuUserCheck className="text-violet-600" />,
+    route: "/onboarding",
+    roles: ["hr", "admin", "hod", "manager", "teamlead"],
+    keywords: ["onboarding", "joining", "induction", "training", "probation", "assets", "documentation", "permanent"],
+  },
+  {
+    id: "app_interview",
+    title: "Candidate Evaluation",
+    tabId: 5,
+    icon: <SiGoogledocs className="text-indigo-600" />,
+    route: "/interview",
+    roles: ["hr", "hod", "admin", "manager"],
+    keywords: ["interview", "candidate", "evaluation", "assessment", "question bank"],
+  },
+  {
+    id: "app_manage_emp",
+    title: "Employee Directory",
+    tabId: null,
+    icon: <LuUsers className="text-blue-600" />,
+    route: "/admin/manage-employees",
+    roles: ["hr", "admin", "hod", "accounts"],
+    keywords: ["manage", "employees", "directory", "staff", "team", "people", "my teams"],
+  },
+  {
     id: "app_accounts_dash",
     title: "Accounts Dashboard",
+    tabId: null,
     icon: <LuTrendingUp className="text-emerald-500" />,
     route: "/accounts/dashboard",
     roles: ["accounts", "payroll", "admin"],
     keywords: ["accounts", "finance", "billing", "dashboard", "ledger"],
-  },
-  {
-    id: "app_it_declaration",
-    title: "IT Declaration",
-    icon: <LuReceipt className="text-blue-600" />,
-    route: "/it-declaration",
-    roles: ["employee", "hr", "accounts", "payroll", "hod", "admin"],
-    keywords: ["it declaration", "income tax", "tds", "tax saving", "regime", "80c", "form 16", "investments", "tax"],
   },
 ];
 
@@ -222,18 +243,81 @@ const getCleanNameParts = (name) => {
   return parts;
 };
 
+// Helpers for daily attendance notice tracking and acknowledgement
+const getDailyNoticeUserKey = () => {
+  if (typeof window === "undefined") return "user";
+  const fromCookie = getCookie("employeeCode");
+  if (fromCookie) return String(fromCookie).trim();
+
+  try {
+    const u = getAuthUser();
+    if (u && (u.employee_code || u.employee_id || u.id)) {
+      return String(u.employee_code || u.employee_id || u.id).trim();
+    }
+  } catch (_) { }
+
+  const fromLocal = localStorage.getItem("employeeCode");
+  if (fromLocal) return String(fromLocal).trim();
+
+  return "user";
+};
+
+const getTodayISTString = () => {
+  try {
+    return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
+  } catch (_) {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
+};
+
+const isNoticeAcknowledgedToday = (userKey, todayStr) => {
+  const ackKey = `hrms_daily_notice_ack_${userKey}_${todayStr}`;
+  if (getCookie(ackKey) === "true") return true;
+  try {
+    if (localStorage.getItem(ackKey) === "true") return true;
+  } catch (_) { }
+  return false;
+};
+
+const saveDailyNoticeAcknowledged = (userKey, todayStr) => {
+  const ackKey = `hrms_daily_notice_ack_${userKey}_${todayStr}`;
+  try {
+    setCookie(ackKey, "true", { expires: 1 });
+  } catch (_) { }
+  try {
+    localStorage.setItem(ackKey, "true");
+  } catch (_) { }
+};
+
+const isNoticeSessionDismissed = (userKey, todayStr) => {
+  try {
+    const sessionKey = `hrms_daily_notice_session_dismissed_${userKey}_${todayStr}`;
+    return sessionStorage.getItem(sessionKey) === "true";
+  } catch (_) {
+    return false;
+  }
+};
+
+const saveDailyNoticeSessionDismissed = (userKey, todayStr) => {
+  try {
+    const sessionKey = `hrms_daily_notice_session_dismissed_${userKey}_${todayStr}`;
+    sessionStorage.setItem(sessionKey, "true");
+  } catch (_) { }
+};
+
 const AppNavbar = () => {
   const navigate = useNavigate();
 
-  const [role, setRole] = useState(localStorage.getItem("role"));
-  const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem("token"));
-  const [userName, setUserName] = useState(localStorage.getItem("userName") || "");
-  const [email, setEmail] = useState(localStorage.getItem("email") || "");
-  const [employeeCode, setEmployeeCode] = useState(localStorage.getItem("empId") || "");
-  const [profilePhoto, setProfilePhoto] = useState(localStorage.getItem("profile_photo") ||
+  const [role, setRole] = useState(getAuthRole() || localStorage.getItem("role"));
+  const [isLoggedIn, setIsLoggedIn] = useState(!!(getAuthToken() || localStorage.getItem("token")));
+  const [userName, setUserName] = useState(getCookie("userName") || localStorage.getItem("userName") || "");
+  const [email, setEmail] = useState(getCookie("email") || localStorage.getItem("email") || "");
+  const [employeeCode, setEmployeeCode] = useState(getCookie("employeeCode") || localStorage.getItem("employeeCode") || "");
+  const [profilePhoto, setProfilePhoto] = useState(getCookie("profile_photo") || localStorage.getItem("profile_photo") ||
     (() => {
       try {
-        return JSON.parse(localStorage.getItem("user") || "{}").profile_photo || "";
+        return (getAuthUser() || JSON.parse(localStorage.getItem("user") || "{}")).profile_photo || "";
       } catch (_) {
         return "";
       }
@@ -252,7 +336,7 @@ const AppNavbar = () => {
 
   const location = useLocation();
 
-  // Trigger daily attendance notice popup once per day after logging in
+  // Trigger daily attendance notice popup once per day after logging in (unless acknowledged)
   useEffect(() => {
     if (!isLoggedIn) return;
     if (typeof window === "undefined") return;
@@ -262,15 +346,13 @@ const AppNavbar = () => {
     if (path === "/login" || path === "/register" || path === "/forgot-password") return;
 
     try {
-      const userKey =
-        localStorage.getItem("userId") ||
-        localStorage.getItem("employeeCode") ||
-        localStorage.getItem("empId") || "user";
-      const todayStr = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
-      const ackKey = `hrms_daily_notice_ack_${userKey}_${todayStr}`;
-      const isAcknowledged = localStorage.getItem(ackKey) === "true";
+      const userKey = getDailyNoticeUserKey();
+      const todayStr = getTodayISTString();
+      const acknowledged = isNoticeAcknowledgedToday(userKey, todayStr);
+      const sessionDismissed = isNoticeSessionDismissed(userKey, todayStr);
 
-      if (!isAcknowledged) {
+      // Unless acknowledged by clicking the understood button, the popup should come everyday after logging in
+      if (!acknowledged && !sessionDismissed) {
         // Small delay so page content smoothly renders first
         const timer = setTimeout(() => {
           setIsDailyNoticeOpen(true);
@@ -282,15 +364,29 @@ const AppNavbar = () => {
     }
   }, [isLoggedIn, location.pathname]);
 
-  const handleCloseDailyNotice = () => {
+  // Explicitly acknowledged by clicking "Understood & Enter Dashboard"
+  const handleAcknowledgeDailyNotice = () => {
     try {
-      const userKey =
-        localStorage.getItem("userId") ||
-        localStorage.getItem("employeeCode") ||
-        localStorage.getItem("empId") || "user";
-      const todayStr = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
-      const ackKey = `hrms_daily_notice_ack_${userKey}_${todayStr}`;
-      localStorage.setItem(ackKey, "true");
+      const userKey = getDailyNoticeUserKey();
+      const todayStr = getTodayISTString();
+      saveDailyNoticeAcknowledged(userKey, todayStr);
+      toast.success("Daily attendance protocol acknowledged", {
+        id: "daily-notice-ack",
+        duration: 2500,
+      });
+    } catch (e) {
+      console.warn("Daily notice acknowledge warning:", e);
+    }
+    setIsDailyNoticeOpen(false);
+  };
+
+  // Merely dismissed via "X", Escape, backdrop, or "Skip" without acknowledging
+  const handleDismissDailyNotice = () => {
+    try {
+      const userKey = getDailyNoticeUserKey();
+      const todayStr = getTodayISTString();
+      // Only dismiss for the current browsing session; daily acknowledgement is NOT recorded!
+      saveDailyNoticeSessionDismissed(userKey, todayStr);
     } catch (e) {
       // ignore
     }
@@ -314,9 +410,11 @@ const AppNavbar = () => {
     setIsDropdownOpen(false);
     setIsAppsOpen(false);
     setIsMobileAppsOpen(false);
+    setIsDailyNoticeOpen(false);
 
+    window.dispatchEvent(new Event("authChanged"));
     toast.success("Logged out!");
-    navigate("/login");
+    navigate("/login", { replace: true });
   };
 
   const handleChangePassword = () => {
@@ -327,14 +425,14 @@ const AppNavbar = () => {
 
   useEffect(() => {
     const checkLogin = () => {
-      const currentToken = localStorage.getItem("token");
-      const currentRole = localStorage.getItem("role");
-      const currentUserName = localStorage.getItem("userName") || "";
-      const currentEmail = localStorage.getItem("email") || "";
-      const currentEmpCode = localStorage.getItem("employeeCode") || localStorage.getItem("empId") || "";
-      const currentPhoto = localStorage.getItem("profile_photo") || (() => {
+      const currentToken = getAuthToken() || localStorage.getItem("token");
+      const currentRole = getAuthRole() || localStorage.getItem("role");
+      const currentUserName = getCookie("userName") || localStorage.getItem("userName") || "";
+      const currentEmail = getCookie("email") || localStorage.getItem("email") || "";
+      const currentEmpCode = getCookie("employeeCode") || localStorage.getItem("employeeCode") || "";
+      const currentPhoto = getCookie("profile_photo") || localStorage.getItem("profile_photo") || (() => {
         try {
-          return JSON.parse(localStorage.getItem("user") || "{}").profile_photo || "";
+          return (getAuthUser() || JSON.parse(localStorage.getItem("user") || "{}")).profile_photo || "";
         } catch (_) {
           return "";
         }
@@ -367,12 +465,14 @@ const AppNavbar = () => {
     const interval = setInterval(checkLogin, 2500);
     document.addEventListener("click", closeDropdowns);
     window.addEventListener("profileUpdated", handleProfileUpdate);
+    window.addEventListener("authChanged", checkLogin);
     window.addEventListener("storage", checkLogin);
 
     return () => {
       clearInterval(interval);
       document.removeEventListener("click", closeDropdowns);
       window.removeEventListener("profileUpdated", handleProfileUpdate);
+      window.removeEventListener("authChanged", checkLogin);
       window.removeEventListener("storage", checkLogin);
     };
   }, []);
@@ -461,13 +561,58 @@ const AppNavbar = () => {
 
   const navLinks = getNavLinks();
 
-  // Filter All Apps strictly by active Role & Search Keyword
+  // Filter All Apps strictly by active Role, Search Keyword & Employee's Configured Tabs
   const userRole = (role || "").toLowerCase();
   const searchTrimmed = appSearch.trim().toLowerCase();
+
+  // For employees, retrieve the tabs configured by HR (via enabled_tabs / tabs_enabled)
+  const employeeEnabledTabs = (() => {
+    if (userRole !== "employee") return null;
+
+    const userObj = getAuthUser();
+    const tabsEnabledFlag =
+      userObj?.tabs_enabled !== undefined
+        ? userObj.tabs_enabled
+        : localStorage.getItem("tabs_enabled") === "true";
+
+    // If tabs_enabled is true, the employee has full access to all tabs
+    if (tabsEnabledFlag) return null;
+
+    const rawTabs =
+      userObj?.enabled_tabs !== undefined && userObj?.enabled_tabs !== null
+        ? userObj.enabled_tabs
+        : localStorage.getItem("enabled_tabs");
+
+    if (rawTabs !== undefined && rawTabs !== null) {
+      if (typeof rawTabs === "string") {
+        const trimmed = rawTabs.trim();
+        if (trimmed === "") return new Set(); // Explicitly cleared by HR
+        return new Set(
+          trimmed
+            .split(",")
+            .map((id) => parseInt(id.trim(), 10))
+            .filter((id) => !isNaN(id))
+        );
+      } else if (Array.isArray(rawTabs)) {
+        return new Set(rawTabs.map(Number).filter((id) => !isNaN(id)));
+      }
+    }
+
+    // Standard default tabs if not explicitly set
+    return new Set([1, 2, 3, 4, 8, 9, 10, 11, 12, 14, 16]);
+  })();
 
   const filteredApps = ALL_APPS.filter((app) => {
     const matchesRole = !userRole || app.roles.some((r) => r.toLowerCase() === userRole);
     if (!matchesRole) return false;
+
+    // For employees, respect HR's configured dashboard modules
+    if (employeeEnabledTabs !== null && app.tabId) {
+      if (!employeeEnabledTabs.has(app.tabId)) {
+        return false;
+      }
+    }
+
     if (!searchTrimmed) return true;
     const matchesTitle = app.title.toLowerCase().includes(searchTrimmed);
     const matchesKeywords = app.keywords ? app.keywords.some((k) => k.toLowerCase().includes(searchTrimmed)) : false;
@@ -912,7 +1057,8 @@ const AppNavbar = () => {
       {/* Daily Attendance Guidelines Modal */}
       <DailyAttendanceNoticeModal
         isOpen={isDailyNoticeOpen}
-        onClose={handleCloseDailyNotice}
+        onClose={handleDismissDailyNotice}
+        onAcknowledge={handleAcknowledgeDailyNotice}
       />
     </nav>
   );

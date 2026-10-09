@@ -14,6 +14,11 @@ import {
   LuStethoscope,
   LuLogOut,
   LuArrowRight,
+  LuFileCheck,
+  LuAward,
+  LuClock,
+  LuBriefcase,
+  LuUserCheck,
 } from "react-icons/lu";
 
 export default function EmployeeModulesView({ employee = {} }) {
@@ -60,7 +65,7 @@ export default function EmployeeModulesView({ employee = {} }) {
       iconBg: "rgba(109, 40, 217, 0.08)",
       iconColor: "#6d28d9",
       isLink: true,
-      linkTo: `/employee/profile/${employee.empId || ""}`,
+      linkTo: `/profile/${employee.empId || ""}`,
     },
     {
       id: 5,
@@ -158,6 +163,61 @@ export default function EmployeeModulesView({ employee = {} }) {
       isLink: true,
       linkTo: "/resignation",
     },
+    {
+      id: 14,
+      title: "Salary Slips",
+      desc: "Download and view official monthly salary payslips and earnings.",
+      btnText: "View Payslips",
+      icon: <LuFileCheck size={24} />,
+      iconBg: "rgba(147, 51, 234, 0.08)",
+      iconColor: "#9333ea",
+      isLink: true,
+      linkTo: "/payslip",
+    },
+    {
+      id: 15,
+      title: "KPI & Goal Tracker",
+      desc: "Set performance goals, track KPI achievements, and review PMS scorecards.",
+      btnText: "Open KPI Hub",
+      icon: <LuAward size={24} />,
+      iconBg: "rgba(217, 119, 6, 0.08)",
+      iconColor: "#d97706",
+      isLink: true,
+      linkTo: "/kpi",
+    },
+    {
+      id: 16,
+      title: "Work Schedule & Roster",
+      desc: "View weekly shift schedules, roster duties, and timing allocations.",
+      btnText: "View Schedule",
+      icon: <LuClock size={24} />,
+      iconBg: "rgba(249, 115, 22, 0.08)",
+      iconColor: "#f97316",
+      isLink: true,
+      linkTo: "/schedule",
+    },
+    {
+      id: 17,
+      title: "Requisition Desk",
+      desc: "Raise workforce requisitions, job vacancies, and review candidate applications.",
+      btnText: "Open Requisition",
+      icon: <LuBriefcase size={24} />,
+      iconBg: "rgba(8, 145, 178, 0.08)",
+      iconColor: "#0891b2",
+      isLink: true,
+      linkTo: "/requisition",
+    },
+    {
+      id: 18,
+      title: "Employee Onboarding",
+      desc: "Complete employee onboarding checklists, doc verification, and asset allocation.",
+      btnText: "Open Onboarding",
+      icon: <LuUserCheck size={24} />,
+      iconBg: "rgba(124, 58, 237, 0.08)",
+      iconColor: "#7c3aed",
+      isLink: true,
+      linkTo: "/onboarding",
+    },
   ];
 
   const enabledTabIds = (() => {
@@ -180,13 +240,13 @@ export default function EmployeeModulesView({ employee = {} }) {
       }
     }
 
-    // 2. If tabs_enabled is true, all 13 modules are granted
+    // 2. If tabs_enabled is true, all 18 modules are granted
     if (employee?.tabs_enabled || localStorage.getItem("tabs_enabled") === "true") {
-      return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
+      return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
     }
 
     // 3. Standard default modules
-    return [1, 2, 3, 4, 8, 9, 10, 11, 12];
+    return [1, 2, 3, 4, 8, 9, 10, 11, 12, 14, 16];
   })();
 
   const visibleActions = quickActions.filter((action) =>

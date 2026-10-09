@@ -84,7 +84,8 @@ const Schedule = () => {
     start_time: "10:00",
     end_time: "19:00",
     date: new Date().toISOString().split("T")[0],
-    notes: ""
+    notes: "",
+    apply_to_all: false
   });
 
   // Form State for Dynamic Rotational Week-Off Assignment
@@ -275,6 +276,56 @@ const Schedule = () => {
     return { bg: "#eff6ff", color: "#2563eb", border: "#bfdbfe" };
   };
 
+  // Employees eligible for assignment based on user role and active department (independent of search bar text)
+  const assignableEmployees = employees.filter((emp) => {
+    const empDept = emp.dept || emp.department || "";
+    if (isEmployee) {
+      if (employeeViewFilter === "own") {
+        return emp.employee_code === userEmpId || emp.employee_id === userEmpId || emp.name === userName;
+      }
+      return empDept.toLowerCase() === userDepartment.toLowerCase();
+    }
+    if (isHod) {
+      return empDept.toLowerCase() === userDepartment.toLowerCase();
+    }
+    if (selectedDept === "All") return true;
+    return empDept.toLowerCase() === selectedDept.toLowerCase();
+  });
+
+  // Filter employees according to Search Query + RBAC Matrix
+  const filteredEmployees = employees.filter((emp) => {
+    const empDept = emp.dept || emp.department || "";
+    const empName = (emp.name || `${emp.first_name || ""} ${emp.last_name || ""}`).toLowerCase();
+    const empCode = (emp.employee_code || emp.employee_id || emp.empId || "").toLowerCase();
+    const empHod = (emp.hod || emp.team_lead || emp.manager || emp.reporting_manager || "").toLowerCase();
+    const query = searchQuery.toLowerCase().trim();
+
+    // 1. Search Query Matching (Name, Employee ID, Department, Team Lead/HOD)
+    if (query) {
+      const matchesSearch =
+        empName.includes(query) ||
+        empCode.includes(query) ||
+        empDept.toLowerCase().includes(query) ||
+        empHod.includes(query);
+
+      if (!matchesSearch) return false;
+    }
+
+    // 2. Role-Based Matrix Filter
+    if (isEmployee) {
+      const isMe = emp.employee_code === userEmpId || emp.employee_id === userEmpId || emp.name === userName;
+      if (employeeViewFilter === "own") return isMe;
+      return empDept.toLowerCase() === userDepartment.toLowerCase();
+    }
+
+    if (isHod) {
+      return empDept.toLowerCase() === userDepartment.toLowerCase();
+    }
+
+    if (selectedDept === "All") return true;
+    return empDept.toLowerCase() === selectedDept.toLowerCase();
+  });
+
   // Submit Assign Shift Form (Admin, HR, HOD)
   const handleAssignShiftSubmit = async (e) => {
     e.preventDefault();
@@ -282,11 +333,16 @@ const Schedule = () => {
     setSaving(true);
     const token = localStorage.getItem("token");
 
+    const isAll = Boolean(shiftForm.apply_to_all || shiftForm.employee_id === "ALL");
+    const targetEmployees = assignableEmployees;
     const selectedEmp = employees.find((e) => e.employee_code === shiftForm.employee_id || e.employee_id === shiftForm.employee_id);
     const payload = {
       ...shiftForm,
-      name: selectedEmp ? selectedEmp.name : shiftForm.name,
-      dept: selectedEmp ? (selectedEmp.dept || shiftForm.dept) : (isHod ? userDepartment : shiftForm.dept),
+      apply_to_all: isAll,
+      employee_id: isAll ? "ALL" : shiftForm.employee_id,
+      employee_ids: isAll ? targetEmployees.map((e) => e.employee_code || e.employee_id).filter(Boolean) : undefined,
+      name: isAll ? "All Employees" : (selectedEmp ? selectedEmp.name : shiftForm.name),
+      dept: isHod ? userDepartment : (selectedDept !== "All" ? selectedDept : (selectedEmp ? selectedEmp.dept : shiftForm.dept)),
       week_start: weekStartStr
     };
 
@@ -301,7 +357,11 @@ const Schedule = () => {
       });
       const data = await res.json();
       if (data.success) {
-        toast.success("Shift schedule assigned successfully!");
+        if (isAll) {
+          toast.success(data.message || `Shift schedule assigned to all ${data.count || targetEmployees.length} employees!`);
+        } else {
+          toast.success("Shift schedule assigned successfully!");
+        }
         setShowAssignModal(false);
 
         // Refresh schedules
@@ -480,39 +540,7 @@ const Schedule = () => {
     toast.success("Copied schedule roster to subsequent period!");
   };
 
-  // Filter employees according to Search Query + RBAC Matrix
-  const filteredEmployees = employees.filter((emp) => {
-    const empDept = emp.dept || emp.department || "";
-    const empName = (emp.name || `${emp.first_name || ""} ${emp.last_name || ""}`).toLowerCase();
-    const empCode = (emp.employee_code || emp.employee_id || emp.empId || "").toLowerCase();
-    const empHod = (emp.hod || emp.team_lead || emp.manager || emp.reporting_manager || "").toLowerCase();
-    const query = searchQuery.toLowerCase().trim();
 
-    // 1. Search Query Matching (Name, Employee ID, Department, Team Lead/HOD)
-    if (query) {
-      const matchesSearch =
-        empName.includes(query) ||
-        empCode.includes(query) ||
-        empDept.toLowerCase().includes(query) ||
-        empHod.includes(query);
-
-      if (!matchesSearch) return false;
-    }
-
-    // 2. Role-Based Matrix Filter
-    if (isEmployee) {
-      const isMe = emp.employee_code === userEmpId || emp.employee_id === userEmpId || emp.name === userName;
-      if (employeeViewFilter === "own") return isMe;
-      return empDept.toLowerCase() === userDepartment.toLowerCase();
-    }
-
-    if (isHod) {
-      return empDept.toLowerCase() === userDepartment.toLowerCase();
-    }
-
-    if (selectedDept === "All") return true;
-    return empDept.toLowerCase() === selectedDept.toLowerCase();
-  });
 
   return (
     <div style={{ backgroundColor: "#f8fafc", minHeight: "100vh", fontFamily: "'Plus Jakarta Sans', system-ui, -apple-system, sans-serif" }} className="max-w-7xl mx-auto pb-10">
@@ -672,7 +700,21 @@ const Schedule = () => {
                 </button>
 
                 <button
-                  onClick={() => setShowAssignModal(true)}
+                  onClick={() => {
+                    setShiftForm({
+                      employee_id: "",
+                      name: "",
+                      dept: isHod ? userDepartment : (selectedDept !== "All" ? selectedDept : userDepartment),
+                      designation: "Staff",
+                      shift_name: "General Shift",
+                      start_time: "10:00",
+                      end_time: "19:00",
+                      date: currentRosterDates[0]?.dateStr || new Date().toISOString().split("T")[0],
+                      notes: "",
+                      apply_to_all: false
+                    });
+                    setShowAssignModal(true);
+                  }}
                   className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3.5 py-2.5 rounded-xl shadow-xs transition-all"
                 >
                   <LuPlus className="h-4 w-4" /> Assign Shift
@@ -915,13 +957,37 @@ const Schedule = () => {
                         return (
                           <td key={rDate.dateStr} className="text-center">
                             <div
-                              className="px-2 py-1.5 rounded-xl text-[11px] font-bold border transition-all cursor-pointer hover:shadow-xs"
+                              onClick={() => {
+                                if (canCreateSchedule) {
+                                  const sType = SHIFT_TYPES.find((t) => t.name.toLowerCase() === (shiftData.shift_name || "").toLowerCase());
+                                  setShiftForm({
+                                    employee_id: emp.employee_code || emp.employee_id,
+                                    name: emp.name,
+                                    dept: emp.dept || emp.department || userDepartment,
+                                    designation: emp.designation || "Staff",
+                                    shift_name: shiftData.shift_name || "General Shift",
+                                    start_time: shiftData.start_time && shiftData.start_time !== "—" ? shiftData.start_time : (sType?.start || "10:00"),
+                                    end_time: shiftData.end_time && shiftData.end_time !== "—" ? shiftData.end_time : (sType?.end || "19:00"),
+                                    date: rDate.dateStr,
+                                    notes: shiftData.notes || "",
+                                    apply_to_all: false
+                                  });
+                                  setShowAssignModal(true);
+                                }
+                              }}
+                              className={`px-2 py-1.5 rounded-xl text-[11px] font-bold border transition-all ${
+                                canCreateSchedule ? "cursor-pointer hover:shadow-md hover:scale-[1.02]" : ""
+                              }`}
                               style={{
                                 backgroundColor: bStyle.bg,
                                 color: bStyle.color,
                                 borderColor: bStyle.border
                               }}
-                              title={`${shiftData.shift_name} (${shiftData.start_time} - ${shiftData.end_time})`}
+                              title={
+                                canCreateSchedule
+                                  ? `Click to edit shift for ${emp.name} on ${rDate.dateStr}`
+                                  : `${shiftData.shift_name} (${shiftData.start_time} - ${shiftData.end_time})`
+                              }
                             >
                               <div className="truncate">{shiftData.shift_name}</div>
                               <div className="text-[9px] opacity-80 font-normal mt-0.5">
@@ -950,20 +1016,71 @@ const Schedule = () => {
         <Modal.Body className="pt-3">
           <Form onSubmit={handleAssignShiftSubmit}>
             <Form.Group className="mb-3">
-              <Form.Label className="small fw-bold text-slate-700">Select Employee</Form.Label>
-              <Form.Select
-                value={shiftForm.employee_id}
-                onChange={(e) => setShiftForm({ ...shiftForm, employee_id: e.target.value })}
-                required
-                className="text-xs py-2 rounded-xl"
-              >
-                <option value="">Choose Employee ▾</option>
-                {filteredEmployees.map((emp) => (
-                  <option key={emp.id} value={emp.employee_code || emp.employee_id}>
-                    {emp.name} ({emp.employee_code || emp.employee_id}) — {emp.dept || userDepartment}
+              <div className="flex items-center justify-between mb-1.5">
+                <Form.Label className="small fw-bold text-slate-700 mb-0">Select Employee</Form.Label>
+                <Form.Check
+                  type="checkbox"
+                  id="apply-to-all-schedule"
+                  label={
+                    <span className="text-xs font-semibold text-indigo-600 cursor-pointer select-none">
+                      Apply to all employees ({assignableEmployees.length})
+                    </span>
+                  }
+                  checked={shiftForm.apply_to_all}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setShiftForm({
+                      ...shiftForm,
+                      apply_to_all: checked,
+                      employee_id: checked ? "ALL" : "",
+                    });
+                  }}
+                  className="small mb-0"
+                />
+              </div>
+
+              {shiftForm.apply_to_all ? (
+                <div className="p-2.5 bg-indigo-50 border border-indigo-200 rounded-xl text-xs text-indigo-900 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-indigo-600 flex-shrink-0 animate-pulse"></span>
+                    <span>
+                      Applying schedule to <strong>all {assignableEmployees.length} employees</strong>
+                      {isHod ? ` in ${userDepartment} department` : (selectedDept !== "All" ? ` in ${selectedDept} department` : " company-wide")}.
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShiftForm({ ...shiftForm, apply_to_all: false, employee_id: "" })}
+                    className="text-xs text-indigo-600 font-bold hover:underline ml-2"
+                  >
+                    Change
+                  </button>
+                </div>
+              ) : (
+                <Form.Select
+                  value={shiftForm.employee_id}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === "ALL") {
+                      setShiftForm({ ...shiftForm, apply_to_all: true, employee_id: "ALL" });
+                    } else {
+                      setShiftForm({ ...shiftForm, employee_id: val, apply_to_all: false });
+                    }
+                  }}
+                  required={!shiftForm.apply_to_all}
+                  className="text-xs py-2 rounded-xl"
+                >
+                  <option value="">Choose Employee ▾</option>
+                  <option value="ALL" className="font-bold text-indigo-700 bg-indigo-50">
+                    ⚡ Apply to All Employees ({assignableEmployees.length} staff)
                   </option>
-                ))}
-              </Form.Select>
+                  {assignableEmployees.map((emp) => (
+                    <option key={emp.id} value={emp.employee_code || emp.employee_id}>
+                      {emp.name} ({emp.employee_code || emp.employee_id}) — {emp.dept || userDepartment}
+                    </option>
+                  ))}
+                </Form.Select>
+              )}
             </Form.Group>
 
             <Form.Group className="mb-3">

@@ -98,23 +98,28 @@ export const setApiBaseUrl = (url) => {
   if (url) api.defaults.baseURL = url;
 };
 
+import { getCookie } from "../utils/cookieStorage";
+
 // ============================================================================
 // 2. AXIOS INSTANCE & INTERCEPTORS
 // ============================================================================
 export const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 5000,
+  timeout: 20000,
+  withCredentials: true,
   headers: {
     "Content-Type": "application/json",
     Accept: 'application/json',
   },
 });
 
-// Request Interceptor: Attach bearer token if available
+// Request Interceptor: Attach bearer token from Cookie or localStorage fallback
 api.interceptors.request.use(
   (config) => {
     const token =
-      typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      typeof window !== "undefined"
+        ? getCookie("token") || localStorage.getItem("token")
+        : null;
     if (token && !config.headers.Authorization) {
       config.headers.Authorization = `Bearer ${token}`;
     }

@@ -14,6 +14,7 @@ import {
   FiLogOut,
 } from "react-icons/fi";
 import { LuSparkles } from "react-icons/lu";
+import { getCookie, getAuthUser } from "../../utils/auth";
 
 /**
  * Fully responsive, centered, mobile-optimized Daily Attendance Notice Modal.
@@ -23,7 +24,7 @@ import { LuSparkles } from "react-icons/lu";
  * Step 1: Office hours (10:00 am - 7:00 pm) & 10:15 AM Late Cutoff
  * Step 2: Mandatory Timely Check-Out for attendance record
  */
-export default function DailyAttendanceNoticeModal({ isOpen, onClose }) {
+export default function DailyAttendanceNoticeModal({ isOpen, onClose, onAcknowledge }) {
   const [step, setStep] = useState(1);
 
   // Reset to step 1 whenever modal opens
@@ -84,7 +85,21 @@ export default function DailyAttendanceNoticeModal({ isOpen, onClose }) {
     }
   })();
 
-  const rawUserName = typeof window !== "undefined" ? localStorage.getItem("userName") : "";
+  const rawUserName = (() => {
+    if (typeof window === "undefined") return "";
+    return (
+      getCookie("userName") ||
+      (() => {
+        try {
+          return getAuthUser()?.name || "";
+        } catch (_) {
+          return "";
+        }
+      })() ||
+      localStorage.getItem("userName") ||
+      ""
+    );
+  })();
 
   return createPortal(
     <div
@@ -193,7 +208,13 @@ export default function DailyAttendanceNoticeModal({ isOpen, onClose }) {
                     Standard Office Hours
                   </h3>
                   <p className="text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 truncate">
-                    Welcome, <span className="font-semibold text-slate-700 dark:text-slate-200">{rawUserName}</span>! Standard working hours and check-in cutoff.
+                    {rawUserName ? (
+                      <>
+                        Welcome, <span className="font-semibold text-slate-700 dark:text-slate-200">{rawUserName}</span>! Standard working hours and check-in cutoff.
+                      </>
+                    ) : (
+                      "Standard working hours and check-in cutoff."
+                    )}
                   </p>
                 </div>
               </div>
@@ -359,7 +380,13 @@ export default function DailyAttendanceNoticeModal({ isOpen, onClose }) {
 
                 <button
                   type="button"
-                  onClick={onClose}
+                  onClick={() => {
+                    if (onAcknowledge) {
+                      onAcknowledge();
+                    } else if (onClose) {
+                      onClose();
+                    }
+                  }}
                   className="flex-1 py-2 sm:py-2.5 px-3.5 sm:px-4 rounded-xl bg-gradient-to-r from-slate-900 via-slate-800 to-blue-900 hover:from-slate-800 hover:to-blue-800 text-white text-xs font-bold shadow-md shadow-slate-900/25 transition-all flex items-center justify-center gap-1.5 group active:scale-[0.99]"
                 >
                   <FiCheck className="w-3.5 h-3.5 text-emerald-400 transition-transform group-hover:scale-125" />

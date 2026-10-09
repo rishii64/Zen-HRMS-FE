@@ -14,6 +14,8 @@ import { useNavigate, useLocation } from "react-router-dom";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { getApiBaseUrl, getUploadUrl } from "../../api/axios";
+import { exportToExcel } from "../../utils/excelExport";
+import EsiSlabAuditModal from "./components/EsiSlabAuditModal";
 
 const API = getApiBaseUrl();
 
@@ -144,12 +146,16 @@ const PayslipPage = () => {
   const [allPayrolls, setAllPayrolls] = useState([]);
   const [alertMsg, setAlertMsg] = useState(null);
 
+  // ESI Slab Configuration & Audit Modal state
+  const [showEsiAuditModal, setShowEsiAuditModal] = useState(false);
+  const [globalEsiThreshold, setGlobalEsiThreshold] = useState(21000);
+
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDept, setSelectedDept] = useState("all");
   const [viewMode, setViewMode] = useState("split"); // 'split' | 'table'
 
-  // 1. Initial Load: Fetch all employees & all payroll records
+  // 1. Initial Load: Fetch all employees, all payroll records & ESI settings
   useEffect(() => {
     fetchInitialData();
   }, []);
@@ -157,12 +163,30 @@ const PayslipPage = () => {
   const fetchInitialData = async () => {
     setLoadingEmployees(true);
     try {
-      const [empRes, payRes] = await Promise.all([
-        fetch(`${API}/employees`),
-        fetch(`${API}/payroll/all`),
+      const [empRes, payRes, setRes] = await Promise.all([
+        fetch(`${API}/employees?_t=${Date.now()}`, {
+          cache: "no-store",
+          headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
+        }),
+        fetch(`${API}/payroll/all?_t=${Date.now()}`, {
+          cache: "no-store",
+          headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
+        }),
+        fetch(`${API}/payroll/settings?_t=${Date.now()}`, {
+          cache: "no-store",
+          headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
+        }).catch(() => null),
       ]);
       const empJson = await empRes.json();
       const payJson = await payRes.json();
+      if (setRes && setRes.ok) {
+        try {
+          const setJson = await setRes.json();
+          if (setJson?.success && setJson?.settings?.esi_threshold) {
+            setGlobalEsiThreshold(Number(setJson.settings.esi_threshold));
+          }
+        } catch { }
+      }
 
       let empList = [];
       if (empJson.success && Array.isArray(empJson.data)) {
@@ -175,15 +199,16 @@ const PayslipPage = () => {
 
       // Determine default selected employee
       if (isRegularEmployee && loggedInEmpCode) {
-        setSelectedEmpCode(loggedInEmpCode);
+        setSelectedEmpCode(loggedInEmpCode.replace(/^#/, "").trim());
       } else if (empList.length > 0) {
         // If url has ?code=..., select that
         const params = new URLSearchParams(location.search);
-        const codeParam = params.get("code");
-        if (codeParam && empList.some((e) => e.employee_code === codeParam)) {
+        const rawCode = params.get("code");
+        const codeParam = rawCode ? rawCode.replace(/^#/, "").trim() : "";
+        if (codeParam && empList.some((e) => (e.employee_code || "").replace(/^#/, "").trim().toLowerCase() === codeParam.toLowerCase())) {
           setSelectedEmpCode(codeParam);
         } else {
-          setSelectedEmpCode(empList[0].employee_code);
+          setSelectedEmpCode((empList[0].employee_code || "").replace(/^#/, "").trim());
         }
       }
     } catch (err) {
@@ -202,8 +227,20 @@ const PayslipPage = () => {
   const fetchEmployeeSlipData = async (empCode, monthYear) => {
     setLoadingSlip(true);
     try {
+      const cleanCode = (empCode || "").toString().replace(/^#/, "").trim();
+      if (!cleanCode) {
+        setLoadingSlip(false);
+        return;
+      }
       const res = await fetch(
-        `${API}/payroll/data/${empCode}?month=${encodeURIComponent(monthYear)}`
+        `${API}/payroll/data/${cleanCode}?month=${encodeURIComponent(monthYear)}&_t=${Date.now()}`,
+        {
+          cache: "no-store",
+          headers: {
+            "Cache-Control": "no-cache",
+            Pragma: "no-cache",
+          },
+        }
       );
       const data = await res.json();
       if (data.success) {
@@ -221,11 +258,11 @@ const PayslipPage = () => {
   // Currently selected employee object
   const activeEmployee = useMemo(() => {
     if (!selectedEmpCode || !Array.isArray(employees)) return null;
+    const cleanSelected = selectedEmpCode.toString().replace(/^#/, "").trim().toLowerCase();
     return (
       employees.find(
         (e) =>
-          String(e.employee_code || "").toLowerCase() ===
-          selectedEmpCode.toLowerCase()
+          String(e.employee_code || "").replace(/^#/, "").trim().toLowerCase() === cleanSelected
       ) || null
     );
   }, [selectedEmpCode, employees]);
@@ -274,20 +311,19 @@ const PayslipPage = () => {
     }
 
     const sp = payrollData.saved_payroll;
-    const isFinal = sp && sp.status === "Finalized";
-    const fp = isFinal
-      ? sp.fixed_pay || {}
-      : payrollData.latest_salary_structure || payrollData.defaults?.fixed_pay || {};
+    const hasStructureUpdate = !!payrollData.has_structure_update;
+    const isFinal = sp && sp.status === "Finalized" && !hasStructureUpdate;
+    const fp = (hasStructureUpdate || !isFinal)
+      ? payrollData.latest_salary_structure || payrollData.defaults?.fixed_pay || (sp ? sp.fixed_pay || {} : {})
+      : sp.fixed_pay || {};
     const vp = sp ? sp.variable_pay || {} : payrollData.defaults?.variable_pay || {};
-    const att = isFinal
-      ? sp.attendance_summary || {}
-      : payrollData.defaults?.attendance_summary || {};
-    const tax = isFinal
-      ? sp.tax_deductions || {}
-      : payrollData.defaults?.tax_deductions || {};
-    const stat = isFinal
-      ? sp.statutory_deductions || {}
-      : payrollData.defaults?.statutory_deductions || {};
+    const att = sp ? sp.attendance_summary || {} : payrollData.defaults?.attendance_summary || {};
+    const tax = (hasStructureUpdate || !isFinal)
+      ? payrollData.defaults?.tax_deductions || sp?.tax_deductions || {}
+      : sp.tax_deductions || {};
+    const stat = (hasStructureUpdate || !isFinal)
+      ? payrollData.latest_salary_structure || payrollData.defaults?.statutory_deductions || sp?.statutory_deductions || {}
+      : sp.statutory_deductions || {};
     const adj = sp?.adjustments || payrollData.adjustments || payrollData.defaults?.adjustments || {};
     const empType = (payrollData.employee?.employment_type || adj.employment_type || "Permanent").trim();
     const isPermanent = (adj.is_permanent !== false) && (empType.toLowerCase() === "permanent");
@@ -297,38 +333,57 @@ const PayslipPage = () => {
         ? parseFloat(vp.overtime)
         : (parseFloat(vp.overtime_hours) || 0) * (parseFloat(vp.overtime_rate) || 0);
 
-    const totalFixedEarnings =
+    const curSal = parseFloat(payrollData.employee?.current_salary) || 0;
+    const structGross =
       (parseFloat(fp.basic) || 0) +
       (parseFloat(fp.hra) || 0) +
       (parseFloat(fp.conveyance) || 0) +
       (parseFloat(fp.medical) || 0) +
       (parseFloat(fp.allowance) || 0);
 
+    let basicVal = parseFloat(fp.basic) || 0;
+    let hraVal = parseFloat(fp.hra) || 0;
+    let convVal = parseFloat(fp.conveyance) || 0;
+    let medVal = parseFloat(fp.medical) || 0;
+    let allowVal = parseFloat(fp.allowance) || 0;
+
+    // Automatically realign if fp components are 0 or differ from current_salary
+    if ((hasStructureUpdate || !isFinal) && curSal > 0 && (structGross === 0 || Math.abs(structGross - curSal) > 1)) {
+      basicVal = Math.round(curSal * 0.45);
+      hraVal = Math.round(curSal * 0.40);
+      convVal = Math.round(curSal * 0.05) || 1600;
+      medVal = Math.round(curSal * 0.05) || 1250;
+      allowVal = Math.max(0, curSal - (basicVal + hraVal + convVal + medVal));
+    }
+
+    const totalFixedEarnings = basicVal + hraVal + convVal + medVal + allowVal;
+
     const lopCalc =
       (parseFloat(att.lop_days) || 0) > 0
         ? Math.round(
           (totalFixedEarnings / (att.total_days || 30)) * parseFloat(att.lop_days)
         )
-        : isFinal
+        : (isFinal && !hasStructureUpdate)
           ? parseFloat(sp.lop_deduction) || 0
           : 0;
 
     const earnings = [
-      { label: "Basic Salary", amount: parseFloat(fp.basic) || 0 },
-      { label: "House Rent Allowance (HRA)", amount: parseFloat(fp.hra) || 0 },
-      { label: "Conveyance Allowance", amount: parseFloat(fp.conveyance) || 0 },
-      { label: "Medical Allowance", amount: parseFloat(fp.medical) || 0 },
-      { label: "Special Allowance", amount: parseFloat(fp.allowance) || 0 },
+      { label: "Basic Salary", amount: basicVal },
+      { label: "House Rent Allowance (HRA)", amount: hraVal },
+      { label: "Conveyance Allowance", amount: convVal },
+      { label: "Medical Allowance", amount: medVal },
+      { label: "Special Allowance", amount: allowVal },
       { label: "Performance Bonus", amount: parseFloat(vp.bonus) || 0 },
       { label: "Overtime Pay", amount: effectiveOT },
       { label: "Incentive", amount: parseFloat(vp.incentive) || 0 },
       { label: "Reimbursement", amount: parseFloat(vp.reimbursement) || 0 },
     ].filter((item) => item.amount > 0);
 
-    const isEsiEligible = totalFixedEarnings <= 21000;
+    const empEsiThresh = payrollData?.esi_threshold ?? 21000;
+    const isEsiEligible = totalFixedEarnings <= empEsiThresh;
     const healthDeduction = isEsiEligible
       ? { label: "Employee State Insurance (ESI)", amount: parseFloat(stat.esi) || 0 }
-      : { label: "Mediclaim", amount: parseFloat(stat.esi || stat.mediclaim) || 0 };
+      : { label: "Mediclaim", amount: parseFloat(stat.mediclaim) || 0 };
 
     const deductions = [
       { label: "Provident Fund (PF)", amount: parseFloat(stat.pf) || 0 },
@@ -389,6 +444,10 @@ const PayslipPage = () => {
     const emp = payrollData.employee;
     const doc = new jsPDF();
 
+    const compName = (emp.company_name || "TATA STEEL").toUpperCase();
+    const grpName = (emp.group_name || "TATA COMPANY").toUpperCase();
+    const locName = emp.work_location || "Kolkata";
+
     // 1. Corporate Header Banner
     doc.setFillColor(74, 40, 53); // Deep Burgundy
     doc.rect(0, 0, 210, 26, "F");
@@ -396,14 +455,14 @@ const PayslipPage = () => {
     doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(15);
-    doc.text("ZENTELEX IT SOLUTIONS PRIVATE LIMITED", 105, 12, {
+    doc.text(compName, 105, 12, {
       align: "center",
     });
 
     doc.setFontSize(8.5);
     doc.setFont("helvetica", "normal");
     doc.text(
-      "Corporate Office: Kolkata, West Bengal, India | Employee Pay Slip",
+      `A Subsidiary of ${grpName} • Location: ${locName} | Confidential Employee Pay Slip`,
       105,
       19,
       { align: "center" }
@@ -424,10 +483,22 @@ const PayslipPage = () => {
         emp.employee_code || "N/A",
       ],
       [
-        { content: "Designation:", styles: { fontStyle: "bold" } },
-        emp.designation || "Staff",
+        { content: "Company / Unit:", styles: { fontStyle: "bold" } },
+        emp.company_name || "TATA Steel",
+        { content: "Parent Group:", styles: { fontStyle: "bold" } },
+        emp.group_name || "TATA Company",
+      ],
+      [
+        { content: "Work Location:", styles: { fontStyle: "bold" } },
+        emp.work_location || "Kolkata",
         { content: "Department:", styles: { fontStyle: "bold" } },
         emp.dept || "General",
+      ],
+      [
+        { content: "Designation:", styles: { fontStyle: "bold" } },
+        emp.designation || "Staff",
+        { content: "Pay Status:", styles: { fontStyle: "bold" } },
+        slipBreakdown.status === "Finalized" ? "PAID" : "UNPAID",
       ],
       [
         { content: "Bank Name:", styles: { fontStyle: "bold" } },
@@ -436,16 +507,16 @@ const PayslipPage = () => {
         emp.bank_details?.account || "N/A",
       ],
       [
-        { content: "Pay Period:", styles: { fontStyle: "bold" } },
-        currentMonthYear,
-        { content: "Pay Status:", styles: { fontStyle: "bold" } },
-        slipBreakdown.status === "Finalized" ? "PAID" : "UNPAID",
-      ],
-      [
         { content: "Employment:", styles: { fontStyle: "bold" } },
         emp.employment_type || slipBreakdown.employment_type || "Permanent",
-        { content: "Paid Days:", styles: { fontStyle: "bold" } },
-        `${slipBreakdown.attendance?.present_days ?? 24}P + ${slipBreakdown.attendance?.leave_days || slipBreakdown.attendance?.paid_leaves || 0}L + ${slipBreakdown.attendance?.holiday_days || 0}H - ${slipBreakdown.attendance?.absent_days || 0}A = ${slipBreakdown.attendance?.paid_days ?? 24} Paid`,
+        { content: "Employee Status:", styles: { fontStyle: "bold" } },
+        emp.status || "Active",
+      ],
+      [
+        { content: "Work & Present Days:", styles: { fontStyle: "bold" } },
+        `${slipBreakdown.attendance?.working_days || 26} Work Days | ${slipBreakdown.attendance?.present_days ?? 0} Present`,
+        { content: "Paid Days Breakdown:", styles: { fontStyle: "bold" } },
+        `${slipBreakdown.attendance?.present_days ?? 24}P + ${slipBreakdown.attendance?.leave_days || slipBreakdown.attendance?.paid_leaves || 0}L + ${slipBreakdown.attendance?.holiday_days || 0}H + ${slipBreakdown.attendance?.week_offs ?? Math.max(0, (slipBreakdown.attendance?.total_days || 30) - (slipBreakdown.attendance?.working_days || 26))}WO - ${slipBreakdown.attendance?.absent_days || 0}A = ${slipBreakdown.attendance?.paid_days ?? 24} Paid (${slipBreakdown.attendance?.total_days || 30} Days)`,
       ],
     ];
 
@@ -523,15 +594,15 @@ const PayslipPage = () => {
 
     const finalY = doc.lastAutoTable.finalY || 140;
 
-    // 5. Net Salary Payable Box
+    // 5. Net Salary Payable Box (Computed according to present work days)
     doc.setFillColor(248, 250, 252);
     doc.setDrawColor(203, 213, 225);
     doc.roundedRect(14, finalY + 8, 182, 18, 2, 2, "FD");
 
     doc.setTextColor(15, 23, 42);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
-    doc.text("NET SALARY PAYABLE:", 22, finalY + 19);
+    doc.setFontSize(10.5);
+    doc.text("NET SALARY PAYABLE (FOR PRESENT WORK DAYS):", 22, finalY + 19);
 
     doc.setFontSize(13);
     doc.setTextColor(22, 101, 52); // Green
@@ -571,6 +642,369 @@ const PayslipPage = () => {
 
     const safeName = String(emp.name || "Employee").replace(/\s+/g, "_");
     doc.save(`Payslip_${safeName}_${selectedMonth}_${selectedYear}.pdf`);
+  };
+
+  // Download Individual Payslip in Excel (.xlsx) with present work days payable salary
+  const handleDownloadExcel = () => {
+    if (!payrollData || !payrollData.employee) return;
+    const emp = payrollData.employee;
+    const isPaid = slipBreakdown.status === "Finalized";
+    const att = slipBreakdown.attendance || {};
+    const bank = emp.bank_details || {};
+    const safeName = String(emp.name || "Employee").replace(/\s+/g, "_");
+
+    const maxRows = Math.max(
+      slipBreakdown.earnings.length,
+      slipBreakdown.deductions.length,
+      1
+    );
+    const finRows = [];
+    for (let i = 0; i < maxRows; i++) {
+      const earn = slipBreakdown.earnings[i];
+      const ded = slipBreakdown.deductions[i];
+      finRows.push([
+        earn ? earn.label : "",
+        earn ? Number(earn.amount) : "",
+        ded ? ded.label : "",
+        ded ? Number(ded.amount) : "",
+      ]);
+    }
+
+    const lopDedObj = slipBreakdown.deductions.find((d) => d.label.includes("Loss of Pay"));
+    const lopCalc = lopDedObj ? Number(lopDedObj.amount) : 0;
+    const earnedGross = Math.max(0, slipBreakdown.gross - lopCalc);
+    const statutoryDeds = Math.max(0, slipBreakdown.totalDeds - lopCalc);
+
+    const compName = (emp.company_name || "TATA STEEL").toUpperCase();
+    const grpName = (emp.group_name || "TATA COMPANY").toUpperCase();
+    const locName = emp.work_location || "Kolkata";
+
+    const rows = [
+      [compName],
+      [`A Division / Subsidiary of ${grpName} • Location: ${locName} | Confidential Employee Pay Slip`],
+      [`SALARY PAYSLIP FOR ${currentMonthYear.toUpperCase()}`],
+      [],
+      ["EMPLOYEE DETAILS", "", "ORGANIZATION & LOCATION", ""],
+      ["Employee Name:", emp.name || "N/A", "Company / Unit:", emp.company_name || "TATA Steel"],
+      ["Employee ID:", emp.employee_code || "N/A", "Parent Group:", emp.group_name || "TATA Company"],
+      ["Designation:", emp.designation || "Staff", "Work Location:", emp.work_location || "Kolkata"],
+      ["Department:", emp.dept || "General", "Employment Type:", emp.employment_type || slipBreakdown.employment_type || "Permanent"],
+      ["Pay Period:", currentMonthYear, "Pay Status:", isPaid ? "PAID" : "UNPAID"],
+      ["Bank Name:", bank.name || "HDFC Bank", "Account No:", bank.account || "N/A"],
+      ["IFSC Code:", bank.ifsc || "N/A", "PAN Number:", bank.pan || emp.pan_no || "N/A"],
+      [],
+      ["ATTENDANCE SUMMARY", "", "", ""],
+      ["Total Days in Month:", att.total_days || 31, "Total Work Days:", att.working_days || 26],
+      ["Total Present Days:", att.present_days ?? 0, "Total Leaves:", att.leave_days || att.paid_leaves || 0],
+      ["Total Absents (LOP):", att.absent_days || att.lop_days || 0, "Holidays / Week Offs:", `${att.holiday_days || 0} / ${att.week_offs || 5}`],
+      ["Total Paid Days:", att.paid_days ?? 0, "Loss of Pay Days:", att.lop_days || 0],
+      [],
+      ["EARNINGS (FIXED STRUCTURE)", "AMOUNT (INR)", "DEDUCTIONS & COMPLIANCE", "AMOUNT (INR)"],
+      ...finRows,
+      ["Total Gross Earnings (Monthly CTC)", Number(slipBreakdown.gross), "Total Deductions", Number(slipBreakdown.totalDeds)],
+      [],
+      ["SALARY COMPUTATION (FOR PRESENT WORK DAYS)", "", "", ""],
+      ["Monthly Full CTC Gross:", Number(slipBreakdown.gross), "Loss of Pay (LOP) Deduction:", Number(lopCalc)],
+      ["Gross Earned (Present Days):", Number(earnedGross), "Statutory Deductions:", Number(statutoryDeds)],
+      ["NET SALARY PAYABLE (PRESENT WORK DAYS):", Number(slipBreakdown.net)],
+      ["In Words:", numberToWords(slipBreakdown.net)],
+      ["Payment Status:", isPaid ? "Paid" : "Unpaid"],
+    ];
+
+    exportToExcel({
+      data: rows,
+      fileName: `Payslip_${safeName}_${selectedMonth}_${selectedYear}.xlsx`,
+      sheetName: "Payslip",
+    });
+  };
+
+  // Fetch full monthly register from summary-sheet API (with fallback)
+  const fetchMonthlyRegister = async () => {
+    try {
+      const userRole = (localStorage.getItem("role") || "admin").toLowerCase();
+      const res = await fetch(
+        `${API}/payroll/summary-sheet?month=${encodeURIComponent(
+          currentMonthYear
+        )}&_t=${Date.now()}`,
+        {
+          cache: "no-store",
+          headers: { "Cache-Control": "no-cache", role: userRole },
+        }
+      );
+      const d = await res.json();
+      if (d.success && Array.isArray(d.summary) && d.summary.length > 0) {
+        return d.summary;
+      }
+    } catch (err) {
+      console.warn("Could not fetch summary-sheet for payslip register:", err);
+    }
+
+    // Fallback: derive from filteredEmployees and allPayrolls
+    return (Array.isArray(employees) ? employees : []).map((emp) => {
+      let ss = {};
+      try {
+        ss = typeof emp.salary_structure === "string" ? JSON.parse(emp.salary_structure) : emp.salary_structure || {};
+      } catch {}
+      const earn = ss.earnings || {};
+      const ded = ss.deductions || {};
+      const curSal = parseFloat(emp.current_salary) || 25000;
+      const gross =
+        (parseFloat(earn.basic) || 0) +
+        (parseFloat(earn.da) || 0) +
+        (parseFloat(earn.hra) || 0) +
+        (parseFloat(earn.conveyance) || 0) +
+        (parseFloat(earn.medical) || 0) +
+        (parseFloat(earn.allowance) || 0) || curSal;
+      const statutoryDeds =
+        (parseFloat(ded.professional_tax) || 0) +
+        (parseFloat(ded.income_tax) || 0) +
+        (parseFloat(ded.pf) || 0) +
+        (parseFloat(ded.esi) || 0) +
+        (parseFloat(ded.mediclaim) || 0) +
+        (parseFloat(ded.tds) || 0);
+
+      const totalDays = 30;
+      const paidDays = 24;
+      const lopDays = Math.max(0, totalDays - paidDays);
+      const dailyRate = totalDays > 0 ? (gross / totalDays) : 0;
+      const lopAmount = Math.round(lopDays * dailyRate);
+      const earnedGross = Math.max(0, gross - lopAmount);
+      const payableSalary = Math.max(0, earnedGross - statutoryDeds);
+
+      const isPaid = allPayrolls.some(
+        (p) =>
+          String(p.employee_id).toLowerCase() === String(emp.employee_code).toLowerCase() &&
+          String(p.month_year).toLowerCase() === currentMonthYear.toLowerCase() &&
+          p.status === "Finalized"
+      );
+
+      const adj = ss.adjustments || {};
+      const advAmt = parseFloat(adj.advance_amount) || 0;
+      const advDed = parseFloat(adj.advance_deduction) || 0;
+      const loanAmt = parseFloat(adj.loan_amount) || 0;
+      const loanEmi = parseFloat(adj.loan_emi) || 0;
+      const insDed = parseFloat(adj.insurance_deduction) || 0;
+      const medDed = parseFloat(ss.deductions?.mediclaim) || parseFloat(adj.mediclaim_deduction) || 0;
+      const gratMonthly = Math.round(((parseFloat(ss.earnings?.basic) || Math.round(curSal * 0.45)) * 15) / (26 * 12));
+
+      const advDisp = advAmt > 0 || advDed > 0 ? `Rs. ${advAmt.toLocaleString("en-IN")}${advDed > 0 ? ` (Rec: Rs. ${advDed})` : ""}` : "-";
+      const loanDisp = loanAmt > 0 || loanEmi > 0 ? `Rs. ${loanAmt.toLocaleString("en-IN")}${loanEmi > 0 ? ` (EMI: Rs. ${loanEmi})` : ""}` : "-";
+      const insDisp = medDed > 0 || insDed > 0 ? `Rs. ${(medDed || insDed).toLocaleString("en-IN")}/mo` : "-";
+      const gratDisp = gratMonthly > 0 ? `Rs. ${gratMonthly.toLocaleString("en-IN")}/mo` : "-";
+
+      return {
+        employee_code: emp.employee_code || "",
+        name: emp.name || "",
+        dept: emp.dept || "General",
+        designation: emp.designation || "Staff",
+        employee_status: emp.status || "Active",
+        employment_type: emp.employment_type || "Permanent",
+        attendance: {
+          total_days: totalDays,
+          working_days: 26,
+          present_days: 24,
+          leave_days: 0,
+          absent_days: 0,
+          holiday_days: 0,
+          week_offs: 4,
+          paid_days: paidDays,
+          lop_days: lopDays,
+        },
+        base_pay: gross,
+        gross_pay: gross,
+        overall_gross: gross,
+        earned_gross: earnedGross,
+        lop_days: lopDays,
+        lop_amount: lopAmount,
+        statutory_deductions: statutoryDeds,
+        total_deductions: statutoryDeds + lopAmount,
+        payable_salary: payableSalary,
+        net_salary: payableSalary,
+        facilities_taken: "None",
+        facility_advance: advDisp,
+        facility_loan: loanDisp,
+        facility_insurance: insDisp,
+        facility_gratuity: gratDisp,
+        facilities: {
+          advance_amount: advAmt,
+          advance_deduction: advDed,
+          loan_amount: loanAmt,
+          loan_emi: loanEmi,
+          insurance_deduction: insDed,
+          mediclaim_deduction: medDed,
+          gratuity_accrual: gratMonthly,
+        },
+        group_name: emp.group_name || "TATA Company",
+        company_name: emp.company_name || "TATA Steel",
+        work_location: emp.work_location || "Kolkata",
+        status: isPaid ? "Paid" : "Unpaid",
+        is_paid: isPaid,
+        bank_name: "HDFC Bank",
+        account_no: "N/A",
+        ifsc: "N/A",
+        pan: emp.pan_no || "N/A",
+      };
+    });
+  };
+
+  // Export all salary slips register to Excel (.xlsx) with separate facility columns
+  const handleExportRegisterExcel = async () => {
+    try {
+      const records = await fetchMonthlyRegister();
+      const rows = records.map((emp) => ({
+        "Holding Group": emp.group_name || "TATA Company",
+        "Company / Subsidiary": emp.company_name || "TATA Steel",
+        "Work Location": emp.work_location || "Kolkata",
+        "Employee ID": emp.employee_code || "",
+        "Employee Name": emp.name || "",
+        "Department": emp.dept || "General",
+        "Designation / Role": emp.designation || "Staff",
+        "Employee Status": emp.employee_status || "Active",
+        "Employment Type": emp.employment_type || "Permanent",
+        "Total Days in Month": emp.attendance?.total_days ?? 30,
+        "Total Work Days": emp.attendance?.working_days ?? 26,
+        "Total Present Days": emp.attendance?.present_days ?? 0,
+        "Total Leaves": emp.attendance?.leave_days ?? 0,
+        "Total Absents / LOP Days": emp.attendance?.absent_days ?? emp.attendance?.lop_days ?? 0,
+        "Holidays": emp.attendance?.holiday_days ?? 0,
+        "Week Offs": emp.attendance?.week_offs ?? 0,
+        "Total Paid Days": emp.attendance?.paid_days ?? 0,
+        "Advance Facility": emp.facility_advance || "-",
+        "Advance Taken (INR)": parseFloat(emp.facilities?.advance_amount || 0),
+        "Advance Monthly Recovery (INR)": parseFloat(emp.facilities?.advance_deduction || 0),
+        "Company Loan Facility": emp.facility_loan || "-",
+        "Loan Taken (INR)": parseFloat(emp.facilities?.loan_amount || 0),
+        "Loan Monthly EMI (INR)": parseFloat(emp.facilities?.loan_emi || 0),
+        "Mediclaim / Insurance Facility": emp.facility_insurance || "-",
+        "Mediclaim / Insurance Deduction (INR)": parseFloat(emp.facilities?.mediclaim_deduction || emp.facilities?.insurance_deduction || 0),
+        "Gratuity Facility": emp.facility_gratuity || "-",
+        "Gratuity Monthly Accrual (INR)": parseFloat(emp.facilities?.gratuity_accrual || 0),
+        "Monthly Overall CTC / Base (INR)": parseFloat(emp.base_pay || 0),
+        "Monthly Overall Gross (INR)": parseFloat(emp.overall_gross || emp.gross_pay || emp.base_pay || 0),
+        "Loss of Pay (LOP) Deduction (INR)": parseFloat(emp.lop_amount || 0),
+        "Earned Gross for Present Days (INR)": parseFloat(emp.earned_gross || 0),
+        "Statutory & Other Deductions (INR)": parseFloat(emp.statutory_deductions || 0),
+        "Total Deductions (INR)": parseFloat(emp.total_deductions || 0),
+        "Net Payable Salary (According to Present Days) (INR)": parseFloat(emp.payable_salary || emp.net_salary || 0),
+        "Payment Status": emp.status || (emp.is_paid ? "Paid" : "Unpaid"),
+        "Bank Name": emp.bank_name || "N/A",
+        "Account Number": emp.account_no || "N/A",
+        "IFSC Code": emp.ifsc || "N/A",
+        "PAN Number": emp.pan || "N/A",
+      }));
+
+      exportToExcel({
+        data: rows,
+        fileName: `Salary_Slips_Register_${selectedMonth}_${selectedYear}.xlsx`,
+        sheetName: `Salary Slips ${selectedMonth} ${selectedYear}`,
+      });
+    } catch (err) {
+      console.error("Error exporting slips Excel:", err);
+      setAlertMsg({ type: "danger", text: "Failed to export salary slips Excel register." });
+    }
+  };
+
+  // Export all salary slips register to PDF (.pdf) with separate facility columns & present work days payable salary
+  const handleExportRegisterPDF = async () => {
+    try {
+      const records = await fetchMonthlyRegister();
+      const firstGrp = records[0]?.group_name || "TATA COMPANY";
+      const doc = new jsPDF("landscape");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(14);
+      doc.setTextColor(15, 23, 42);
+      doc.text(
+        `${firstGrp.toUpperCase()} - SALARY SLIPS REGISTER (${selectedMonth.toUpperCase()} ${selectedYear})`,
+        14,
+        15
+      );
+
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(100, 116, 139);
+      doc.text(
+        `Generated on ${new Date().toLocaleDateString("en-IN")} | Consolidated Location-wise Corporate Salary Slips Register Across Subsidiaries`,
+        14,
+        21
+      );
+
+      const rows = records.map((emp) => [
+        emp.employee_code || "",
+        emp.name || "",
+        emp.company_name || "TATA Steel",
+        emp.work_location || "Kolkata",
+        emp.designation || emp.dept || "Staff",
+        emp.employee_status || "Active",
+        String(emp.attendance?.working_days ?? 26),
+        String(emp.attendance?.present_days ?? 0),
+        String(emp.attendance?.paid_days ?? 0),
+        emp.facility_advance || (parseFloat(emp.facilities?.advance_amount) > 0 ? `Rs. ${formatPdfNum(emp.facilities.advance_amount)}` : "-"),
+        emp.facility_loan || (parseFloat(emp.facilities?.loan_amount) > 0 ? `Rs. ${formatPdfNum(emp.facilities.loan_amount)}` : "-"),
+        emp.facility_insurance || (parseFloat(emp.facilities?.mediclaim_deduction || emp.facilities?.insurance_deduction) > 0 ? `Rs. ${formatPdfNum(emp.facilities?.mediclaim_deduction || emp.facilities?.insurance_deduction)}/mo` : "-"),
+        formatPdfNum(emp.overall_gross || emp.gross_pay || emp.base_pay),
+        formatPdfNum(emp.lop_amount || 0),
+        formatPdfNum(emp.payable_salary || emp.net_salary),
+        emp.status || (emp.is_paid ? "Paid" : "Unpaid"),
+      ]);
+
+      autoTable(doc, {
+        startY: 25,
+        margin: { left: 8, right: 8 },
+        head: [
+          [
+            "Emp Code",
+            "Staff Member",
+            "Company",
+            "Location",
+            "Role",
+            "Status",
+            "Work Days",
+            "Present",
+            "Paid Days",
+            "Advance",
+            "Loan",
+            "Mediclaim",
+            "Gross (INR)",
+            "LOP Ded (INR)",
+            "Payable Salary (INR)",
+            "Status",
+          ],
+        ],
+        body: rows,
+        theme: "grid",
+        headStyles: {
+          fillColor: [74, 40, 53],
+          textColor: [255, 255, 255],
+          fontStyle: "bold",
+          fontSize: 7,
+          halign: "center",
+        },
+        styles: { fontSize: 6.8, cellPadding: 2 },
+        columnStyles: {
+          0: { halign: "center" },
+          1: { halign: "left" },
+          2: { halign: "left" },
+          3: { halign: "center" },
+          4: { halign: "left" },
+          5: { halign: "center" },
+          6: { halign: "center" },
+          7: { halign: "center" },
+          8: { halign: "center" },
+          9: { halign: "center" },
+          10: { halign: "center" },
+          11: { halign: "center" },
+          12: { halign: "right" },
+          13: { halign: "right" },
+          14: { halign: "right", fontStyle: "bold" },
+          15: { halign: "center" },
+        },
+      });
+
+      doc.save(`Salary_Slips_Register_${selectedMonth}_${selectedYear}.pdf`);
+    } catch (err) {
+      console.error("Error exporting slips PDF:", err);
+      setAlertMsg({ type: "danger", text: "Failed to export salary slips PDF register." });
+    }
   };
 
   // Avatar renderer
@@ -621,7 +1055,7 @@ const PayslipPage = () => {
   };
 
   return (
-    <div className="container-fluid max-w-6xl mt-3 mt-md-4 pb-5 px-2 px-md-4">
+    <div className="container-fluid max-w-7xl mt-3 mt-md-4 pb-5 px-2 px-md-4">
       {/* ══ HEADER & TOP NAVIGATION ══ */}
       <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
         <div>
@@ -641,14 +1075,14 @@ const PayslipPage = () => {
         </div>
 
         {/* Top Controls: Period selector & Link to Salary Structure */}
-        <div className="d-flex flex-wrap align-items-center gap-2">
+        <div className="d-flex flex-wrap justify-end align-items-center gap-2">
           {/* Month & Year Selectors */}
           <div className="d-flex align-items-center bg-white border rounded-3 px-2 py-1 gap-1 shadow-xs">
             <span className="text-muted small ps-1">📅</span>
             <Form.Select
               size="sm"
               className="border-0 bg-transparent py-0 fw-semibold text-dark shadow-none"
-              style={{ width: "115px", fontSize: "13px" }}
+              style={{ width: "116px", fontSize: "13px" }}
               value={selectedMonth}
               onChange={(e) => setSelectedMonth(e.target.value)}
             >
@@ -682,6 +1116,43 @@ const PayslipPage = () => {
           >
             <span>💼 Salary Structure</span>
           </Button>
+
+          {/* ESI Slab Configuration & Statutory Cycles (All Roles) */}
+          <Button
+            variant="outline-primary"
+            size="sm"
+            className="rounded-3 px-3 py-1.5 fw-semibold d-flex align-items-center gap-1.5 bg-white shadow-xs border"
+            style={{ borderColor: "#2563eb", color: "#1d4ed8" }}
+            onClick={() => setShowEsiAuditModal(true)}
+            title="View ESI statutory wage ceiling, rates, and past revisions"
+          >
+            <span>🛡️</span>
+            <span>ESI Slab (₹{Number(globalEsiThreshold).toLocaleString("en-IN")})</span>
+          </Button>
+
+          {/* Export All Slips Register (Excel & PDF) for HR / Accounts */}
+          {!isRegularEmployee && (
+            <div className="d-flex align-items-center gap-1.5">
+              <Button
+                variant="outline-success"
+                size="sm"
+                className="rounded-3 px-3 py-1.5 fw-semibold d-flex align-items-center gap-1.5 bg-white shadow-xs border"
+                onClick={handleExportRegisterExcel}
+                title="Export all salary slips register to Excel (.xlsx) with work days & status"
+              >
+                <span>📊 Export Excel</span>
+              </Button>
+              <Button
+                variant="outline-secondary"
+                size="sm"
+                className="rounded-3 px-3 py-1.5 fw-semibold d-flex align-items-center gap-1.5 bg-white shadow-xs text-dark border"
+                onClick={handleExportRegisterPDF}
+                title="Export all salary slips register to PDF (.pdf) with work days & status"
+              >
+                <span>📄 Export PDF</span>
+              </Button>
+            </div>
+          )}
 
           {/* View Toggle for HR / Accounts */}
           {!isRegularEmployee && (
@@ -796,11 +1267,13 @@ const PayslipPage = () => {
                     </div>
                   ) : (
                     filteredEmployees.map((emp) => {
-                      const isSelected = emp.employee_code === selectedEmpCode;
+                      const cleanEmpCode = (emp.employee_code || "").toString().replace(/^#/, "").trim();
+                      const cleanSelected = (selectedEmpCode || "").toString().replace(/^#/, "").trim();
+                      const isSelected = cleanEmpCode.toLowerCase() === cleanSelected.toLowerCase();
                       return (
                         <div
                           key={emp.employee_code}
-                          onClick={() => setSelectedEmpCode(emp.employee_code)}
+                          onClick={() => setSelectedEmpCode(cleanEmpCode)}
                           className={`p-2.5 rounded-3 mb-2 d-flex align-items-center justify-content-between cursor-pointer transition-all border ${
                             isSelected
                               ? "bg-light border-dark shadow-xs"
@@ -861,10 +1334,24 @@ const PayslipPage = () => {
                   <div className="border-bottom pb-3 mb-3">
                     <div className="d-flex flex-column flex-sm-row justify-content-between align-items-sm-start gap-2">
                       <div>
-                        <div className="d-flex align-items-center gap-2">
-                          <h4 className="fw-bold text-dark mb-0">Salary Pay Slip</h4>
+                        <div className="d-flex flex-wrap align-items-center gap-2">
+                          <h4 className="fw-bold text-dark mb-0">
+                            {payrollData.employee.company_name || "TATA STEEL"}
+                          </h4>
                           <span
-                            className="px-2.5 py-0.5 rounded-pill small fw-semibold"
+                            className="badge px-2.5 py-1 rounded-pill fw-semibold text-uppercase"
+                            style={{ background: "#0f172a", color: "#fff", fontSize: "11px" }}
+                          >
+                            Group: {payrollData.employee.group_name || "TATA Company"}
+                          </span>
+                          <span
+                            className="badge px-2.5 py-1 rounded-pill fw-medium text-uppercase"
+                            style={{ background: "#e0e7ff", color: "#3730a3", fontSize: "11px" }}
+                          >
+                            📍 {payrollData.employee.work_location || "Kolkata"}
+                          </span>
+                          <span
+                            className="badge px-2.5 py-1 rounded-pill fw-semibold"
                             style={{
                               background:
                                 slipBreakdown.status === "Finalized"
@@ -880,8 +1367,8 @@ const PayslipPage = () => {
                             {slipBreakdown.status === "Finalized" ? "Paid" : "Unpaid"}
                           </span>
                         </div>
-                        <div className="text-muted small mt-0.5">
-                          Zentelex IT Solutions Pvt. Ltd. • Kolkata, India
+                        <div className="text-muted small mt-1">
+                          {payrollData.employee.group_name ? `A Division / Subsidiary of ${payrollData.employee.group_name} • ` : ""}Official Work Location: {payrollData.employee.work_location || "Kolkata"}
                         </div>
                       </div>
 
@@ -917,13 +1404,38 @@ const PayslipPage = () => {
                       </Col>
                       <Col xs={12} sm={6} md={3}>
                         <div className="text-muted" style={{ fontSize: "11px" }}>
+                          COMPANY / SUBSIDIARY
+                        </div>
+                        <div className="fw-bold text-dark">
+                          {payrollData.employee.company_name || "TATA Steel"}
+                        </div>
+                      </Col>
+                      <Col xs={12} sm={6} md={3}>
+                        <div className="text-muted" style={{ fontSize: "11px" }}>
+                          PARENT GROUP
+                        </div>
+                        <div className="text-dark">
+                          {payrollData.employee.group_name || "TATA Company"}
+                        </div>
+                      </Col>
+
+                      <Col xs={12} sm={6} md={3} className="pt-2">
+                        <div className="text-muted" style={{ fontSize: "11px" }}>
+                          WORK LOCATION
+                        </div>
+                        <div className="text-dark fw-medium">
+                          📍 {payrollData.employee.work_location || "Kolkata"}
+                        </div>
+                      </Col>
+                      <Col xs={12} sm={6} md={3} className="pt-2">
+                        <div className="text-muted" style={{ fontSize: "11px" }}>
                           ROLE & DESIGNATION
                         </div>
                         <div className="text-dark">
                           {payrollData.employee.designation || "Staff"}
                         </div>
                       </Col>
-                      <Col xs={12} sm={6} md={3}>
+                      <Col xs={12} sm={6} md={3} className="pt-2">
                         <div className="text-muted" style={{ fontSize: "11px" }}>
                           DEPARTMENT
                         </div>
@@ -931,7 +1443,6 @@ const PayslipPage = () => {
                           {payrollData.employee.dept || "General"}
                         </div>
                       </Col>
-
                       <Col xs={12} sm={6} md={3} className="pt-2">
                         <div className="text-muted" style={{ fontSize: "11px" }}>
                           BANK NAME
@@ -989,10 +1500,10 @@ const PayslipPage = () => {
                     <div>
                       <div className="d-flex align-items-center gap-2 mb-1">
                         <strong className="text-dark small">📅 Paid Days Calculation:</strong>
-                        <Badge bg="primary" style={{ fontSize: "10px" }}>Attendance + Leaves + Holidays − Absents</Badge>
+                        <Badge bg="primary" style={{ fontSize: "10px" }}>Attendance + Leaves + Holidays + Week-offs − Absents</Badge>
                       </div>
                       <div className="text-muted small" style={{ fontSize: "12px" }}>
-                        Formula: <strong>{slipBreakdown.attendance?.present_days ?? 0}</strong> (Present) + <strong>{slipBreakdown.attendance?.leave_days || slipBreakdown.attendance?.paid_leaves || 0}</strong> (Leaves) + <strong>{slipBreakdown.attendance?.holiday_days || 0}</strong> (Holidays) − <strong>{slipBreakdown.attendance?.absent_days || 0}</strong> (Absents) = <strong className="text-success">{slipBreakdown.attendance?.paid_days ?? ((slipBreakdown.attendance?.present_days ?? 0) + (slipBreakdown.attendance?.leave_days || slipBreakdown.attendance?.paid_leaves || 0) + (slipBreakdown.attendance?.holiday_days || 0) - (slipBreakdown.attendance?.absent_days || 0))} Paid Days</strong> (out of {slipBreakdown.attendance?.working_days || 26} Working Days)
+                        Formula: <strong>{slipBreakdown.attendance?.present_days ?? 0}</strong> (Present) + <strong>{slipBreakdown.attendance?.leave_days || slipBreakdown.attendance?.paid_leaves || 0}</strong> (Leaves) + <strong>{slipBreakdown.attendance?.holiday_days || 0}</strong> (Holidays) + <strong>{slipBreakdown.attendance?.week_offs ?? Math.max(0, (slipBreakdown.attendance?.total_days || 30) - (slipBreakdown.attendance?.working_days || 26))}</strong> (Week-offs) − <strong>{slipBreakdown.attendance?.absent_days || 0}</strong> (Absents) = <strong className="text-success">{slipBreakdown.attendance?.paid_days ?? 0} Paid Days</strong> (out of {slipBreakdown.attendance?.total_days || 30} Days in Month)
                       </div>
                     </div>
                     {slipBreakdown.isPermanent && (parseFloat(slipBreakdown.adjustments?.gratuity_accrual) > 0) && (
@@ -1050,9 +1561,33 @@ const PayslipPage = () => {
                           slipBreakdown.deductions.map((ded, i) => (
                             <div
                               key={i}
-                              className="d-flex justify-content-between small text-muted mb-2"
+                              className="d-flex justify-content-between align-items-center small text-muted mb-2"
                             >
-                              <span>{ded.label}</span>
+                              <span className="d-flex align-items-center gap-1.5 flex-wrap">
+                                <span>{ded.label}</span>
+                                {ded.label.includes("ESI") && (
+                                  <Badge
+                                    bg="primary"
+                                    className="cursor-pointer"
+                                    style={{ fontSize: "10px", cursor: "pointer" }}
+                                    onClick={() => setShowEsiAuditModal(true)}
+                                    title="Click to view statutory ESI wage ceiling & audit history"
+                                  >
+                                    ₹{Number(globalEsiThreshold).toLocaleString("en-IN")} Ceiling ⓘ
+                                  </Badge>
+                                )}
+                                {ded.label.includes("Mediclaim") && (
+                                  <Badge
+                                    bg="secondary"
+                                    className="cursor-pointer fw-normal"
+                                    style={{ fontSize: "10px", cursor: "pointer" }}
+                                    onClick={() => setShowEsiAuditModal(true)}
+                                    title="Gross exceeds ₹21,000 statutory limit - covered under corporate Mediclaim instead of ESI"
+                                  >
+                                    Gross &gt; ₹{Number(globalEsiThreshold).toLocaleString("en-IN")} ⓘ
+                                  </Badge>
+                                )}
+                              </span>
                               <span className="text-danger fw-semibold">
                                 {fmt(ded.amount)}
                               </span>
@@ -1098,10 +1633,34 @@ const PayslipPage = () => {
 
                     <div className="d-flex align-items-center gap-2">
                       <Button
+                        variant="outline-success"
+                        size="sm"
+                        className="rounded-3 px-3 py-2 fw-semibold d-flex align-items-center gap-1.5 shadow-sm bg-white border"
+                        onClick={handleDownloadExcel}
+                        title="Download official payslip in Excel (.xlsx) sheet"
+                      >
+                        <svg
+                          width="15"
+                          height="15"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                          <polyline points="14 2 14 8 20 8"></polyline>
+                          <line x1="8" y1="13" x2="16" y2="17"></line>
+                          <line x1="16" y1="13" x2="8" y2="17"></line>
+                        </svg>
+                        <span>Download Payslip (Excel)</span>
+                      </Button>
+
+                      <Button
                         size="sm"
                         className="rounded-3 px-4 py-2 fw-semibold text-white border-0 d-flex align-items-center gap-1.5 shadow-sm"
                         style={{ background: "#4a2835" }}
                         onClick={handleDownloadPDF}
+                        title="Download official payslip in PDF (.pdf) document"
                       >
                         <svg
                           width="15"
@@ -1150,6 +1709,24 @@ const PayslipPage = () => {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 style={{ width: "200px" }}
               />
+              <Button
+                variant="outline-success"
+                size="sm"
+                className="rounded-3 px-3 py-1 fw-semibold d-flex align-items-center gap-1 bg-white shadow-xs border"
+                onClick={handleExportRegisterExcel}
+                title="Export all salary slips register to Excel (.xlsx) with work days & status"
+              >
+                <span>📊 Export Excel</span>
+              </Button>
+              <Button
+                variant="outline-secondary"
+                size="sm"
+                className="rounded-3 px-3 py-1 fw-semibold d-flex align-items-center gap-1 bg-white shadow-xs text-dark border"
+                onClick={handleExportRegisterPDF}
+                title="Export all salary slips register to PDF (.pdf) with work days & status"
+              >
+                <span>📄 Export PDF</span>
+              </Button>
             </div>
           </div>
 
@@ -1160,6 +1737,7 @@ const PayslipPage = () => {
                   <th className="py-2.5 ps-3">Staff Member</th>
                   <th className="py-2.5">Role / Dept</th>
                   <th className="py-2.5 text-end">Gross Pay</th>
+                  <th className="py-2.5 text-center">Statutory Cover</th>
                   <th className="py-2.5 text-end">Total Deductions</th>
                   <th className="py-2.5 text-end">Net Take-Home</th>
                   <th className="py-2.5 text-center">Status</th>
@@ -1211,6 +1789,9 @@ const PayslipPage = () => {
                       p.status === "Finalized"
                   );
 
+                  const isEsiCovered =
+                    (parseFloat(ded.esi) || 0) > 0 || gross <= globalEsiThreshold;
+
                   return (
                     <tr key={emp.employee_code}>
                       <td className="ps-3">
@@ -1234,6 +1815,22 @@ const PayslipPage = () => {
                       </td>
                       <td className="text-end fw-semibold text-dark">
                         {fmt(gross)}
+                      </td>
+                      <td className="text-center">
+                        <span
+                          className="badge rounded-pill fw-semibold cursor-pointer"
+                          style={{
+                            background: isEsiCovered ? "#eff6ff" : "#f1f5f9",
+                            color: isEsiCovered ? "#1d4ed8" : "#475569",
+                            border: isEsiCovered ? "1px solid #bfdbfe" : "1px solid #cbd5e1",
+                            fontSize: "10.5px",
+                            cursor: "pointer",
+                          }}
+                          onClick={() => setShowEsiAuditModal(true)}
+                          title="Click to view statutory ESI wage ceiling & audit history"
+                        >
+                          {isEsiCovered ? `🛡️ ESI (≤₹${Number(globalEsiThreshold).toLocaleString("en-IN")})` : "Mediclaim"}
+                        </span>
                       </td>
                       <td className="text-end text-danger">
                         {fmt(totalDeds)}
@@ -1260,7 +1857,7 @@ const PayslipPage = () => {
                           variant="outline-dark"
                           className="rounded-pill py-1 px-3 small fw-semibold"
                           onClick={() => {
-                            setSelectedEmpCode(emp.employee_code);
+                            setSelectedEmpCode((emp.employee_code || "").toString().replace(/^#/, "").trim());
                             setViewMode("split");
                           }}
                         >
@@ -1275,6 +1872,21 @@ const PayslipPage = () => {
           </div>
         </Card>
       )}
+
+      {/* ══ STATUTORY ESI SLAB CONFIGURATION & AUDIT MODAL ══ */}
+      <EsiSlabAuditModal
+        show={showEsiAuditModal}
+        onHide={() => setShowEsiAuditModal(false)}
+        canEdit={["accounts", "admin", "payroll", "hr"].includes(userRole)}
+        role={userRole}
+        onSaved={async (newThresh) => {
+          if (newThresh) setGlobalEsiThreshold(newThresh);
+          await fetchInitialData();
+          if (selectedEmpCode) {
+            fetchEmployeeSlipData(selectedEmpCode, currentMonthYear);
+          }
+        }}
+      />
     </div>
   );
 };

@@ -4,6 +4,8 @@ import { FiHash, FiLock, FiEye, FiEyeOff, FiLoader, FiUserCheck, FiChevronDown }
 import loginIllustration from "../../assets/login_illustration.png";
 import toast from 'react-hot-toast';
 import { getApiBaseUrl } from "../../api/axios";
+import { setAuthCookies } from "../../utils/cookieStorage";
+import { resetRedirectLock } from "../../utils/auth";
 
 export default function UnifiedLogin() {
   const [employeeId, setEmployeeId] = useState("");
@@ -28,6 +30,7 @@ export default function UnifiedLogin() {
       const API = getApiBaseUrl();
       const response = await fetch(`${API}/login`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ employee_id: employeeId.trim(), password, role }),
       });
@@ -36,38 +39,37 @@ export default function UnifiedLogin() {
 
       if (response.ok && data.success) {
         toast.success("Login successful");
-        localStorage.setItem("token", data.token);
-        localStorage.setItem("role", data.user.role);
-        localStorage.setItem("userName", data.user.name);
-        localStorage.setItem("email", data.user.email);
-        localStorage.setItem("userId", data.user.id);
-        const empCode = data.user.employee_id || data.user.employee_code || "";
-        localStorage.setItem("employeeCode", empCode);
-        localStorage.setItem("empId", empCode);
-        localStorage.setItem("user", JSON.stringify(data.user));
-        if (data.user.enabled_tabs !== undefined && data.user.enabled_tabs !== null) {
-          localStorage.setItem("enabled_tabs", String(data.user.enabled_tabs));
-        }
-        if (data.user.tabs_enabled !== undefined) {
-          localStorage.setItem("tabs_enabled", data.user.tabs_enabled ? "true" : "false");
+        // Store sensitive authentication credentials and user profile in cookies instead of localStorage
+        setAuthCookies(data);
+        resetRedirectLock();
+
+        // Clear any temporary session dismiss flags so logging in always presents the daily notice if unacknowledged
+        try {
+          if (typeof sessionStorage !== "undefined") {
+            Object.keys(sessionStorage).forEach((k) => {
+              if (k.startsWith("hrms_daily_notice_session_dismissed_")) {
+                sessionStorage.removeItem(k);
+              }
+            });
+          }
+        } catch (_) {}
+
+        window.dispatchEvent(new Event("authChanged"));
+
+        setLoading(false);
+        const userRole = (data.user?.role || role || "").toLowerCase().trim();
+        let targetRoute = "/employee/dashboard";
+        if (userRole === "hr" || userRole === "admin" || userRole === "hrmanager") {
+          targetRoute = "/admin/dashboard";
+        } else if (userRole === "employee") {
+          targetRoute = "/employee/dashboard";
+        } else if (userRole === "accounts" || userRole === "payroll") {
+          targetRoute = "/accounts/dashboard";
+        } else if (userRole === "hod") {
+          targetRoute = "/hod/dashboard";
         }
 
-        setTimeout(() => {
-          setLoading(false);
-          // Redirect based on role
-          if (data.user.role === "hr") {
-            navigate("/admin/dashboard");
-          } else if (data.user.role === "employee") {
-            navigate("/employee/dashboard");
-          } else if (data.user.role === "accounts" || data.user.role === "payroll") {
-            navigate("/accounts/dashboard");
-          } else if (data.user.role === "hod") {
-            navigate("/hod/dashboard");
-          } else {
-            toast.error("Invalid role");
-            navigate("/");
-          }
-        }, 100);
+        navigate(targetRoute, { replace: true });
       } else {
         toast.error(data.error || "Login failed. Please check your credentials.");
         // setError(data.error || "Login failed. Please check your credentials.");

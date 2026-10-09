@@ -37,10 +37,15 @@ export default function AccountsDashboardView() {
 
         let allPayrolls = [];
         try {
-          const payRes = await api.get("/payroll");
-          allPayrolls = payRes.data?.data || payRes.data?.payrolls || [];
+          const payRes = await api.get("/payroll/all");
+          allPayrolls = payRes.data?.records || payRes.data?.data || payRes.data?.payrolls || [];
         } catch (e) {
-          console.warn("Payroll records empty or error:", e);
+          try {
+            const payResFallback = await api.get("/payroll");
+            allPayrolls = payResFallback.data?.records || payResFallback.data?.data || payResFallback.data?.payrolls || [];
+          } catch (e2) {
+            console.warn("Payroll records empty or error:", e2);
+          }
         }
 
         let totalAmount = 0;
@@ -188,7 +193,7 @@ export default function AccountsDashboardView() {
               <Button
                 variant="link"
                 onClick={() => navigate("/payroll")}
-                className="p-0 text-decoration-none text-xs font-bold text-emerald-700 hover:text-emerald-900"
+                className="p-0 text-decoration-none !text-xs font-bold text-emerald-700 hover:text-emerald-900"
               >
                 Manage Payroll →
               </Button>
@@ -229,7 +234,7 @@ export default function AccountsDashboardView() {
               <Button
                 variant="link"
                 onClick={() => navigate("/payslip")}
-                className="p-0 text-decoration-none text-xs font-bold text-blue-600 hover:text-blue-800"
+                className="p-0 text-decoration-none !text-xs font-bold text-blue-600 hover:text-blue-800"
               >
                 View Slips →
               </Button>

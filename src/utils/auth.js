@@ -1,11 +1,22 @@
 import toast from "react-hot-toast";
+import { getCookie, clearAuthCookies, getAuthToken } from "./cookieStorage";
+
+export * from "./cookieStorage";
+
+export const resetRedirectLock = () => {
+  isRedirecting = false;
+};
 
 /**
- * Clear all auth-related items from localStorage and session
+ * Clear all auth-related items from cookies, session, and localStorage
  */
 export const clearAuthSession = () => {
+  isRedirecting = false;
   if (typeof window === "undefined") return;
-  localStorage.clear();
+  clearAuthCookies();
+  try {
+    localStorage.clear();
+  } catch (_) {}
 };
 
 /**
@@ -79,7 +90,7 @@ export const initTokenExpiryWatcher = () => {
   if (typeof window === "undefined") return;
 
   const checkStatus = () => {
-    const token = localStorage.getItem("token");
+    const token = getAuthToken() || localStorage.getItem("token");
     if (!token) return;
 
     if (isTokenExpired(token)) {

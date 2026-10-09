@@ -25,7 +25,7 @@ import {
   LuInfo,
 } from "react-icons/lu";
 import toast from "react-hot-toast";
-import * as XLSX from "xlsx";
+import { exportToExcel } from "../../utils/excelExport";
 import api, { getUploadUrl } from "../../api";
 import Loader from "../../components/Loader/Loader";
 
@@ -454,10 +454,11 @@ export default function Mediclaim() {
       return;
     }
 
-    const ws = XLSX.utils.json_to_sheet(dataToExport);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Mediclaim Claims");
-    XLSX.writeFile(wb, `Mediclaim_Claims_Register_${new Date().toISOString().split("T")[0]}.xlsx`);
+    exportToExcel({
+      data: dataToExport,
+      fileName: `Mediclaim_Claims_Register_${new Date().toISOString().split("T")[0]}.xlsx`,
+      sheetName: "Mediclaim Claims",
+    });
     toast.success("Excel report exported successfully!");
   };
 

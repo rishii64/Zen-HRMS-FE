@@ -57,19 +57,24 @@ const getEmployeeAvatar = (emp) => {
 };
 
 const ALL_TABS = [
-  { id: 1, name: "Attendance Tracker", desc: "Track daily shift times, logs, and check-in history", badge: "Attendance" },
+  { id: 1, name: "Attendance Tracker", desc: "Track daily shift times, roster logs, and check-in history", badge: "Attendance" },
   { id: 2, name: "Leave Requests", desc: "Apply for leaves, view balances, and check status", badge: "Leaves" },
   { id: 3, name: "Payroll & Salary", desc: "Review monthly salary slips, tax records, and allowances", badge: "Payroll" },
+  { id: 14, name: "Salary Slips (Payslips)", desc: "Download and view official monthly salary payslips and earnings", badge: "Payslip" },
   { id: 4, name: "Profile & Documents", desc: "Update personal records and upload files for HR review", badge: "Profile" },
-  { id: 5, name: "Interviews", desc: "Manage schedules and view candidate interview panels", badge: "Hiring" },
-  { id: 6, name: "Performance Appraisal", desc: "Review appraisals, feedback loops, and rating scorecards", badge: "Appraisal" },
-  { id: 7, name: "Training Modules", desc: "Access training modules and onboarding tasks", badge: "Training" },
+  { id: 5, name: "Candidate Evaluation", desc: "Manage candidate interview evaluations, question bank, and feedback scorecards", badge: "Hiring" },
+  { id: 6, name: "Performance Appraisal", desc: "Review annual/probation appraisals, feedback loops, and rating scorecards", badge: "Appraisal" },
+  { id: 15, name: "Performance KPI", desc: "Set performance goals, track KPI achievements, and review PMS scorecards", badge: "KPI" },
+  { id: 7, name: "Training Modules", desc: "Access company training modules, induction resources, and onboarding tasks", badge: "Training" },
   { id: 8, name: "IT Declaration", desc: "Declare tax investments, 80C/80D deductions, and tax regime", badge: "Taxation" },
   { id: 9, name: "ID-Card & Documents", desc: "Preview official corporate badge, upload ID proofs, and download digital ID", badge: "Identity" },
-  { id: 10, name: "Mediclaim & Health Insurance", desc: "Digital health E-card, covered dependents, and medical insurance claims", badge: "Mediclaim" },
+  { id: 10, name: "Mediclaim & Health Insurance", desc: "Digital health E-card, covered dependents, hospital list, and insurance claims", badge: "Mediclaim" },
   { id: 11, name: "Holiday Calendar", desc: "View company holiday list, festival breaks, and official days off", badge: "Calendar" },
   { id: 12, name: "Company Policies", desc: "Access company policies, code of conduct, and employee handbook", badge: "Policy" },
   { id: 13, name: "Separation & Resignation", desc: "Submit formal resignation notice, track clearances, and exit tasks", badge: "Exit" },
+  { id: 16, name: "Work Schedule & Roster", desc: "View weekly shift schedules, roster duties, and timing allocations", badge: "Schedule" },
+  { id: 17, name: "Job Requisition Desk", desc: "Raise workforce requisitions, job vacancies, and review candidate applications", badge: "Requisition" },
+  { id: 18, name: "Employee Onboarding", desc: "Complete employee onboarding checklists, doc verification, and asset allocation", badge: "Onboarding" },
 ];
 
 const EMPTY_FORM = {
@@ -95,6 +100,17 @@ const EMPTY_FORM = {
   password: "User@123",
   kpi: "",
   tabs_enabled: false,
+  facilities: {
+    advance: true,
+    loan: true,
+    insurance: true,
+    gratuity: true,
+  },
+  esi_threshold: "",
+  esi_slab_type: "global",
+  group_name: "TATA Company",
+  company_name: "TATA Steel",
+  work_location: "Kolkata",
 };
 
 const InfoRow = ({ label, value }) => (
@@ -128,14 +144,8 @@ const SalaryStructureModal = ({
     tds: 0,
     lop: 0,
     employment_type: "Permanent",
-    advance_amount: 0,
-    advance_deduction: 0,
-    loan_amount: 0,
-    loan_emi: 0,
-    insurance_deduction: 0,
-    gratuity_accrual: 0,
-    total_gratuity: 0,
   });
+  const [esiThreshold, setEsiThreshold] = useState(21000);
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -143,10 +153,10 @@ const SalaryStructureModal = ({
   const [successMsg, setSuccessMsg] = useState(null);
   const [quickGross, setQuickGross] = useState("");
 
-  // Determine if editing is allowed (HR or Admin)
+  // Determine if editing is allowed (HR, Accounts, Payroll, or Admin)
   const isHRUser =
     canEdit ||
-    ["hr", "hrmanager", "admin"].includes(
+    ["hr", "hrmanager", "admin", "accounts", "payroll"].includes(
       (role || localStorage.getItem("role") || "").toLowerCase()
     );
 
@@ -156,48 +166,63 @@ const SalaryStructureModal = ({
       setError(null);
       setSuccessMsg(null);
 
-      fetch(`${API}/employees/${employeeCode}/salary`, {
-        headers: { role: role || "hr" },
+      const cleanCode = String(employeeCode || "").replace(/^#/, "").trim();
+
+      fetch(`${API}/employees/${cleanCode}/salary?_t=${Date.now()}`, {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache", role: role || "hr" },
       })
         .then((r) => r.json())
         .then((res) => {
           if (res.success && res.salary) {
             const e = res.salary.earnings || {};
             const d = res.salary.deductions || {};
-            const basicVal = parseFloat(e.basic) || 0;
+            const curSal = parseFloat(res.current_salary) || 0;
+            let basicVal = parseFloat(e.basic) || 0;
+            let hraVal = parseFloat(e.hra) || 0;
+            let allowanceVal = parseFloat(e.allowance) || 0;
+            let conveyanceVal = parseFloat(e.conveyance) || 0;
+            let medicalVal = parseFloat(e.medical) || 0;
+
+            let grossVal = res.salary.gross_salary != null
+              ? parseFloat(res.salary.gross_salary)
+              : (basicVal + hraVal + allowanceVal + conveyanceVal + medicalVal);
+
+            // Automatically sync with current_salary if structure gross differs
+            if (curSal > 0 && Math.abs(grossVal - curSal) > 1) {
+              basicVal = Math.round(curSal * 0.45);
+              hraVal = Math.round(curSal * 0.40);
+              conveyanceVal = Math.round(curSal * 0.05) || 1600;
+              medicalVal = Math.round(curSal * 0.05) || 1250;
+              allowanceVal = Math.max(0, curSal - (basicVal + hraVal + conveyanceVal + medicalVal));
+              grossVal = curSal;
+            }
+
+            const threshold = parseFloat(res.esi_threshold || res.salary?.esi_threshold) || 21000;
+            setEsiThreshold(threshold);
+            const isEsi = grossVal <= threshold;
+            const empType = res.salary.employment_type || "Permanent";
+
             const esiVal = parseFloat(d.esi) || 0;
             const mediVal = parseFloat(d.mediclaim) || 0;
-            const grossVal = res.salary.gross_salary != null
-              ? parseFloat(res.salary.gross_salary)
-              : (basicVal + (parseFloat(e.hra) || 0) + (parseFloat(e.allowance) || 0) + (parseFloat(e.conveyance) || 0) + (parseFloat(e.medical) || 0));
-            const isEsi = grossVal <= 21000;
-            const empType = res.salary.employment_type || "Permanent";
-            const isPerm = res.salary.is_permanent ?? (empType.toLowerCase() === "permanent");
 
             const loaded = {
               basic: basicVal,
-              hra: parseFloat(e.hra) || 0,
-              allowance: parseFloat(e.allowance) || 0,
-              conveyance: parseFloat(e.conveyance) || 0,
-              medical: parseFloat(e.medical) || 0,
+              hra: hraVal,
+              allowance: allowanceVal,
+              conveyance: conveyanceVal,
+              medical: medicalVal,
               professional_tax: parseFloat(d.professional_tax) || 0,
               income_tax: parseFloat(d.income_tax) || 0,
               pf: parseFloat(d.pf) || 0,
-              esi: isEsi ? (esiVal || mediVal) : 0,
-              mediclaim: !isEsi ? (mediVal || esiVal) : 0,
+              esi: isEsi ? esiVal : 0,
+              mediclaim: !isEsi ? mediVal : 0,
               tds: parseFloat(d.tds) || 0,
               lop: parseFloat(d.lop) || 0,
               employment_type: empType,
-              advance_amount: isPerm ? (parseFloat(res.salary.advance_amount) || 0) : 0,
-              advance_deduction: isPerm ? (parseFloat(res.salary.advance_deduction) || 0) : 0,
-              loan_amount: isPerm ? (parseFloat(res.salary.loan_amount) || 0) : 0,
-              loan_emi: isPerm ? (parseFloat(res.salary.loan_emi) || 0) : 0,
-              insurance_deduction: isPerm ? (parseFloat(res.salary.insurance_deduction) || 0) : 0,
-              gratuity_accrual: isPerm ? (parseFloat(res.salary.gratuity_accrual) || 0) : 0,
-              total_gratuity: isPerm ? (parseFloat(res.salary.total_gratuity) || 0) : 0,
             };
             setFormData(loaded);
-            setQuickGross(res.salary.gross_salary || "");
+            setQuickGross(grossVal || "");
           } else {
             setError(res.error || "Failed to load salary structure");
           }
@@ -212,21 +237,9 @@ const SalaryStructureModal = ({
 
   const handleChange = (field, val) => {
     if (field === "employment_type") {
-      const isNowPerm = (val || "").toLowerCase() === "permanent";
       setFormData((prev) => ({
         ...prev,
         employment_type: val,
-        ...(!isNowPerm
-          ? {
-              advance_amount: 0,
-              advance_deduction: 0,
-              loan_amount: 0,
-              loan_emi: 0,
-              insurance_deduction: 0,
-              gratuity_accrual: 0,
-              total_gratuity: 0,
-            }
-          : {}),
       }));
       return;
     }
@@ -242,10 +255,10 @@ const SalaryStructureModal = ({
           (parseFloat(next.allowance) || 0) +
           (parseFloat(next.conveyance) || 0) +
           (parseFloat(next.medical) || 0);
-        if (curGross > 21000 && prev.esi > 0 && !prev.mediclaim) {
+        if (curGross > esiThreshold && prev.esi > 0 && !prev.mediclaim) {
           next.mediclaim = prev.esi;
           next.esi = 0;
-        } else if (curGross <= 21000 && prev.mediclaim > 0 && !prev.esi) {
+        } else if (curGross <= esiThreshold && prev.mediclaim > 0 && !prev.esi) {
           next.esi = prev.mediclaim;
           next.mediclaim = 0;
         }
@@ -267,20 +280,14 @@ const SalaryStructureModal = ({
   const numPT = parseFloat(formData.professional_tax) || 0;
   const numIT = parseFloat(formData.income_tax) || 0;
   const numPf = parseFloat(formData.pf) || 0;
-  const isEsiEligible = grossSalary <= 21000;
+  const isEsiEligible = grossSalary <= esiThreshold;
   const numEsi = isEsiEligible ? (parseFloat(formData.esi) || 0) : 0;
   const numMediclaim = !isEsiEligible ? (parseFloat(formData.mediclaim) || 0) : 0;
   const numTds = parseFloat(formData.tds) || 0;
   const numLop = parseFloat(formData.lop) || 0;
 
-  const isPermanent = (formData.employment_type || "Permanent").toLowerCase() === "permanent";
-  const numAdvDed = isPermanent ? (parseFloat(formData.advance_deduction) || 0) : 0;
-  const numLoanEmi = isPermanent ? (parseFloat(formData.loan_emi) || 0) : 0;
-  const numInsurance = isPermanent ? (parseFloat(formData.insurance_deduction) || 0) : 0;
-  const gratuityMonthlyAccrual = isPermanent ? Math.round((numBasic * 15) / (26 * 12)) : 0;
-
   const totalDeductions =
-    numPT + numIT + numPf + (isEsiEligible ? numEsi : numMediclaim) + numTds + numLop + numAdvDed + numLoanEmi + numInsurance;
+    numPT + numIT + numPf + (isEsiEligible ? numEsi : numMediclaim) + numTds + numLop;
   const netSalary = Math.max(0, grossSalary - totalDeductions);
 
   // Quick auto-distribution formula for HR
@@ -296,7 +303,7 @@ const SalaryStructureModal = ({
     const allowance = Math.max(0, gross - assigned);
 
     const pf = Math.round(basic * 0.12);
-    const isEligible = gross <= 21000;
+    const isEligible = gross <= esiThreshold;
     const esi = isEligible ? Math.round(gross * 0.0075) : 0;
     const mediclaim = !isEligible ? (gross > 25000 ? 750 : 500) : 0;
     const pt = gross > 15000 ? 200 : 0;
@@ -320,20 +327,7 @@ const SalaryStructureModal = ({
 
   const handleSave = async () => {
     if (!isHRUser) {
-      toast.error("Access denied: Only HR can edit the salary structure.");
-      return;
-    }
-
-    const isPerm = (formData.employment_type || "Permanent").toLowerCase() === "permanent";
-    const advAmount = isPerm ? (parseFloat(formData.advance_amount) || 0) : 0;
-    const loanAmount = isPerm ? (parseFloat(formData.loan_amount) || 0) : 0;
-
-    if (isPerm && advAmount > 100000) {
-      setError("Advance Payment limit exceeded: Maximum allowed is ₹1,00,000 (1 Lakh).");
-      return;
-    }
-    if (isPerm && loanAmount > 0 && (loanAmount < 100000 || loanAmount > 1000000)) {
-      setError("Company Loan amount must be between ₹1,00,000 and ₹10,00,000 (1 to 10 Lakhs).");
+      toast.error("Access denied: Only HR or Accounts can edit the salary structure.");
       return;
     }
 
@@ -342,7 +336,8 @@ const SalaryStructureModal = ({
     setSuccessMsg(null);
 
     try {
-      const res = await fetch(`${API}/employees/${employeeCode}/salary`, {
+      const cleanCode = String(employeeCode || "").replace(/^#/, "").trim();
+      const res = await fetch(`${API}/employees/${cleanCode}/salary`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -363,11 +358,6 @@ const SalaryStructureModal = ({
           tds: numTds,
           lop: numLop,
           employment_type: formData.employment_type || "Permanent",
-          advance_amount: advAmount,
-          advance_deduction: isPerm ? (parseFloat(formData.advance_deduction) || 0) : 0,
-          loan_amount: loanAmount,
-          loan_emi: isPerm ? (parseFloat(formData.loan_emi) || 0) : 0,
-          insurance_deduction: isPerm ? (parseFloat(formData.insurance_deduction) || 0) : 0,
         }),
       });
 
@@ -375,7 +365,7 @@ const SalaryStructureModal = ({
       if (data.success) {
         setSuccessMsg("Salary structure updated and saved successfully!");
         if (onSalaryUpdated) {
-          onSalaryUpdated(data.current_salary || grossSalary);
+          onSalaryUpdated(data.current_salary || grossSalary, data.salary);
         }
         setTimeout(() => { setSuccessMsg(null); onHide(); }, 1500);
       } else {
@@ -754,7 +744,7 @@ const SalaryStructureModal = ({
                           <div className="d-flex justify-content-between align-items-center">
                             <Form.Label className="small fw-semibold mb-1">Employee State Insurance (ESI)</Form.Label>
                             <Badge bg="info" className="fw-normal" style={{ fontSize: "9.5px" }}>
-                              Total Salary ≤ ₹21,000
+                              Total Salary ≤ ₹${esiThreshold.toLocaleString("en-IN")}
                             </Badge>
                           </div>
                           {isHRUser ? (
@@ -773,7 +763,7 @@ const SalaryStructureModal = ({
                             <div className="fw-bold text-end p-1 border-bottom">{fmt(formData.esi)}</div>
                           )}
                           <small className="text-muted d-block mt-0.5" style={{ fontSize: "10px" }}>
-                            State insurance scheme for total salary ₹21,000 or less
+                            State insurance scheme for total salary ₹${esiThreshold.toLocaleString("en-IN")} or less
                           </small>
                         </div>
                       ) : (
@@ -781,7 +771,7 @@ const SalaryStructureModal = ({
                           <div className="d-flex justify-content-between align-items-center">
                             <Form.Label className="small fw-semibold mb-1">Mediclaim</Form.Label>
                             <Badge bg="primary" className="fw-normal" style={{ fontSize: "9.5px" }}>
-                              Total Salary &gt; ₹21,000
+                              Total Salary &gt; ₹${esiThreshold.toLocaleString("en-IN")}
                             </Badge>
                           </div>
                           {isHRUser ? (
@@ -800,7 +790,7 @@ const SalaryStructureModal = ({
                             <div className="fw-bold text-end p-1 border-bottom">{fmt(formData.mediclaim)}</div>
                           )}
                           <small className="text-muted d-block mt-0.5" style={{ fontSize: "10px" }}>
-                            Corporate health mediclaim policy deduction for total salary above ₹21,000
+                            Corporate health mediclaim policy deduction for total salary above ₹${esiThreshold.toLocaleString("en-IN")}
                           </small>
                         </div>
                       )}
@@ -858,196 +848,6 @@ const SalaryStructureModal = ({
                 </Card>
               </Col>
             </Row>
-
-            {/* 3. Permanent Employee Facilities & Adjustments */}
-            <Card className="shadow-sm border-0 mt-3">
-              <Card.Header
-                className="py-2 px-3 fw-bold small d-flex justify-content-between align-items-center"
-                style={{
-                  background: isPermanent ? "#1e3c72" : "#475569",
-                  color: "#ffffff",
-                }}
-              >
-                <div className="d-flex align-items-center gap-2">
-                  <span>🏦 3. Facilities & Statutory Benefits</span>
-                  <Badge
-                    bg={isPermanent ? "success" : "warning"}
-                    className="fw-normal"
-                    style={{ fontSize: "10px" }}
-                  >
-                    {isPermanent ? "Permanent Staff Only" : "Locked for " + (formData.employment_type || "Probation")}
-                  </Badge>
-                </div>
-                <small className="opacity-90">
-                  {isPermanent ? "Advance (≤ ₹1L) • Loan (₹1L-₹10L) • Insurance • Gratuity" : "Not Eligible"}
-                </small>
-              </Card.Header>
-              <Card.Body className="p-3">
-                {!isPermanent ? (
-                  <Alert variant="warning" className="mb-0 d-flex align-items-center gap-2 small">
-                    <span className="fs-5">⚠️</span>
-                    <div>
-                      <strong>Facilities Policy Notice:</strong> Advance Payment (up to ₹1 Lakh), Company Loan (₹1 to 10 Lakhs), Corporate Group Insurance, and Gratuity calculations are strictly reserved for <strong>Permanent Employees</strong> only. This employee is categorized as <strong>{formData.employment_type || "Probation / Intern"}</strong> and cannot avail these benefits.
-                    </div>
-                  </Alert>
-                ) : (
-                  <Row className="g-3">
-                    {/* Advance Payment */}
-                    <Col xs={12} md={6}>
-                      <div className="p-3 rounded border bg-light h-100">
-                        <div className="d-flex justify-content-between align-items-center mb-1">
-                          <strong className="small text-primary">Advance Payment (Up to ₹1,00,000)</strong>
-                          <Badge bg="info" style={{ fontSize: "9px" }}>Max ₹1 Lakh</Badge>
-                        </div>
-                        <div className="text-muted small mb-2" style={{ fontSize: "11px" }}>
-                          Salary advance granted to permanent staff.
-                        </div>
-                        <Row className="g-2">
-                          <Col xs={6}>
-                            <Form.Label className="small mb-1 text-muted" style={{ fontSize: "11px" }}>Principal Advance</Form.Label>
-                            {isHRUser ? (
-                              <InputGroup size="sm">
-                                <InputGroup.Text>₹</InputGroup.Text>
-                                <Form.Control
-                                  type="number"
-                                  min="0"
-                                  max="100000"
-                                  placeholder="Max 1,00,000"
-                                  value={formData.advance_amount === 0 ? 0 : (formData.advance_amount || "")}
-                                  onChange={(e) => handleChange("advance_amount", e.target.value)}
-                                />
-                              </InputGroup>
-                            ) : (
-                              <div className="fw-semibold">{fmt(formData.advance_amount)}</div>
-                            )}
-                          </Col>
-                          <Col xs={6}>
-                            <Form.Label className="small mb-1 text-muted" style={{ fontSize: "11px" }}>Monthly Recovery</Form.Label>
-                            {isHRUser ? (
-                              <InputGroup size="sm">
-                                <InputGroup.Text>₹</InputGroup.Text>
-                                <Form.Control
-                                  type="number"
-                                  min="0"
-                                  placeholder="Recovery"
-                                  value={formData.advance_deduction === 0 ? 0 : (formData.advance_deduction || "")}
-                                  onChange={(e) => handleChange("advance_deduction", e.target.value)}
-                                />
-                              </InputGroup>
-                            ) : (
-                              <div className="fw-semibold text-danger">{fmt(formData.advance_deduction)}</div>
-                            )}
-                          </Col>
-                        </Row>
-                      </div>
-                    </Col>
-
-                    {/* Company Loan */}
-                    <Col xs={12} md={6}>
-                      <div className="p-3 rounded border bg-light h-100">
-                        <div className="d-flex justify-content-between align-items-center mb-1">
-                          <strong className="small text-primary">Company Loan (₹1 to 10 Lakhs)</strong>
-                          <Badge bg="primary" style={{ fontSize: "9px" }}>₹1L – ₹10L</Badge>
-                        </div>
-                        <div className="text-muted small mb-2" style={{ fontSize: "11px" }}>
-                          Long term company loan with monthly EMI deduction.
-                        </div>
-                        <Row className="g-2">
-                          <Col xs={6}>
-                            <Form.Label className="small mb-1 text-muted" style={{ fontSize: "11px" }}>Loan Principal</Form.Label>
-                            {isHRUser ? (
-                              <InputGroup size="sm">
-                                <InputGroup.Text>₹</InputGroup.Text>
-                                <Form.Control
-                                  type="number"
-                                  min="100000"
-                                  max="1000000"
-                                  placeholder="1L - 10L"
-                                  value={formData.loan_amount === 0 ? 0 : (formData.loan_amount || "")}
-                                  onChange={(e) => handleChange("loan_amount", e.target.value)}
-                                />
-                              </InputGroup>
-                            ) : (
-                              <div className="fw-semibold">{fmt(formData.loan_amount)}</div>
-                            )}
-                          </Col>
-                          <Col xs={6}>
-                            <Form.Label className="small mb-1 text-muted" style={{ fontSize: "11px" }}>Monthly EMI</Form.Label>
-                            {isHRUser ? (
-                              <InputGroup size="sm">
-                                <InputGroup.Text>₹</InputGroup.Text>
-                                <Form.Control
-                                  type="number"
-                                  min="0"
-                                  placeholder="Monthly EMI"
-                                  value={formData.loan_emi === 0 ? 0 : (formData.loan_emi || "")}
-                                  onChange={(e) => handleChange("loan_emi", e.target.value)}
-                                />
-                              </InputGroup>
-                            ) : (
-                              <div className="fw-semibold text-danger">{fmt(formData.loan_emi)}</div>
-                            )}
-                          </Col>
-                        </Row>
-                      </div>
-                    </Col>
-
-                    {/* Corporate Group Insurance */}
-                    <Col xs={12} md={6}>
-                      <div className="p-3 rounded border bg-light h-100">
-                        <div className="d-flex justify-content-between align-items-center mb-1">
-                          <strong className="small text-primary">Corporate Group Insurance</strong>
-                          <Badge bg="success" style={{ fontSize: "9px" }}>Health & Life</Badge>
-                        </div>
-                        <div className="text-muted small mb-2" style={{ fontSize: "11px" }}>
-                          Monthly insurance premium deduction for permanent staff coverage.
-                        </div>
-                        <div>
-                          <Form.Label className="small mb-1 text-muted" style={{ fontSize: "11px" }}>Monthly Insurance Deduction</Form.Label>
-                          {isHRUser ? (
-                            <InputGroup size="sm">
-                              <InputGroup.Text>₹</InputGroup.Text>
-                              <Form.Control
-                                type="number"
-                                min="0"
-                                placeholder="Insurance Premium"
-                                value={formData.insurance_deduction === 0 ? 0 : (formData.insurance_deduction || "")}
-                                onChange={(e) => handleChange("insurance_deduction", e.target.value)}
-                              />
-                            </InputGroup>
-                          ) : (
-                            <div className="fw-semibold text-danger">{fmt(formData.insurance_deduction)}</div>
-                          )}
-                        </div>
-                      </div>
-                    </Col>
-
-                    {/* Gratuity Calculation (Act 1972) */}
-                    <Col xs={12} md={6}>
-                      <div className="p-3 rounded border bg-light h-100">
-                        <div className="d-flex justify-content-between align-items-center mb-1">
-                          <strong className="small text-primary">Gratuity Calculation (Act 1972)</strong>
-                          <Badge bg="secondary" style={{ fontSize: "9px" }}>Statutory CTC</Badge>
-                        </div>
-                        <div className="text-muted small mb-2" style={{ fontSize: "11px" }}>
-                          Calculated: (15 × Basic) / (26 × 12) ≈ 4.81% of Basic Monthly.
-                        </div>
-                        <Row className="g-2">
-                          <Col xs={6}>
-                            <div className="small text-muted" style={{ fontSize: "11px" }}>Monthly CTC Accrual:</div>
-                            <div className="fw-bold text-success fs-6 mt-1">{fmt(gratuityMonthlyAccrual)}</div>
-                          </Col>
-                          <Col xs={6}>
-                            <div className="small text-muted" style={{ fontSize: "11px" }}>Total Entitlement:</div>
-                            <div className="fw-bold text-dark fs-6 mt-1">{fmt(formData.total_gratuity || gratuityMonthlyAccrual * 12)}</div>
-                          </Col>
-                        </Row>
-                      </div>
-                    </Col>
-                  </Row>
-                )}
-              </Card.Body>
-            </Card>
 
             {/* Bottom Net Pay Card */}
             <div
@@ -1310,6 +1110,10 @@ const ManageEmployees = () => {
   });
   const [savingTabs, setSavingTabs] = useState(false);
   const [role, setRole] = useState(localStorage.getItem("role") || "admin");
+  const [globalEsiThreshold, setGlobalEsiThreshold] = useState(21000);
+  const [showEsiModal, setShowEsiModal] = useState(false);
+  const [esiForm, setEsiForm] = useState({ global_esi_threshold: 21000, apply_to_all: false });
+  const [savingEsi, setSavingEsi] = useState(false);
 
   const [viewMode, setViewMode] = useState("grid"); // "grid" | "list"
   const [selectedDesignation, setSelectedDesignation] = useState("All");
@@ -1331,6 +1135,7 @@ const ManageEmployees = () => {
       return;
     }
     fetchEmployees();
+    fetchGlobalEsi();
 
     // Re-fetch latest employee records and updated photos whenever the window gains focus
     const handleFocus = () => {
@@ -1345,7 +1150,10 @@ const ManageEmployees = () => {
     else setRefreshing(true);
     try {
       // Query param with timestamp prevents stale HTTP browser cache
-      const res = await fetch(`${API}/employees?_t=${Date.now()}`, { headers: { role } });
+      const res = await fetch(`${API}/employees?_t=${Date.now()}`, {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache", Pragma: "no-cache", role },
+      });
       const data = await res.json();
       if (data.success) setEmployees(Array.isArray(data.data) ? data.data : []);
       else if (!silent) toast.error("Error fetching employees");
@@ -1354,6 +1162,60 @@ const ManageEmployees = () => {
     }
     if (!silent) setLoading(false);
     else setRefreshing(false);
+  };
+
+  const fetchGlobalEsi = async () => {
+    try {
+      const res = await fetch(`${API}/payroll/settings`, {
+        headers: { role, Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
+      });
+      const data = await res.json();
+      if (data.success && data.settings?.global_esi_threshold) {
+        const val = parseFloat(data.settings.global_esi_threshold) || 21000;
+        setGlobalEsiThreshold(val);
+        setEsiForm((prev) => ({ ...prev, global_esi_threshold: val }));
+      }
+    } catch (e) {
+      console.warn("Failed to fetch global ESI setting:", e.message);
+    }
+  };
+
+  const openEsiModal = () => {
+    setEsiForm({
+      global_esi_threshold: globalEsiThreshold,
+      apply_to_all: false,
+    });
+    setShowEsiModal(true);
+  };
+
+  const handleSaveEsiSettings = async () => {
+    setSavingEsi(true);
+    try {
+      const res = await fetch(`${API}/payroll/settings`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          role,
+          Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
+        },
+        body: JSON.stringify({
+          global_esi_threshold: parseFloat(esiForm.global_esi_threshold) || 21000,
+          apply_to_all: !!esiForm.apply_to_all,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success("Global ESI Slab threshold updated successfully!");
+        setGlobalEsiThreshold(parseFloat(esiForm.global_esi_threshold) || 21000);
+        setShowEsiModal(false);
+        fetchEmployees();
+      } else {
+        toast.error(data.error || "Failed to update ESI settings");
+      }
+    } catch (e) {
+      toast.error("Error: " + e.message);
+    }
+    setSavingEsi(false);
   };
 
   const handleChange = (e) => {
@@ -1404,7 +1266,12 @@ const ManageEmployees = () => {
       return;
     }
     setEditMode(false);
-    setEmpForm(EMPTY_FORM);
+    setEmpForm({
+      ...EMPTY_FORM,
+      facilities: { advance: true, loan: true, insurance: true, gratuity: true },
+      esi_threshold: "",
+      esi_slab_type: "global",
+    });
     setShowModal(true);
   };
 
@@ -1428,6 +1295,14 @@ const ManageEmployees = () => {
       cleanName = cleanName.replace(/^Mrs\.\s+/, "");
     }
 
+    let fac = { advance: true, loan: true, insurance: true, gratuity: true };
+    if (emp.facilities) {
+      try {
+        fac = typeof emp.facilities === "string" ? JSON.parse(emp.facilities) : emp.facilities;
+      } catch (e) {}
+    }
+    const hasCustomEsi = emp.esi_threshold != null && emp.esi_threshold !== "" && !isNaN(parseFloat(emp.esi_threshold));
+
     setEmpForm({
       ...emp,
       salutation,
@@ -1444,6 +1319,12 @@ const ManageEmployees = () => {
       kpi: emp.kpi || "",
       employment_type: emp.employment_type || "Permanent",
       tabs_enabled: emp.tabs_enabled || false,
+      facilities: fac,
+      esi_threshold: hasCustomEsi ? emp.esi_threshold : "",
+      esi_slab_type: hasCustomEsi ? "custom" : "global",
+      group_name: emp.group_name || "TATA Company",
+      company_name: emp.company_name || "TATA Steel",
+      work_location: emp.work_location || "Kolkata",
     });
     setShowModal(true);
   };
@@ -1523,6 +1404,10 @@ const ManageEmployees = () => {
       personal_email: primaryPersonalEmail,
       current_salary: monthlySalary,
       salary_type: salary_type || "Monthly (In Hand)",
+      facilities: empForm.facilities,
+      esi_threshold: empForm.esi_slab_type === "custom" && empForm.esi_threshold !== "" && !isNaN(parseFloat(empForm.esi_threshold))
+        ? parseFloat(empForm.esi_threshold)
+        : null,
     };
 
     setSaving(true);
@@ -1572,7 +1457,7 @@ const ManageEmployees = () => {
   };
 
   const openConfigureTabs = (emp) => {
-    let currentTabs = [1, 2, 3, 4, 8, 9, 10, 11, 12]; // default standard tabs
+    let currentTabs = [1, 2, 3, 4, 8, 9, 10, 11, 12, 14, 16]; // default standard tabs
     if (emp.enabled_tabs) {
       let parsed = [];
       if (typeof emp.enabled_tabs === "string") {
@@ -1581,6 +1466,8 @@ const ManageEmployees = () => {
         parsed = emp.enabled_tabs.map(Number).filter(id => !isNaN(id));
       }
       if (parsed.length > 0) currentTabs = parsed;
+    } else if (emp.tabs_enabled) {
+      currentTabs = ALL_TABS.map(t => t.id);
     }
     setTabsModal({
       show: true,
@@ -1601,7 +1488,14 @@ const ManageEmployees = () => {
       });
       const data = await res.json();
       if (data.success) {
-        toast.success("Tab permissions updated successfully!");
+        toast.success("Module permissions updated successfully!");
+        setEmployees(prev =>
+          prev.map(emp =>
+            (emp.employee_code || emp.employee_id) === empCode
+              ? { ...emp, enabled_tabs: tabsModal.selectedTabs.join(",") }
+              : emp
+          )
+        );
         fetchEmployees();
         setTabsModal({ show: false, employee: null, selectedTabs: [] });
       } else {
@@ -1859,6 +1753,19 @@ const ManageEmployees = () => {
                   <LuList size={15} />
                 </button>
               </div>
+
+              {/* Global ESI Slab Settings Button */}
+              {(isAdmin || isHR) && (
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline-primary d-flex align-items-center gap-1.5 py-1.5 px-3 flex-shrink-0 rounded-3 shadow-xs"
+                  onClick={openEsiModal}
+                  style={{ fontSize: "13px", whiteSpace: "nowrap", fontWeight: 500 }}
+                  title="Configure Global ESI Slab & Threshold"
+                >
+                  <span>⚙️ ESI Slab (₹{globalEsiThreshold.toLocaleString("en-IN")})</span>
+                </button>
+              )}
 
               {/* Add Employee Button */}
               {(isAdmin || isHR) && (
@@ -2170,7 +2077,14 @@ const ManageEmployees = () => {
                           </div>
                           <div>
                             <div className="fw-bold text-dark">{emp.name}</div>
-                            <div className="text-muted small" style={{ fontSize: "11px" }}>{emp.employee_code}</div>
+                            <div className="text-muted small d-flex flex-wrap align-items-center gap-1.5" style={{ fontSize: "11px" }}>
+                              <span>{emp.employee_code}</span>
+                              {emp.company_name && (
+                                <span className="badge bg-light text-dark border px-1.5 py-0.5" style={{ fontSize: "10px" }}>
+                                  🏢 {emp.company_name} • 📍 {emp.work_location || "Kolkata"}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </td>
@@ -2444,6 +2358,36 @@ const ManageEmployees = () => {
                 <Form.Label className="small fw-bold">Designation</Form.Label>
                 <Form.Control size="sm" name="designation" value={empForm.designation} onChange={handleChange} />
               </Col>
+              <Col xs={12} md={4}>
+                <Form.Label className="small fw-bold text-primary">Parent Group</Form.Label>
+                <Form.Control
+                  size="sm"
+                  name="group_name"
+                  placeholder="e.g. TATA Company"
+                  value={empForm.group_name || ""}
+                  onChange={handleChange}
+                />
+              </Col>
+              <Col xs={12} md={4}>
+                <Form.Label className="small fw-bold text-dark">Company / Subsidiary</Form.Label>
+                <Form.Control
+                  size="sm"
+                  name="company_name"
+                  placeholder="e.g. TATA Steel, TATA Motors, TCS"
+                  value={empForm.company_name || ""}
+                  onChange={handleChange}
+                />
+              </Col>
+              <Col xs={12} md={4}>
+                <Form.Label className="small fw-bold text-secondary">Work Location</Form.Label>
+                <Form.Control
+                  size="sm"
+                  name="work_location"
+                  placeholder="e.g. Kolkata, Mumbai, Pune"
+                  value={empForm.work_location || ""}
+                  onChange={handleChange}
+                />
+              </Col>
               <Col xs={12} md={6}>
                 <Form.Label className="small fw-bold">Salary & Frequency</Form.Label>
                 <InputGroup size="sm">
@@ -2460,7 +2404,7 @@ const ManageEmployees = () => {
                     name="salary_type"
                     value={empForm.salary_type || "Monthly (In Hand)"}
                     onChange={(e) => handleSalaryFrequencyChange(e.target.value)}
-                    style={{ maxWidth: "165px", fontWeight: "600" }}
+                    style={{ maxWidth: "170px", fontWeight: "600" }}
                   >
                     <option value="Monthly (In Hand)">Monthly (In Hand)</option>
                     <option value="LPA">LPA (Lakhs/yr)</option>
@@ -2530,6 +2474,128 @@ const ManageEmployees = () => {
                 </div>
               </Col>
 
+              {/* Facilities & Statutory Benefits (HR Configuration) */}
+              <Col xs={12}>
+                <div className="p-3 rounded-3 border bg-white shadow-xs">
+                  <div className="d-flex align-items-center justify-content-between mb-2 pb-2 border-bottom">
+                    <div className="d-flex align-items-center gap-2">
+                      <span className="fs-5">🏦</span>
+                      <div>
+                        <div className="fw-bold small text-dark">Employee Facilities & Statutory Entitlements</div>
+                        <div className="text-muted" style={{ fontSize: "11px" }}>
+                          Enable or disable specific facilities for this employee. Detailed amounts are calculated in Payroll by Accounts.
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 4 facility checkboxes */}
+                  <Row className="g-2 mb-3">
+                    <Col xs={6} md={3}>
+                      <div className="p-2 rounded border bg-light d-flex align-items-center gap-2">
+                        <Form.Check
+                          type="checkbox"
+                          id="fac-advance"
+                          label={<span className="small fw-semibold">Advance Payment</span>}
+                          checked={empForm.facilities?.advance !== false}
+                          onChange={(e) => setEmpForm((prev) => ({
+                            ...prev,
+                            facilities: { ...(prev.facilities || {}), advance: e.target.checked }
+                          }))}
+                        />
+                      </div>
+                    </Col>
+                    <Col xs={6} md={3}>
+                      <div className="p-2 rounded border bg-light d-flex align-items-center gap-2">
+                        <Form.Check
+                          type="checkbox"
+                          id="fac-loan"
+                          label={<span className="small fw-semibold">Company Loans</span>}
+                          checked={empForm.facilities?.loan !== false}
+                          onChange={(e) => setEmpForm((prev) => ({
+                            ...prev,
+                            facilities: { ...(prev.facilities || {}), loan: e.target.checked }
+                          }))}
+                        />
+                      </div>
+                    </Col>
+                    <Col xs={6} md={3}>
+                      <div className="p-2 rounded border bg-light d-flex align-items-center gap-2">
+                        <Form.Check
+                          type="checkbox"
+                          id="fac-insurance"
+                          label={<span className="small fw-semibold">Insurance</span>}
+                          checked={empForm.facilities?.insurance !== false}
+                          onChange={(e) => setEmpForm((prev) => ({
+                            ...prev,
+                            facilities: { ...(prev.facilities || {}), insurance: e.target.checked }
+                          }))}
+                        />
+                      </div>
+                    </Col>
+                    <Col xs={6} md={3}>
+                      <div className="p-2 rounded border bg-light d-flex align-items-center gap-2">
+                        <Form.Check
+                          type="checkbox"
+                          id="fac-gratuity"
+                          label={<span className="small fw-semibold">Gratuity</span>}
+                          checked={empForm.facilities?.gratuity !== false}
+                          onChange={(e) => setEmpForm((prev) => ({
+                            ...prev,
+                            facilities: { ...(prev.facilities || {}), gratuity: e.target.checked }
+                          }))}
+                        />
+                      </div>
+                    </Col>
+                  </Row>
+
+                  {/* ESI Slab Configuration */}
+                  <div className="p-2.5 rounded border bg-light-subtle">
+                    <div className="d-flex justify-content-between align-items-center mb-1">
+                      <strong className="small text-primary">ESI / Mediclaim Slab Configuration</strong>
+                      <Badge bg="info" className="fw-normal" style={{ fontSize: "10px" }}>Statutory Cutoff</Badge>
+                    </div>
+                    <div className="text-muted mb-2" style={{ fontSize: "11px" }}>
+                      Define the salary threshold up to which ESI applies (0.75%), beyond which Corporate Mediclaim applies.
+                    </div>
+                    <div className="d-flex flex-wrap align-items-center gap-3">
+                      <Form.Check
+                        type="radio"
+                        name="esi_slab_type"
+                        id="esi-global"
+                        label={<span className="small">Use Global Slab (₹{globalEsiThreshold.toLocaleString("en-IN")})</span>}
+                        checked={empForm.esi_slab_type !== "custom"}
+                        onChange={() => setEmpForm((prev) => ({ ...prev, esi_slab_type: "global", esi_threshold: "" }))}
+                      />
+                      <Form.Check
+                        type="radio"
+                        name="esi_slab_type"
+                        id="esi-custom"
+                        label={<span className="small">Custom Threshold for this Employee</span>}
+                        checked={empForm.esi_slab_type === "custom"}
+                        onChange={() => setEmpForm((prev) => ({ ...prev, esi_slab_type: "custom", esi_threshold: prev.esi_threshold || globalEsiThreshold }))}
+                      />
+                    </div>
+                    {empForm.esi_slab_type === "custom" && (
+                      <div className="mt-2" style={{ maxWidth: "260px" }}>
+                        <InputGroup size="sm">
+                          <InputGroup.Text>₹</InputGroup.Text>
+                          <Form.Control
+                            type="number"
+                            placeholder="e.g. 21000"
+                            value={empForm.esi_threshold}
+                            onChange={(e) => setEmpForm((prev) => ({ ...prev, esi_threshold: e.target.value }))}
+                          />
+                        </InputGroup>
+                        <small className="text-muted" style={{ fontSize: "10.5px" }}>
+                          Gross &le; ₹{parseFloat(empForm.esi_threshold || 0).toLocaleString("en-IN")} = ESI, Gross &gt; ₹{parseFloat(empForm.esi_threshold || 0).toLocaleString("en-IN")} = Mediclaim
+                        </small>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </Col>
+
               {/* Request Employee to Submit / Upload Documents */}
               <Col xs={12}>
                 <div className="p-2.5 rounded-3 border bg-light-subtle d-flex align-items-center justify-content-between">
@@ -2589,8 +2655,22 @@ const ManageEmployees = () => {
           employeeName={salaryModal.name}
           canEdit={isAdmin || isHR}
           role={role}
-          onSalaryUpdated={(newSalary) => {
-            fetchEmployees();
+          onSalaryUpdated={(newSalary, newStructure) => {
+            if (salaryModal.code && newSalary != null) {
+              const cleanModalCode = String(salaryModal.code).replace(/^#/, "").toLowerCase();
+              setEmployees((prev) =>
+                prev.map((emp) =>
+                  String(emp.employee_code || "").replace(/^#/, "").toLowerCase() === cleanModalCode
+                    ? {
+                        ...emp,
+                        current_salary: parseFloat(newSalary),
+                        salary_structure: newStructure || emp.salary_structure,
+                      }
+                    : emp
+                )
+              );
+            }
+            fetchEmployees(true);
           }}
         />
 
@@ -2636,7 +2716,7 @@ const ManageEmployees = () => {
                 <Button
                   variant="outline-primary"
                   size="sm"
-                  onClick={() => setTabsModal(prev => ({ ...prev, selectedTabs: [1, 2, 4, 9, 11, 12] }))}
+                  onClick={() => setTabsModal(prev => ({ ...prev, selectedTabs: [1, 2, 3, 4, 8, 9, 10, 11, 12, 14, 16] }))}
                   className="py-1 px-2 text-xs"
                 >
                   Standard Default
@@ -3251,6 +3331,60 @@ const ManageEmployees = () => {
           }
         }
       `}</style>
+        {/* Global ESI Slab Configuration Modal */}
+        <Modal show={showEsiModal} onHide={() => setShowEsiModal(false)} centered>
+          <Modal.Header closeButton style={{ background: "linear-gradient(135deg, #1e3c72, #2a5298)", color: "white" }}>
+            <Modal.Title className="fs-5 d-flex align-items-center gap-2">
+              <span>⚙️</span> Global ESI Slab Configuration
+            </Modal.Title>
+          </Modal.Header>
+          <Modal.Body className="p-4 bg-light">
+            <div className="mb-3">
+              <label className="fw-semibold small mb-1">Company-wide ESI Salary Threshold (₹)</label>
+              <InputGroup>
+                <InputGroup.Text>₹</InputGroup.Text>
+                <Form.Control
+                  type="number"
+                  min="0"
+                  step="500"
+                  value={esiForm.global_esi_threshold}
+                  onChange={(e) => setEsiForm((prev) => ({ ...prev, global_esi_threshold: e.target.value }))}
+                  placeholder="21000"
+                />
+              </InputGroup>
+              <div className="text-muted mt-1" style={{ fontSize: "11.5px" }}>
+                Employees with monthly Gross Salary ≤ this threshold will have <strong>Employee State Insurance (0.75%)</strong> deducted.
+                Employees earning above this threshold will have <strong>Corporate Mediclaim Health Policy</strong> applied.
+              </div>
+            </div>
+
+            <div className="p-3 rounded border bg-white shadow-xs">
+              <Form.Check
+                type="checkbox"
+                id="apply-all-checkbox"
+                checked={esiForm.apply_to_all}
+                onChange={(e) => setEsiForm((prev) => ({ ...prev, apply_to_all: e.target.checked }))}
+                label={
+                  <div>
+                    <span className="fw-semibold text-danger small">Apply to All Employees</span>
+                    <div className="text-muted" style={{ fontSize: "11px" }}>
+                      Check this to override any existing custom individual ESI thresholds and enforce this slab across the entire company.
+                    </div>
+                  </div>
+                }
+              />
+            </div>
+          </Modal.Body>
+          <Modal.Footer className="bg-white">
+            <Button variant="link" className="text-muted text-decoration-none" onClick={() => setShowEsiModal(false)}>
+              Cancel
+            </Button>
+            <Button variant="primary" size="sm" onClick={handleSaveEsiSettings} disabled={savingEsi}>
+              {savingEsi ? "Saving..." : "Save ESI Slab"}
+            </Button>
+          </Modal.Footer>
+        </Modal>
+
       </Container>
     </div>
   );

@@ -347,7 +347,7 @@ export default function InterviewForm() {
 
   return (
     <div className="interview-assessment-page bg-slate-50 min-vh-100 py-4 px-3 px-md-4">
-      <Container fluid="xl">
+      <Container fluid="2xl px-5">
         {/* ── TOP HEADER / BREADCRUMB ─────────────────────────────────── */}
         <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
           <div className="d-flex align-items-center gap-3">

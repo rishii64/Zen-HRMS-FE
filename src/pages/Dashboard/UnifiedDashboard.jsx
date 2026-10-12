@@ -5,6 +5,8 @@ import EmployeeModulesView from "./components/EmployeeModulesView";
 import HRAdminDashboardView from "./components/HRAdminDashboardView";
 import AccountsDashboardView from "./components/AccountsDashboardView";
 import HODDashboardView from "./components/HODDashboardView";
+import AdminTasksView from "./components/AdminTasksView";
+import ITDashboardView from "./components/ITDashboardView";
 import api, { getUploadUrl } from "../../api/axios";
 
 export default function UnifiedDashboard() {
@@ -29,11 +31,11 @@ export default function UnifiedDashboard() {
   // Fetch employee profile & attendance logs
   const fetchDashboardData = async () => {
     const token = localStorage.getItem("token");
-    const empId = localStorage.getItem("employeeCode") || localStorage.getItem("empId") || "";
+    const employeeCode = localStorage.getItem("employeeCode") || "";
 
     // 1. Fetch Employee Profile
     try {
-      const res = await api.get(`/employee/${empId || "me"}`);
+      const res = await api.get(`/employee/${employeeCode || "me"}`);
       const emp = res.data?.employee || res.data?.data || res.data;
       if (emp && (emp.name || emp.employee_id || emp.email)) {
         const liveStatus = emp.status || "Active";
@@ -48,9 +50,14 @@ export default function UnifiedDashboard() {
           ? getUploadUrl(emp.profile_photo)
           : "https://cdn-icons-png.flaticon.com/512/3135/3135715.png";
 
+        const currentEmployeeCode = emp.employee_id || employeeCode;
+        if (currentEmployeeCode && !localStorage.getItem("employeeCode")) {
+          localStorage.setItem("employeeCode", currentEmployeeCode);
+        }
+
         setEmployee({
           name: localStorage.getItem("userName") || emp.name || "Employee",
-          empId: emp.employee_id || empId,
+          employeeCode: currentEmployeeCode,
           designation: emp.designation || localStorage.getItem("designation") || "Staff",
           email: localStorage.getItem("email") || emp.email || "N/A",
           phone: localStorage.getItem("phone") || emp.phone_no || "N/A",
@@ -71,7 +78,7 @@ export default function UnifiedDashboard() {
 
       setEmployee({
         name: localStorage.getItem("userName") || "Employee",
-        empId: localStorage.getItem("empId") || "N/A",
+        employeeCode: localStorage.getItem("employeeCode") || "",
         designation: localStorage.getItem("designation") || "Staff",
         email: localStorage.getItem("email") || "N/A",
         phone: localStorage.getItem("phone") || "N/A",
@@ -115,11 +122,17 @@ export default function UnifiedDashboard() {
     fetchDashboardData();
   }, []);
 
+  // State for view mode for leadership/management roles: "management" | "workspace"
+  const [dashboardViewMode, setDashboardViewMode] = useState("management");
+
   // Determine active view based on role
-  const isHrOrAdmin = currentRole === "hr" || currentRole === "admin";
-  const isAccounts = currentRole === "accounts" || currentRole === "payroll";
-  const isHod = currentRole === "hod" || currentRole === "manager";
-  const isEmployee = !isHrOrAdmin && !isAccounts && !isHod;
+  const isAdmin = currentRole === "admin";
+  const isManagement = ["management", "ceo", "coo", "cfo", "vp", "secretary"].includes(currentRole);
+  const isHr = ["hr", "hrmanager"].includes(currentRole);
+  const isAccounts = ["accounts", "payroll"].includes(currentRole);
+  const isIt = currentRole === "it";
+  const isHod = ["hod", "manager", "teamlead"].includes(currentRole);
+  const isEmployee = currentRole === "employee" || (!isAdmin && !isManagement && !isHr && !isAccounts && !isIt && !isHod);
 
   return (
     <div
@@ -192,7 +205,7 @@ export default function UnifiedDashboard() {
         .role-switch-btn {
           font-size: 11px;
           font-weight: 700;
-          padding: 6px 12px;
+          padding: 6px 14px;
           border-radius: 10px;
           border: 1px solid transparent;
           transition: all 0.2s ease;
@@ -225,21 +238,76 @@ export default function UnifiedDashboard() {
           onStatusChange={fetchDashboardData}
         />
 
+        {/* View Switcher for privileged roles (Admin, HR, HOD, Manager, Accounts) */}
+        {!isEmployee && (
+          <div className="d-flex flex-wrap align-items-center justify-content-between mb-4 bg-white p-2.5 rounded-3 border shadow-sm">
+            <div className="d-flex align-items-center gap-2">
+              <span className="small text-muted fw-bold ps-2">Dashboard View:</span>
+              <button
+                type="button"
+                className={`role-switch-btn ${dashboardViewMode === "management" ? "active" : ""}`}
+                onClick={() => setDashboardViewMode("management")}
+              >
+                🏢 {
+                  isAdmin
+                    ? "Admin Operations & Unofficial Tasks"
+                    : isManagement
+                    ? "Executive Leadership Hub"
+                    : isHr
+                    ? "HR Operations & Recruitment"
+                    : isIt
+                    ? "IT & Systems Desk"
+                    : isAccounts
+                    ? "Finance & Accounts Hub"
+                    : "Department & Team Hub"
+                }
+              </button>
+              <button
+                type="button"
+                className={`role-switch-btn ${dashboardViewMode === "workspace" ? "active" : ""}`}
+                onClick={() => setDashboardViewMode("workspace")}
+              >
+                👤 My Employee Workspace (18 Modules)
+              </button>
+            </div>
+            <div className="small text-muted pe-2 py-1">
+              <span>Portal Role: <strong className="text-primary text-uppercase">{currentRole}</strong></span>
+              {employee?.designation && <span className="ms-2 ps-2 border-start">&bull; Designation: <strong className="text-dark">{employee.designation}</strong></span>}
+            </div>
+          </div>
+        )}
+
         {/* ============================================================ */}
-        {/* ROLE-BASED OPERATIONAL MODULES (BELOW COMMON TOP SECTION)   */}
+        {/* OPERATIONAL MODULES ACCORDING TO VIEW MODE & ROLE           */}
         {/* ============================================================ */}
 
-        {/* 1. REGULAR EMPLOYEE: 13 Workspace Modules Grid */}
-        {isEmployee && <EmployeeModulesView employee={employee || {}} />}
+        {/* 1. PERSONAL EMPLOYEE WORKSPACE: Shown for standard employees OR when toggled by leadership */}
+        {(isEmployee || dashboardViewMode === "workspace") && (
+          <EmployeeModulesView employee={employee || {}} />
+        )}
 
-        {/* 2. HR / ADMIN: 4 KPIs + 2 Analytics Charts + Employee Directory */}
-        {isHrOrAdmin && <HRAdminDashboardView />}
+        {/* 2. MANAGEMENT & OPERATIONAL VIEWS */}
+        {!isEmployee && dashboardViewMode === "management" && (
+          <>
+            {/* Dedicated Admin Operations & Unofficial Tasks Desk */}
+            {isAdmin && <AdminTasksView />}
 
-        {/* 3. ACCOUNTS / PAYROLL: 4 Financial Cards + Operations Hub */}
-        {isAccounts && <AccountsDashboardView />}
+            {/* Executive Leadership Hub */}
+            {isManagement && <HRAdminDashboardView isExecutiveView={true} />}
 
-        {/* 4. HOD / DEPT HEAD: Approval Center + Team Overview + Shifts + OKRs + Direct Reports */}
-        {isHod && <HODDashboardView />}
+            {/* HR Operations & Recruitment */}
+            {isHr && <HRAdminDashboardView />}
+
+            {/* IT Infrastructure & Technical Service Desk */}
+            {isIt && <ITDashboardView />}
+
+            {/* Finance & Accounts Hub */}
+            {isAccounts && <AccountsDashboardView />}
+
+            {/* Department Head & Managers Hub */}
+            {isHod && !isAdmin && !isManagement && !isHr && !isIt && !isAccounts && <HODDashboardView />}
+          </>
+        )}
       </Container>
     </div>
   );

@@ -6,7 +6,7 @@ import ProbationAppraisalReviews from "./ProbationAppraisalReviews";
 export default function AppraisalPage() {
   return (
     <div className="min-h-screen bg-slate-50/60 p-4 md:p-6 space-y-4">
-      <Container fluid className="px-0">
+      <Container fluid className="px-4 max-w-7xl">
         {/* Header */}
         <div className="bg-white rounded-2xl p-4 md:p-5 border border-slate-200 shadow-sm mb-4 d-flex flex-wrap justify-between align-items-center gap-3">
           <div>

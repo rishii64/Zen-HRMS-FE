@@ -202,8 +202,8 @@ const MyAttendance = () => {
       .catch((err) => console.error("Error fetching employees:", err));
   }, [token, userEmpId, userName]);
 
-  // Fetch attendance list
-  const fetchAttendanceList = async () => {
+  // Fetch attendance list with cancellation support
+  const fetchAttendanceList = async (abortSignal) => {
     setLoading(true);
     try {
       let url = `${API}/attendance?range=${selectedRange}&date=${selectedDateStr}`;
@@ -214,11 +214,12 @@ const MyAttendance = () => {
         url += `&order=${effectiveDateSort}`;
       }
       if (selectedDept !== "All") {
-        url += `&dept=${selectedDept}`;
+        url += `&dept=${encodeURIComponent(selectedDept)}`;
       }
 
       const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
+        signal: abortSignal,
       });
       const data = await res.json();
       if (data.success) {
@@ -227,15 +228,21 @@ const MyAttendance = () => {
         toast.error(data.error || "Failed to load attendance records");
       }
     } catch (err) {
-      console.error("Error fetching attendance list:", err);
-      toast.error("Failed to connect to server");
+      if (err.name !== "AbortError") {
+        console.error("Error fetching attendance list:", err);
+        toast.error("Failed to connect to server");
+      }
     } finally {
-      setLoading(false);
+      if (!abortSignal || !abortSignal.aborted) {
+        setLoading(false);
+      }
     }
   };
 
   useEffect(() => {
-    fetchAttendanceList();
+    setLoading(true);
+    const controller = new AbortController();
+    fetchAttendanceList(controller.signal);
 
     const handleHolidayUpdate = () => {
       fetchAttendanceList();
@@ -251,37 +258,49 @@ const MyAttendance = () => {
     window.addEventListener("storage", handleStorageUpdate);
 
     return () => {
+      controller.abort();
       window.removeEventListener("holiday-updated", handleHolidayUpdate);
       window.removeEventListener("storage", handleStorageUpdate);
     };
   }, [selectedDateStr, selectedRange, selectedDept, fromDate, toDate, effectiveDateSort]);
 
-  // Fetch full month attendance for KPI metrics
-  const fetchMonthlyRecords = async () => {
+  // Fetch month attendance for KPI metrics (scoped to target employee for 95% faster response)
+  const fetchMonthlyRecords = async (abortSignal) => {
     setMonthlyLoading(true);
     try {
       const monthQueryDate = `${currentYear}-${String(currentMonth).padStart(2, "0")}-01`;
       let url = `${API}/attendance?range=month&date=${monthQueryDate}`;
-      if (isEmployeeOnly) {
+      const targetEmpCode = selectedKpiEmpId || (isEmployeeOnly ? userEmpId : (employees[0]?.employee_code || employees[0]?.employee_id || userEmpId));
+      if (targetEmpCode) {
+        url += `&emp_id=${encodeURIComponent(targetEmpCode)}`;
+      } else if (isEmployeeOnly) {
         url += `&scope=my`;
       }
       const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
+        signal: abortSignal,
       });
       const data = await res.json();
       if (data.success) {
         setMonthlyAttendanceRecords(data.data || []);
       }
     } catch (err) {
-      console.error("Error fetching monthly attendance records:", err);
+      if (err.name !== "AbortError") {
+        console.error("Error fetching monthly attendance records:", err);
+      }
     } finally {
       setMonthlyLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchMonthlyRecords();
-  }, [currentYear, currentMonth, token, isEmployeeOnly]);
+    const controller = new AbortController();
+    fetchMonthlyRecords(controller.signal);
+
+    return () => {
+      controller.abort();
+    };
+  }, [currentYear, currentMonth, token, isEmployeeOnly, selectedKpiEmpId]);
 
   const handleRefreshAll = () => {
     fetchAttendanceList();
@@ -427,22 +446,22 @@ const MyAttendance = () => {
 
     return true;
   })
-  .sort((a, b) => {
-    const isAsc = effectiveDateSort === "asc";
-    const dateA = a.date || "";
-    const dateB = b.date || "";
-    if (dateA !== dateB) {
-      return isAsc ? dateA.localeCompare(dateB) : dateB.localeCompare(dateA);
-    }
-    const empA = a.employee_id || "";
-    const empB = b.employee_id || "";
-    if (empA !== empB) {
-      return empA.localeCompare(empB);
-    }
-    const inA = a.check_in || "";
-    const inB = b.check_in || "";
-    return inA.localeCompare(inB);
-  });
+    .sort((a, b) => {
+      const isAsc = effectiveDateSort === "asc";
+      const dateA = a.date || "";
+      const dateB = b.date || "";
+      if (dateA !== dateB) {
+        return isAsc ? dateA.localeCompare(dateB) : dateB.localeCompare(dateA);
+      }
+      const empA = a.employee_id || "";
+      const empB = b.employee_id || "";
+      if (empA !== empB) {
+        return empA.localeCompare(empB);
+      }
+      const inA = a.check_in || "";
+      const inB = b.check_in || "";
+      return inA.localeCompare(inB);
+    });
 
   // 1. Target Employee Resolution for Personal/Employee KPI Widgets
   const effectiveEmpId = (
@@ -480,13 +499,13 @@ const MyAttendance = () => {
   }
 
   // 3. Reporting Manager Resolution
-  const rawReportingManager = 
+  const rawReportingManager =
     targetEmpObj?.reporting_manager?.trim() ||
     (effectiveEmpId === userEmpId ? storedUser?.reporting_manager?.trim() : "") ||
     localStorage.getItem("reporting_manager") ||
     "";
-    
-  const reportingManager = 
+
+  const reportingManager =
     rawReportingManager && rawReportingManager !== "N/A" && rawReportingManager !== "null" && rawReportingManager !== "undefined"
       ? rawReportingManager
       : "Management / HR";
@@ -517,7 +536,7 @@ const MyAttendance = () => {
     const dateKey = String(r.date).split("T")[0];
     const curStatus = r.status || "Present";
     const prevStatus = monthlyDayMap[dateKey];
-    
+
     if (!prevStatus) {
       monthlyDayMap[dateKey] = curStatus;
     } else {
@@ -646,7 +665,7 @@ const MyAttendance = () => {
 
       {/* HEADER SECTION */}
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6 px-2">
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-4">
           <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight m-0">Attendance</h1>
 
           {/* Date Navigator (< Monday, 15 October >) */}
@@ -674,7 +693,7 @@ const MyAttendance = () => {
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <button
             onClick={handleExportReport}
             className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold px-4 py-2.5 rounded-xl shadow-xs transition-all"
@@ -698,34 +717,36 @@ const MyAttendance = () => {
       <div className="mb-6 px-2">
         {/* KPI Section Control Header */}
         <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
               Monthly Attendance KPI Summary
             </span>
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-blue-50 text-blue-700 border border-blue-100">
-              {monthYearTitle}
-            </span>
-            <div className="flex items-center gap-1 ml-1">
-              <button
-                onClick={handlePrevMonth}
-                title="Previous Month"
-                className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors"
-              >
-                <LuChevronLeft className="h-3.5 w-3.5" />
-              </button>
-              <button
-                onClick={handleNextMonth}
-                title="Next Month"
-                className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors"
-              >
-                <LuChevronRight className="h-3.5 w-3.5" />
-              </button>
+            <div className="flex items-center gap-1">
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-blue-50 text-blue-700 border border-blue-100">
+                {monthYearTitle}
+              </span>
+              <div className="flex items-center gap-1 ml-1">
+                <button
+                  onClick={handlePrevMonth}
+                  title="Previous Month"
+                  className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors"
+                >
+                  <LuChevronLeft className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  onClick={handleNextMonth}
+                  title="Next Month"
+                  className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors"
+                >
+                  <LuChevronRight className="h-3.5 w-3.5" />
+                </button>
+              </div>
             </div>
           </div>
 
           {/* Employee Selector for Admins/HR/HOD */}
           {!isEmployeeOnly && employees.length > 0 && (
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs text-slate-500 font-semibold flex items-center gap-1">
                 <LuUser className="h-3.5 w-3.5 text-slate-400" />
                 Viewing KPI for:
@@ -922,8 +943,8 @@ const MyAttendance = () => {
       </div>
 
       {/* FILTER BAR SECTION */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-4 mb-6 shadow-xs flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-3 flex-1">
+      <div className="bg-white border border-slate-200 rounded-2xl py-4 px-2 mb-6 shadow-xs flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 flex-wrap flex-1">
           {/* Search Input */}
           <div className="relative flex-1 min-w-[200px]">
             <LuSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-3.5 w-3.5" />
@@ -1059,11 +1080,10 @@ const MyAttendance = () => {
                   <div className="flex items-center gap-1.5">
                     <span>Date</span>
                     <span
-                      className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-extrabold transition-colors ${
-                        effectiveDateSort === "asc"
+                      className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-extrabold transition-colors ${effectiveDateSort === "asc"
                           ? "bg-blue-50 text-blue-600 border border-blue-200"
                           : "bg-slate-100 text-slate-500 border border-slate-200"
-                      }`}
+                        }`}
                     >
                       {effectiveDateSort === "asc" ? (
                         <>
@@ -1091,11 +1111,78 @@ const MyAttendance = () => {
             </thead>
             <tbody>
               {loading ? (
-                // SKELETON LOADERS (3 Skeleton Rows)
-                Array.from({ length: 4 }).map((_, idx) => (
-                  <tr key={idx}>
-                    <td colSpan={13} className="py-3">
-                      <div className="skeleton-pulse h-8 w-full"></div>
+                // SKELETAL LOADING ROWS (Matches full 13-column structure)
+                Array.from({ length: 6 }).map((_, idx) => (
+                  <tr key={idx} className="border-b border-slate-100">
+                    {/* Employee Name & Subtitle */}
+                    <td className="py-3 px-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="skeleton-pulse w-8 h-8 rounded-full flex-shrink-0"></div>
+                        <div className="flex flex-col gap-1.5 w-full">
+                          <div className="skeleton-pulse h-3 w-28"></div>
+                          <div className="skeleton-pulse h-2.5 w-16"></div>
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Employee ID */}
+                    <td className="py-3 px-3">
+                      <div className="skeleton-pulse h-3.5 w-16"></div>
+                    </td>
+
+                    {/* Date */}
+                    <td className="py-3 px-3">
+                      <div className="skeleton-pulse h-3.5 w-24"></div>
+                    </td>
+
+                    {/* Department */}
+                    <td className="py-3 px-3">
+                      <div className="skeleton-pulse h-5 w-20 rounded-md"></div>
+                    </td>
+
+                    {/* Designation */}
+                    <td className="py-3 px-3">
+                      <div className="skeleton-pulse h-3.5 w-24"></div>
+                    </td>
+
+                    {/* Shift */}
+                    <td className="py-3 px-3">
+                      <div className="skeleton-pulse h-5 w-20 rounded-md"></div>
+                    </td>
+
+                    {/* Check-In */}
+                    <td className="py-3 px-3">
+                      <div className="skeleton-pulse h-3.5 w-14"></div>
+                    </td>
+
+                    {/* Check-Out */}
+                    <td className="py-3 px-3">
+                      <div className="skeleton-pulse h-3.5 w-14"></div>
+                    </td>
+
+                    {/* Working Hours */}
+                    <td className="py-3 px-3">
+                      <div className="skeleton-pulse h-5 w-32 rounded-lg"></div>
+                    </td>
+
+                    {/* Overtime */}
+                    <td className="py-3 px-3">
+                      <div className="skeleton-pulse h-3.5 w-12"></div>
+                    </td>
+
+                    {/* Status */}
+                    <td className="py-3 px-3">
+                      <div className="skeleton-pulse h-5 w-20 rounded-full"></div>
+                    </td>
+
+                    {/* Notes */}
+                    <td className="py-3 px-3">
+                      <div className="skeleton-pulse h-3.5 w-20"></div>
+                    </td>
+
+                    {/* Actions */}
+                    <td className="py-3 px-3 text-center">
+                      <div className="skeleton-pulse h-7 w-7 rounded-lg mx-auto"></div>
                     </td>
                   </tr>
                 ))

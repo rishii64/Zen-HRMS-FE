@@ -444,8 +444,8 @@ const SalaryStructureModal = ({
                   formData.employment_type === "Permanent"
                     ? "success"
                     : formData.employment_type === "Probation"
-                    ? "warning"
-                    : "secondary"
+                      ? "warning"
+                      : "secondary"
                 }
                 className="px-2.5 py-1.5"
               >
@@ -1117,14 +1117,17 @@ const ManageEmployees = () => {
 
   const [viewMode, setViewMode] = useState("grid"); // "grid" | "list"
   const [selectedDesignation, setSelectedDesignation] = useState("All");
+  const [selectedDept, setSelectedDept] = useState("All");
   const [selectedStatus, setSelectedStatus] = useState("All");
   const [sortBy, setSortBy] = useState("newest");
   const [quickViewModal, setQuickViewModal] = useState({ show: false, employee: null });
+  const [isCustomDept, setIsCustomDept] = useState(false);
+  const [customDeptInput, setCustomDeptInput] = useState("");
 
-  const isAdmin = role === "admin";
-  const isHR = role === "hr" || role === "hrmanager";
-  const isManager = role === "manager";
-  const isEmployee = role === "employee";
+  const isAdmin = ["admin", "management", "ceo", "coo", "cfo", "vp", "secretary"].includes((role || "").toLowerCase());
+  const isHR = ["hr", "hrmanager"].includes((role || "").toLowerCase());
+  const isManager = ["manager", "hod", "teamlead"].includes((role || "").toLowerCase());
+  const isEmployee = (role || "").toLowerCase() === "employee";
   const canEditKpi = isAdmin || isHR;
 
   const [refreshing, setRefreshing] = useState(false);
@@ -1266,6 +1269,8 @@ const ManageEmployees = () => {
       return;
     }
     setEditMode(false);
+    setIsCustomDept(false);
+    setCustomDeptInput("");
     setEmpForm({
       ...EMPTY_FORM,
       facilities: { advance: true, loan: true, insurance: true, gratuity: true },
@@ -1281,6 +1286,34 @@ const ManageEmployees = () => {
       return;
     }
     setEditMode(true);
+
+    const PRESET_DEPTS = [
+      "Management / Executive",
+      "Human Resources (HR)",
+      "Accounts & Finance",
+      "Administration & Facilities",
+      "IT & Systems",
+      "Legal Cell",
+      "Operations",
+      "Sales & Marketing",
+      "Engineering / Tech",
+      "Customer Support",
+      "HR",
+      "Accounts",
+      "Finance",
+      "IT",
+      "Marketing",
+      "Sales",
+      "Executive",
+    ];
+    const isStandardDept = PRESET_DEPTS.includes(emp.dept);
+    if (emp.dept && !isStandardDept) {
+      setIsCustomDept(true);
+      setCustomDeptInput(emp.dept);
+    } else {
+      setIsCustomDept(false);
+      setCustomDeptInput("");
+    }
 
     let salutation = emp.salutation || "Mr.";
     let cleanName = emp.name || "";
@@ -1299,7 +1332,7 @@ const ManageEmployees = () => {
     if (emp.facilities) {
       try {
         fac = typeof emp.facilities === "string" ? JSON.parse(emp.facilities) : emp.facilities;
-      } catch (e) {}
+      } catch (e) { }
     }
     const hasCustomEsi = emp.esi_threshold != null && emp.esi_threshold !== "" && !isNaN(parseFloat(emp.esi_threshold));
 
@@ -1350,13 +1383,14 @@ const ManageEmployees = () => {
       phone_no,
     } = empForm;
 
+    const resolvedDept = isCustomDept ? customDeptInput.trim() : (dept || "").trim();
     const primaryWorkEmail = (work_email || email || "").toLowerCase().trim();
     const primaryPersonalEmail = (personal_email || "").toLowerCase().trim();
 
     if (
       !employee_code ||
       !name ||
-      !dept ||
+      !resolvedDept ||
       !designation ||
       !primaryWorkEmail ||
       !current_salary ||
@@ -1364,7 +1398,7 @@ const ManageEmployees = () => {
       !reporting_manager ||
       !phone_no
     ) {
-      toast.error("Please fill all required fields (including Work Email)!");
+      toast.error("Please fill all required fields (including Work Email and Department)!");
       return;
     }
 
@@ -1394,6 +1428,7 @@ const ManageEmployees = () => {
 
     const payload = {
       ...empForm,
+      dept: resolvedDept,
       pan_no: empForm.pan_no ? empForm.pan_no.toUpperCase().trim() : "",
       aadhaar_no: empForm.aadhaar_no ? empForm.aadhaar_no.trim() : "",
       request_documents: empForm.request_documents,
@@ -1571,6 +1606,23 @@ const ManageEmployees = () => {
     return ["All", ...Array.from(set)];
   }, [employees]);
 
+  const allDepartments = useMemo(() => {
+    const set = new Set([
+      "Management / Executive",
+      "Human Resources (HR)",
+      "Accounts & Finance",
+      "Administration & Facilities",
+      "IT & Systems",
+      "Legal Cell",
+      "Operations",
+      "Sales & Marketing",
+    ]);
+    employees.forEach((emp) => {
+      if (emp.dept && emp.dept.trim()) set.add(emp.dept.trim());
+    });
+    return ["All", ...Array.from(set)];
+  }, [employees]);
+
   const filteredAndSortedEmployees = useMemo(() => {
     let list = employees.filter((emp) => {
       const term = searchTerm.toLowerCase().trim();
@@ -1587,11 +1639,15 @@ const ManageEmployees = () => {
         selectedDesignation === "All" ||
         empDesig === selectedDesignation.toLowerCase();
 
+      const matchesDept =
+        selectedDept === "All" ||
+        (emp.dept || "").toLowerCase() === selectedDept.toLowerCase();
+
       const matchesStatus =
         selectedStatus === "All" ||
         (emp.status || "").toLowerCase() === selectedStatus.toLowerCase();
 
-      return matchesSearch && matchesDesig && matchesStatus;
+      return matchesSearch && matchesDesig && matchesDept && matchesStatus;
     });
 
     list.sort((a, b) => {
@@ -1615,7 +1671,7 @@ const ManageEmployees = () => {
     });
 
     return list;
-  }, [employees, searchTerm, selectedDesignation, selectedStatus, sortBy]);
+  }, [employees, searchTerm, selectedDesignation, selectedDept, selectedStatus, sortBy]);
 
   return (
     <div className="emp-page-wrapper py-3 py-md-4">
@@ -1638,6 +1694,26 @@ const ManageEmployees = () => {
                   .map((d) => (
                     <option key={d} value={d}>
                       {d}
+                    </option>
+                  ))}
+              </Form.Select>
+            </div>
+
+            {/* Department Filter */}
+            <div className="filter-item flex-shrink-0" style={{ width: "165px" }}>
+              <Form.Select
+                size="sm"
+                value={selectedDept}
+                onChange={(e) => setSelectedDept(e.target.value)}
+                className="filter-select rounded-3 py-1.5 px-2 fw-semibold text-secondary"
+                style={{ fontSize: "13px", borderColor: "#cbd5e1" }}
+              >
+                <option value="All">Dept : All</option>
+                {allDepartments
+                  .filter((d) => d !== "All")
+                  .map((d) => (
+                    <option key={d} value={d}>
+                      Dept : {d}
                     </option>
                   ))}
               </Form.Select>
@@ -1713,12 +1789,14 @@ const ManageEmployees = () => {
                   value={role}
                   onChange={(e) => setRole(e.target.value)}
                   className="rounded-3 py-1.5 px-2 fw-semibold text-secondary"
-                  style={{ width: "135px", fontSize: "13px", borderColor: "#cbd5e1" }}
+                  style={{ width: "155px", fontSize: "13px", borderColor: "#cbd5e1" }}
                   title="Active Workspace Role"
                 >
+                  <option value="management">Management</option>
                   <option value="hr">HR Manager</option>
                   <option value="admin">Admin</option>
-                  <option value="manager">Reporting HOD</option>
+                  <option value="accounts">Accounts</option>
+                  <option value="it">IT Support</option>
                 </Form.Select>
               </div>
 
@@ -2322,15 +2400,19 @@ const ManageEmployees = () => {
                   System Role
                 </Form.Label>
                 <Form.Select size="sm" name="job_role" value={empForm.job_role} onChange={handleChange} >
-                  <option value="employee">Employee</option>
-                  <option value="hod">Reporting Manager (HOD)</option>
-                  <option value="hr">HR Manager</option>
+                  <option value="management">Management (CEO / CTO / COO / CFO / VP / Secretary)</option>
+                  <option value="hr">HR</option>
+                  <option value="employee">Employees</option>
                   <option value="accounts">Accounts</option>
-                  <option value="manager">Manager</option>
-                  <option value="teamlead">Team Lead</option>
-                  <option value="payroll">Payroll Specialist</option>
-                  <option value="admin">Administrator</option>
+                  <option value="admin">Admin</option>
+                  <option value="it">IT</option>
+                  {!["management", "hr", "employee", "accounts", "admin", "it"].includes((empForm.job_role || "").toLowerCase()) && empForm.job_role && (
+                    <option value={empForm.job_role}>{empForm.job_role} (Legacy)</option>
+                  )}
                 </Form.Select>
+                <div className="text-muted mt-1" style={{ fontSize: "11px" }}>
+                  Sets portal permissions & dashboard access.
+                </div>
               </Col>
               <Col xs={6} md={4}>
                 <Form.Label className="small fw-bold text-success">Tabs Access</Form.Label>
@@ -2342,21 +2424,98 @@ const ManageEmployees = () => {
                 </Form.Select>
               </Col>
               <Col xs={6} md={4}>
-                <Form.Label className="small fw-bold">Dept</Form.Label>
-                <Form.Select size="sm" name="dept" value={empForm.dept || ""} onChange={handleChange}>
+                <Form.Label className="small fw-bold">Department</Form.Label>
+                <Form.Select
+                  size="sm"
+                  name="dept"
+                  value={isCustomDept ? "Others" : (empForm.dept || "")}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === "Others") {
+                      setIsCustomDept(true);
+                      setEmpForm(prev => ({ ...prev, dept: customDeptInput }));
+                    } else {
+                      setIsCustomDept(false);
+                      setEmpForm(prev => ({ ...prev, dept: val }));
+                    }
+                  }}
+                >
                   <option value="">Select Department</option>
-                  <option value="HR">HR</option>
-                  <option value="Accounts">Accounts</option>
-                  <option value="Marketing">Marketing</option>
-                  <option value="Sales">Sales</option>
-                  <option value="HOD">HOD</option>
-                  <option value="IT">IT</option>
-                  <option value="Other">Other</option>
+                  <option value="Management / Executive">Management / Executive</option>
+                  <option value="Human Resources (HR)">Human Resources (HR)</option>
+                  <option value="Accounts & Finance">Accounts & Finance</option>
+                  <option value="Administration & Facilities">Administration & Facilities</option>
+                  <option value="IT & Systems">IT & Systems</option>
+                  <option value="Legal Cell">Legal Cell</option>
+                  <option value="Operations">Operations</option>
+                  <option value="Sales & Marketing">Sales & Marketing</option>
+                  <option value="Engineering / Tech">Engineering / Tech</option>
+                  <option value="Customer Support">Customer Support</option>
+                  {empForm.dept && !["Management / Executive", "Human Resources (HR)", "Accounts & Finance", "Administration & Facilities", "IT & Systems", "Legal Cell", "Operations", "Sales & Marketing", "Engineering / Tech", "Customer Support", "Others"].includes(empForm.dept) && !isCustomDept && (
+                    <option value={empForm.dept}>{empForm.dept}</option>
+                  )}
+                  <option value="Others">Others (Custom Field)</option>
                 </Form.Select>
+                {isCustomDept && (
+                  <div className="mt-1">
+                    <Form.Control
+                      size="sm"
+                      placeholder="Enter custom department name..."
+                      value={customDeptInput}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setCustomDeptInput(val);
+                        setEmpForm(prev => ({ ...prev, dept: val }));
+                      }}
+                      className="border-primary"
+                    />
+                    <div className="text-muted" style={{ fontSize: "10px" }}>
+                      Custom department will be saved for this employee
+                    </div>
+                  </div>
+                )}
               </Col>
               <Col xs={12} md={4}>
                 <Form.Label className="small fw-bold">Designation</Form.Label>
-                <Form.Control size="sm" name="designation" value={empForm.designation} onChange={handleChange} />
+                <Form.Control
+                  size="sm"
+                  name="designation"
+                  list="designations-list"
+                  placeholder="e.g. Employee, TL, Manager (HOD), GM, AGM..."
+                  value={empForm.designation || ""}
+                  onChange={handleChange}
+                />
+                <datalist id="designations-list">
+                  <option value="Employee" />
+                  <option value="TL" />
+                  <option value="Manager (HOD)" />
+                  <option value="GM" />
+                  <option value="AGM" />
+                  <option value="CEO" />
+                  <option value="CTO" />
+                  <option value="COO" />
+                  <option value="CFO" />
+                  <option value="VP" />
+                  <option value="Secretary" />
+                  <option value="Legal Advisor" />
+                  <option value="Accountant" />
+                  <option value="IT Support Engineer" />
+                  <option value="HR Executive" />
+                </datalist>
+                <div className="d-flex flex-wrap gap-1 mt-1">
+                  {["Employee", "TL", "Manager (HOD)", "GM", "AGM"].map((d) => (
+                    <Badge
+                      key={d}
+                      bg="light"
+                      text="dark"
+                      className="border text-primary cursor-pointer"
+                      style={{ fontSize: "10px", cursor: "pointer", fontWeight: "normal" }}
+                      onClick={() => setEmpForm(prev => ({ ...prev, designation: d }))}
+                    >
+                      +{d}
+                    </Badge>
+                  ))}
+                </div>
               </Col>
               <Col xs={12} md={4}>
                 <Form.Label className="small fw-bold text-primary">Parent Group</Form.Label>
@@ -2404,7 +2563,7 @@ const ManageEmployees = () => {
                     name="salary_type"
                     value={empForm.salary_type || "Monthly (In Hand)"}
                     onChange={(e) => handleSalaryFrequencyChange(e.target.value)}
-                    style={{ maxWidth: "170px", fontWeight: "600" }}
+                    style={{ maxWidth: "175px", fontWeight: "600" }}
                   >
                     <option value="Monthly (In Hand)">Monthly (In Hand)</option>
                     <option value="LPA">LPA (Lakhs/yr)</option>
@@ -2662,10 +2821,10 @@ const ManageEmployees = () => {
                 prev.map((emp) =>
                   String(emp.employee_code || "").replace(/^#/, "").toLowerCase() === cleanModalCode
                     ? {
-                        ...emp,
-                        current_salary: parseFloat(newSalary),
-                        salary_structure: newStructure || emp.salary_structure,
-                      }
+                      ...emp,
+                      current_salary: parseFloat(newSalary),
+                      salary_structure: newStructure || emp.salary_structure,
+                    }
                     : emp
                 )
               );

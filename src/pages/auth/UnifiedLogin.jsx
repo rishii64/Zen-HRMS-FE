@@ -59,14 +59,20 @@ export default function UnifiedLogin() {
         setLoading(false);
         const userRole = (data.user?.role || role || "").toLowerCase().trim();
         let targetRoute = "/employee/dashboard";
-        if (userRole === "hr" || userRole === "admin" || userRole === "hrmanager") {
+        if (["management", "ceo", "cto", "coo", "cfo", "vp", "secretary"].includes(userRole)) {
+          targetRoute = "/management/dashboard";
+        } else if (["admin"].includes(userRole)) {
           targetRoute = "/admin/dashboard";
-        } else if (userRole === "employee") {
-          targetRoute = "/employee/dashboard";
-        } else if (userRole === "accounts" || userRole === "payroll") {
+        } else if (["hr", "hrmanager"].includes(userRole)) {
+          targetRoute = "/hr/dashboard";
+        } else if (["it"].includes(userRole)) {
+          targetRoute = "/it/dashboard";
+        } else if (["accounts", "payroll"].includes(userRole)) {
           targetRoute = "/accounts/dashboard";
-        } else if (userRole === "hod") {
+        } else if (["hod", "manager", "teamlead"].includes(userRole)) {
           targetRoute = "/hod/dashboard";
+        } else {
+          targetRoute = "/employee/dashboard";
         }
 
         navigate(targetRoute, { replace: true });
@@ -138,10 +144,12 @@ export default function UnifiedLogin() {
                   className="w-full appearance-none rounded-full border border-slate-200 py-3 pl-14 pr-10 text-sm font-medium text-slate-700 bg-white placeholder-slate-400 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-200/40 transition-all shadow-sm cursor-pointer"
                   required
                 >
-                  <option value="employee">Employee</option>
-                  <option value="hr">HR Manager</option>
-                  <option value="accounts">Finance & Accounts</option>
-                  <option value="hod">Department Head (HOD)</option>
+                  <option value="management">Management</option>
+                  <option value="hr">HR</option>
+                  <option value="employee">Employees</option>
+                  <option value="accounts">Accounts</option>
+                  <option value="admin">Admin</option>
+                  <option value="it">IT & Systems</option>
                 </select>
                 <div className="absolute right-4 pointer-events-none text-slate-400">
                   <FiChevronDown className="h-4 w-4" />

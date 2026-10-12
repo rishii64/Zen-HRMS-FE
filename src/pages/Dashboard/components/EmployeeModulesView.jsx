@@ -24,6 +24,8 @@ import {
 export default function EmployeeModulesView({ employee = {} }) {
   const navigate = useNavigate();
 
+  const employeeCode = employee?.employeeCode || localStorage.getItem("employeeCode") || "";
+
   const quickActions = [
     {
       id: 1,
@@ -44,7 +46,7 @@ export default function EmployeeModulesView({ employee = {} }) {
       iconBg: "rgba(22, 163, 74, 0.08)",
       iconColor: "#16a34a",
       isLink: true,
-      linkTo: "/employee/leave",
+      linkTo: "/leave",
     },
     {
       id: 3,
@@ -65,7 +67,7 @@ export default function EmployeeModulesView({ employee = {} }) {
       iconBg: "rgba(109, 40, 217, 0.08)",
       iconColor: "#6d28d9",
       isLink: true,
-      linkTo: `/profile/${employee.empId || ""}`,
+      linkTo: `/profile/${employeeCode}`,
     },
     {
       id: 5,
@@ -285,7 +287,15 @@ export default function EmployeeModulesView({ employee = {} }) {
         <Row className="g-3">
         {visibleActions.map((action, index) => (
           <Col xs={12} sm={6} lg={4} key={action.id}>
-            <Card className="h-100 shadow-sm border-0 rounded-4 hover-card bg-white">
+            <Card
+              className="h-100 shadow-sm border-0 rounded-4 hover-card bg-white"
+              style={{ cursor: "pointer" }}
+              onClick={(e) => {
+                if (e.target.closest("a, button")) return;
+                if (action.isLink && action.linkTo) navigate(action.linkTo);
+                else if (action.onClick) action.onClick(e);
+              }}
+            >
               <Card.Body className="d-flex flex-column p-4 justify-content-between">
                 <div>
                   <div className="d-flex justify-content-between align-items-center mb-3">

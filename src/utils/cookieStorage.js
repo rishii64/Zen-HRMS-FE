@@ -228,7 +228,11 @@ export const setAuthCookies = (data) => {
 
   const token = data.token;
   const user = data.user || {};
-  const role = user.role || data.role || "";
+  let role = (user.role || data.role || "").toLowerCase().trim();
+  if (role === "employees") role = "employee";
+  if (user && user.role && String(user.role).toLowerCase().trim() === "employees") {
+    user.role = "employee";
+  }
   const empCode = user.employee_code || user.employee_id || data.employee_id || "";
   const userName = user.name || data.userName || "";
 
@@ -262,19 +266,26 @@ export const getAuthToken = () => {
 };
 
 export const getAuthRole = () => {
-  const role = getCookieRaw("role");
-  if (role) return role;
-  const user = getAuthUser();
-  if (user && user.role) return user.role;
-  const token = getAuthToken();
-  if (token) {
-    try {
-      const parts = token.split(".");
-      if (parts.length >= 2) {
-        const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
-        if (payload && payload.role) return payload.role;
-      }
-    } catch (_) {}
+  let role = getCookieRaw("role");
+  if (!role) {
+    const user = getAuthUser();
+    if (user && user.role) role = user.role;
+  }
+  if (!role) {
+    const token = getAuthToken();
+    if (token) {
+      try {
+        const parts = token.split(".");
+        if (parts.length >= 2) {
+          const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
+          if (payload && payload.role) role = payload.role;
+        }
+      } catch (_) {}
+    }
+  }
+  if (role) {
+    const cleanRole = String(role).toLowerCase().trim();
+    return cleanRole === "employees" ? "employee" : cleanRole;
   }
   return null;
 };

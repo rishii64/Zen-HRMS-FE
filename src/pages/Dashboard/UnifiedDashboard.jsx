@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { Container, Spinner, Badge } from "react-bootstrap";
 import CommonAttendanceTop from "./components/CommonAttendanceTop";
 import EmployeeModulesView from "./components/EmployeeModulesView";
@@ -6,10 +7,12 @@ import HRAdminDashboardView from "./components/HRAdminDashboardView";
 import AccountsDashboardView from "./components/AccountsDashboardView";
 import HODDashboardView from "./components/HODDashboardView";
 import AdminTasksView from "./components/AdminTasksView";
-import ITDashboardView from "./components/ITDashboardView";
 import api, { getUploadUrl } from "../../api/axios";
 
 export default function UnifiedDashboard() {
+  const location = useLocation();
+  const isAdminTasksRoute = location.pathname.includes("/admin/tasks");
+
   const [loader, setLoader] = useState(true);
   const [employee, setEmployee] = useState(null);
   const [attendanceLogs, setAttendanceLogs] = useState([]);
@@ -17,7 +20,8 @@ export default function UnifiedDashboard() {
   const [tickingTime, setTickingTime] = useState(new Date());
 
   // Determine role: default from localStorage
-  const storedRole = (localStorage.getItem("role") || "employee").toLowerCase();
+  const rawStoredRole = (localStorage.getItem("role") || "employee").toLowerCase().trim();
+  const storedRole = rawStoredRole === "employees" ? "employee" : rawStoredRole;
   const [currentRole, setCurrentRole] = useState(storedRole);
 
   // Live ticking clock
@@ -130,9 +134,8 @@ export default function UnifiedDashboard() {
   const isManagement = ["management", "ceo", "coo", "cfo", "vp", "secretary"].includes(currentRole);
   const isHr = ["hr", "hrmanager"].includes(currentRole);
   const isAccounts = ["accounts", "payroll"].includes(currentRole);
-  const isIt = currentRole === "it";
   const isHod = ["hod", "manager", "teamlead"].includes(currentRole);
-  const isEmployee = currentRole === "employee" || (!isAdmin && !isManagement && !isHr && !isAccounts && !isIt && !isHod);
+  const isEmployee = currentRole === "employee" || (!isAdmin && !isManagement && !isHr && !isAccounts && !isHod);
 
   return (
     <div
@@ -238,8 +241,8 @@ export default function UnifiedDashboard() {
           onStatusChange={fetchDashboardData}
         />
 
-        {/* View Switcher for privileged roles (Admin, HR, HOD, Manager, Accounts) */}
-        {!isEmployee && (
+        {/* View Switcher for privileged roles (HR, HOD, Manager, Accounts, Management) when not on explicit /admin/tasks route */}
+        {!isEmployee && !isAdminTasksRoute && (
           <div className="d-flex flex-wrap align-items-center justify-content-between mb-4 bg-white p-2.5 rounded-3 border shadow-sm">
             <div className="d-flex align-items-center gap-2">
               <span className="small text-muted fw-bold ps-2">Dashboard View:</span>
@@ -255,8 +258,6 @@ export default function UnifiedDashboard() {
                     ? "Executive Leadership Hub"
                     : isHr
                     ? "HR Operations & Recruitment"
-                    : isIt
-                    ? "IT & Systems Desk"
                     : isAccounts
                     ? "Finance & Accounts Hub"
                     : "Department & Team Hub"
@@ -277,35 +278,82 @@ export default function UnifiedDashboard() {
           </div>
         )}
 
+        {/* When Admin is on their dedicated /admin/tasks route, provide quick switch between Unofficial Tasks & Employee Workspace */}
+        {isAdmin && isAdminTasksRoute && (
+          <div className="d-flex flex-wrap align-items-center justify-content-between mb-4 bg-white p-2.5 rounded-3 border shadow-sm">
+            <div className="d-flex align-items-center gap-2">
+              <span className="small text-muted fw-bold ps-2">Admin Workspace:</span>
+              <button
+                type="button"
+                className={`role-switch-btn ${dashboardViewMode === "management" ? "active" : ""}`}
+                onClick={() => setDashboardViewMode("management")}
+              >
+                🛠️ Unofficial Tasks Desk
+              </button>
+              <button
+                type="button"
+                className={`role-switch-btn ${dashboardViewMode === "workspace" ? "active" : ""}`}
+                onClick={() => setDashboardViewMode("workspace")}
+              >
+                👤 My Employee Workspace (18 Modules)
+              </button>
+            </div>
+            <div className="small text-muted pe-2 py-1">
+              <span>Portal Role: <strong className="text-primary text-uppercase">{currentRole}</strong></span>
+              <span className="ms-2 ps-2 border-start">&bull; Scope: <strong className="text-success">Facilities & Unofficial Tasks</strong></span>
+            </div>
+          </div>
+        )}
+
+        {/* When HR / Management visits /admin/tasks to assign tasks */}
+        {isAdminTasksRoute && (isHr || isManagement) && (
+          <div className="mb-4 d-flex align-items-center justify-content-between bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-3 px-3 py-2 shadow-xs">
+            <div className="d-flex align-items-center gap-2 small fw-semibold">
+              <span>🛠️ Admin Tasks Desk</span>
+              <span className="text-muted">&bull;</span>
+              <span>Assign & Oversee Facilities, Supplies & Logistics Tasks Delegated to Admin</span>
+            </div>
+            <Badge bg="primary" className="fw-semibold px-2.5 py-1">HR / Management Desk</Badge>
+          </div>
+        )}
+
         {/* ============================================================ */}
         {/* OPERATIONAL MODULES ACCORDING TO VIEW MODE & ROLE           */}
         {/* ============================================================ */}
 
-        {/* 1. PERSONAL EMPLOYEE WORKSPACE: Shown for standard employees OR when toggled by leadership */}
-        {(isEmployee || dashboardViewMode === "workspace") && (
-          <EmployeeModulesView employee={employee || {}} />
-        )}
-
-        {/* 2. MANAGEMENT & OPERATIONAL VIEWS */}
-        {!isEmployee && dashboardViewMode === "management" && (
+        {/* If on /admin/tasks route */}
+        {isAdminTasksRoute ? (
+          isAdmin && dashboardViewMode === "workspace" ? (
+            <EmployeeModulesView employee={employee || {}} />
+          ) : (
+            <AdminTasksView />
+          )
+        ) : (
           <>
-            {/* Dedicated Admin Operations & Unofficial Tasks Desk */}
-            {isAdmin && <AdminTasksView />}
+            {/* 1. PERSONAL EMPLOYEE WORKSPACE: Shown for standard employees OR when toggled by leadership */}
+            {(isEmployee || dashboardViewMode === "workspace") && (
+              <EmployeeModulesView employee={employee || {}} />
+            )}
 
-            {/* Executive Leadership Hub */}
-            {isManagement && <HRAdminDashboardView isExecutiveView={true} />}
+            {/* 2. MANAGEMENT & OPERATIONAL VIEWS */}
+            {!isEmployee && dashboardViewMode === "management" && (
+              <>
+                {/* Dedicated Admin Operations & Unofficial Tasks Desk */}
+                {isAdmin && <AdminTasksView />}
 
-            {/* HR Operations & Recruitment */}
-            {isHr && <HRAdminDashboardView />}
+                {/* Executive Leadership Hub */}
+                {isManagement && <HRAdminDashboardView isExecutiveView={true} />}
 
-            {/* IT Infrastructure & Technical Service Desk */}
-            {isIt && <ITDashboardView />}
+                {/* HR Operations & Recruitment */}
+                {isHr && <HRAdminDashboardView />}
 
-            {/* Finance & Accounts Hub */}
-            {isAccounts && <AccountsDashboardView />}
+                {/* Finance & Accounts Hub */}
+                {isAccounts && <AccountsDashboardView />}
 
-            {/* Department Head & Managers Hub */}
-            {isHod && !isAdmin && !isManagement && !isHr && !isIt && !isAccounts && <HODDashboardView />}
+                {/* Department Head & Managers Hub */}
+                {isHod && !isAdmin && !isManagement && !isHr && !isAccounts && <HODDashboardView />}
+              </>
+            )}
           </>
         )}
       </Container>

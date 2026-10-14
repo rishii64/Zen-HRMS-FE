@@ -16,7 +16,8 @@ import {
   LuSparkles,
   LuCheck,
   LuExternalLink,
-  LuBuilding2
+  LuBuilding2,
+  LuLogOut
 } from "react-icons/lu";
 import { FiCheckCircle, FiAlertTriangle } from "react-icons/fi";
 import toast from "react-hot-toast";
@@ -24,6 +25,7 @@ import api from "../../../api/axios";
 
 const CATEGORIES = [
   "Facilities & Maintenance",
+  "Joining Kits & Welcome Kits",
   "Stationery & Supplies",
   "Logistics & Dispatch",
   "Pantry & Catering",
@@ -130,6 +132,11 @@ export default function AdminTasksView() {
   const [selectedPriority, setSelectedPriority] = useState("All");
   const [selectedStatus, setSelectedStatus] = useState("All");
 
+  const userRole = (localStorage.getItem("role") || "").toLowerCase().trim();
+  const userName = localStorage.getItem("userName") || "HR Team";
+  const userEmpCode = localStorage.getItem("employeeCode") || "HR-ADMIN";
+  const canAssignTask = ["hr", "hrmanager", "management", "ceo", "coo", "cto", "cfo", "vp", "secretary"].includes(userRole);
+
   // Modal State
   const [showModal, setShowModal] = useState(false);
   const [viewTask, setViewTask] = useState(null);
@@ -138,11 +145,11 @@ export default function AdminTasksView() {
     category: "Facilities & Maintenance",
     priority: "Medium",
     status: "Pending",
-    requester_name: "",
-    requester_id: "",
-    dept: "Operations",
+    requester_name: userName,
+    requester_id: userEmpCode,
+    dept: "HR",
     due_date: "",
-    assigned_to: "Admin Team",
+    assigned_to: "Facilities Admin",
     description: "",
     notes: "",
   });
@@ -191,6 +198,10 @@ export default function AdminTasksView() {
 
   const handleCreateTask = async (e) => {
     e.preventDefault();
+    if (!canAssignTask) {
+      toast.error("Only HR can assign tasks to Admin!");
+      return;
+    }
     if (!taskForm.title.trim()) {
       toast.error("Please enter a task title");
       return;
@@ -251,6 +262,8 @@ export default function AdminTasksView() {
     switch (cat) {
       case "Facilities & Maintenance":
         return { icon: <LuWrench className="text-orange-500" />, badge: "bg-orange-50 text-orange-700 border-orange-200" };
+      case "Joining Kits & Welcome Kits":
+        return { icon: <LuSparkles className="text-indigo-500" />, badge: "bg-indigo-50 text-indigo-700 border-indigo-200" };
       case "Stationery & Supplies":
         return { icon: <LuPenTool className="text-emerald-500" />, badge: "bg-emerald-50 text-emerald-700 border-emerald-200" };
       case "Logistics & Dispatch":
@@ -297,55 +310,117 @@ export default function AdminTasksView() {
 
   return (
     <div className="space-y-6">
-      {/* Top Banner */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-3xl p-6 md:p-8 text-white shadow-xl border border-slate-800">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      {/* Top Banner (Material Design Light Surface) */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-white via-slate-50/80 to-indigo-50/40 p-6 md:p-8 border border-slate-200/90 shadow-sm">
+        {/* Subtle decorative ambient lights for Material depth */}
+        <div className="absolute top-0 right-0 -mr-16 -mt-16 w-72 h-72 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-1/4 -mb-20 w-80 h-32 bg-blue-500/5 rounded-full blur-2xl pointer-events-none" />
+
+        <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-400/30 text-indigo-300 text-xs font-bold tracking-wider uppercase mb-2">
-              <LuBuilding2 className="w-3.5 h-3.5" />
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-200/80 text-indigo-700 text-xs font-bold tracking-wider uppercase mb-2 shadow-2xs">
+              <LuBuilding2 className="w-3.5 h-3.5 text-indigo-600" />
               Administrative Operations Desk
             </div>
-            <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-white">
+            <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-slate-900">
               Unofficial Tasks & Facilities Hub
             </h1>
-            <p className="text-slate-300 text-sm max-w-2xl mt-1">
+            <p className="text-slate-600 text-sm max-w-2xl mt-1.5 leading-relaxed">
               Handling workplace facilities, logistics, office supplies, visitor passes, catering, and ad-hoc operational requests across all company departments.
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <Button
-              variant="primary"
-              className="d-flex align-items-center gap-2 fw-bold px-4 py-2.5 rounded-xl shadow-sm"
-              style={{ backgroundColor: "#2563eb", borderColor: "#2563eb" }}
-              onClick={() => setShowModal(true)}
-            >
-              <LuPlus className="w-4 h-4" />
-              Log Unofficial Task
-            </Button>
+          <div className="relative z-10 flex flex-wrap items-center gap-3">
+            {canAssignTask ? (
+              <Button
+                variant="primary"
+                className="d-flex align-items-center gap-2 fw-bold px-4 py-2.5 rounded-xl shadow-xs transition-all"
+                style={{ backgroundColor: "#4f46e5", borderColor: "#4f46e5" }}
+                onClick={() => setShowModal(true)}
+              >
+                <LuPlus className="w-4 h-4" />
+                Assign Task to Admin
+              </Button>
+            ) : (
+              <div className="d-flex flex-wrap align-items-center gap-2.5">
+                <div className="d-flex align-items-center gap-2 px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 text-xs font-semibold shadow-2xs">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  <span>Tasks Assigned by HR (Admin Task Desk)</span>
+                </div>
+                <a
+                  href="/resignation"
+                  className="d-flex align-items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 border border-indigo-600 text-white text-xs font-semibold shadow-xs hover:shadow transition-all text-decoration-none"
+                >
+                  <LuLogOut className="w-3.5 h-3.5" />
+                  <span>Resignation Approvals</span>
+                </a>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* 4 KPI Metric Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-6 border-t border-slate-800/80">
-          <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-4 border border-white/10">
-            <div className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Total Tasks</div>
-            <div className="text-2xl font-black text-white mt-1">{tasks.length}</div>
-            <div className="text-xs text-slate-400 mt-1">Operational work orders</div>
+        {/* 4 KPI Metric Cards (Material Design Elevated Cards) */}
+        <div className="relative z-10 grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-6 border-t border-slate-200/80">
+          {/* Total Tasks */}
+          <div className="bg-white rounded-2xl p-4.5 border border-slate-200/90 shadow-2xs hover:shadow-md transition-all duration-200 flex flex-col justify-between">
+            <div className="flex items-center justify-between gap-2 p-3">
+              <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">Total Tasks</span>
+              <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
+                <LuBuilding2 className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="p-3">
+              <div className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">{tasks.length}</div>
+              <div className="text-xs text-slate-500 mt-1 font-medium">Operational work orders</div>
+            </div>
           </div>
-          <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-4 border border-white/10">
-            <div className="text-amber-400 text-xs font-semibold uppercase tracking-wider">Pending Action</div>
-            <div className="text-2xl font-black text-amber-300 mt-1">{pendingCount}</div>
-            <div className="text-xs text-amber-200/70 mt-1">Awaiting dispatch/vendor</div>
+
+          {/* Pending Action */}
+          <div className="bg-white rounded-2xl p-4.5 border border-amber-200/80 shadow-2xs hover:shadow-md transition-all duration-200 flex flex-col justify-between">
+            <div className="flex items-center justify-between gap-2 p-3">
+              <span className="text-amber-800 text-xs font-bold uppercase tracking-wider">Pending Action</span>
+              <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                <LuClock className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="p-3">
+              <div className="flex items-baseline gap-2">
+                <div className="text-2xl md:text-3xl font-black text-amber-600 tracking-tight">{pendingCount}</div>
+                {urgentCount > 0 && (
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-600 border border-rose-200">
+                    {urgentCount} urgent
+                  </span>
+                )}
+              </div>
+              <div className="text-xs text-amber-700/80 mt-1 font-medium">Awaiting dispatch/vendor</div>
+            </div>
           </div>
-          <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-4 border border-white/10">
-            <div className="text-blue-400 text-xs font-semibold uppercase tracking-wider">In Progress</div>
-            <div className="text-2xl font-black text-blue-300 mt-1">{inProgressCount}</div>
-            <div className="text-xs text-blue-200/70 mt-1">Active execution</div>
+
+          {/* In Progress */}
+          <div className="bg-white rounded-2xl p-4.5 border border-blue-200/80 shadow-2xs hover:shadow-md transition-all duration-200 flex flex-col justify-between">
+            <div className="flex items-center justify-between gap-2 p-3">
+              <span className="text-blue-800 text-xs font-bold uppercase tracking-wider">In Progress</span>
+              <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                <LuWrench className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="p-3">
+              <div className="text-2xl md:text-3xl font-black text-blue-600 tracking-tight">{inProgressCount}</div>
+              <div className="text-xs text-blue-700/80 mt-1 font-medium">Active execution</div>
+            </div>
           </div>
-          <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-4 border border-white/10">
-            <div className="text-emerald-400 text-xs font-semibold uppercase tracking-wider">Resolved</div>
-            <div className="text-2xl font-black text-emerald-300 mt-1">{completedCount}</div>
-            <div className="text-xs text-emerald-200/70 mt-1">Completed successfully</div>
+
+          {/* Resolved */}
+          <div className="bg-white rounded-2xl p-4.5 border border-emerald-200/80 shadow-2xs hover:shadow-md transition-all duration-200 flex flex-col justify-between">
+            <div className="flex items-center justify-between gap-2 p-3">
+              <span className="text-emerald-800 text-xs font-bold uppercase tracking-wider">Resolved</span>
+              <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                <FiCheckCircle className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="p-3">
+              <div className="text-2xl md:text-3xl font-black text-emerald-600 tracking-tight">{completedCount}</div>
+              <div className="text-xs text-emerald-700/80 mt-1 font-medium">Completed successfully</div>
+            </div>
           </div>
         </div>
       </div>
@@ -507,14 +582,16 @@ export default function AdminTasksView() {
                           >
                             <LuEye className="w-4 h-4" />
                           </button>
-                          <button
-                            type="button"
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                            title="Delete Task"
-                            onClick={() => handleDelete(t.id)}
-                          >
-                            <LuTrash2 className="w-4 h-4" />
-                          </button>
+                          {canAssignTask && (
+                            <button
+                              type="button"
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                              title="Delete Task"
+                              onClick={() => handleDelete(t.id)}
+                            >
+                              <LuTrash2 className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -526,12 +603,12 @@ export default function AdminTasksView() {
         </div>
       </div>
 
-      {/* Modal: Log New Unofficial Task */}
+      {/* Modal: Assign Task to Admin */}
       <Modal show={showModal} onHide={() => setShowModal(false)} centered size="lg">
         <Modal.Header closeButton className="border-b px-6 py-4">
           <Modal.Title className="text-lg font-bold text-slate-800 d-flex align-items-center gap-2">
             <LuBuilding2 className="text-blue-600 w-5 h-5" />
-            Log Unofficial Administrative Task
+            Assign Unofficial Task to Admin
           </Modal.Title>
         </Modal.Header>
         <Form onSubmit={handleCreateTask}>

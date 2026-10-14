@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { FiHash, FiLock, FiEye, FiEyeOff, FiLoader, FiUserCheck, FiChevronDown } from "react-icons/fi";
+import { FiHash, FiLock, FiEye, FiEyeOff, FiLoader } from "react-icons/fi";
 import loginIllustration from "../../assets/login_illustration.png";
 import toast from 'react-hot-toast';
 import { getApiBaseUrl } from "../../api/axios";
@@ -10,21 +10,18 @@ import { resetRedirectLock } from "../../utils/auth";
 export default function UnifiedLogin() {
   const [employeeId, setEmployeeId] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState("employee");
   const [loading, setLoading] = useState(false);
-  // const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    if (!employeeId || !password || !role) {
-      toast.error("Please fill in all fields.");
+    if (!employeeId.trim() || !password) {
+      toast.error("Please enter Employee ID and password.");
       return;
     }
 
     setLoading(true);
-    // setError("");
 
     try {
       const API = getApiBaseUrl();
@@ -32,7 +29,7 @@ export default function UnifiedLogin() {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ employee_id: employeeId.trim(), password, role }),
+        body: JSON.stringify({ employee_id: employeeId.trim(), password }),
       });
 
       const data = await response.json();
@@ -57,16 +54,14 @@ export default function UnifiedLogin() {
         window.dispatchEvent(new Event("authChanged"));
 
         setLoading(false);
-        const userRole = (data.user?.role || role || "").toLowerCase().trim();
+        const userRole = (data.user?.role || "employee").toLowerCase().trim();
         let targetRoute = "/employee/dashboard";
         if (["management", "ceo", "cto", "coo", "cfo", "vp", "secretary"].includes(userRole)) {
           targetRoute = "/management/dashboard";
-        } else if (["admin"].includes(userRole)) {
-          targetRoute = "/admin/dashboard";
+        } else if (userRole === "admin") {
+          targetRoute = "/admin/tasks";
         } else if (["hr", "hrmanager"].includes(userRole)) {
           targetRoute = "/hr/dashboard";
-        } else if (["it"].includes(userRole)) {
-          targetRoute = "/it/dashboard";
         } else if (["accounts", "payroll"].includes(userRole)) {
           targetRoute = "/accounts/dashboard";
         } else if (["hod", "manager", "teamlead"].includes(userRole)) {
@@ -78,11 +73,9 @@ export default function UnifiedLogin() {
         navigate(targetRoute, { replace: true });
       } else {
         toast.error(data.error || "Login failed. Please check your credentials.");
-        // setError(data.error || "Login failed. Please check your credentials.");
       }
     } catch (err) {
       toast.error("Unable to connect to the authentication service. Is the backend running?");
-      // setError("Unable to connect to the authentication service. Is the backend running?");
       console.error(err);
     } finally {
       setLoading(false);
@@ -122,40 +115,16 @@ export default function UnifiedLogin() {
             </div>
 
             {/* Title */}
-            <div className="mb-6 border-b border-slate-100 pb-3">
+            <div className="mb-2 border-b border-slate-100">
               <div className="relative pb-1 select-none inline-block">
                 <h2 className="text-xl font-bold text-slate-800">Sign In</h2>
                 <div className="absolute bottom-0 left-0 w-8 h-0.5 bg-amber-500 rounded-full"></div>
               </div>
-              <p className="text-xs text-slate-400 mt-1">Select your role and enter credentials to continue</p>
+              <p className="text-xs text-slate-400 mt-1">Enter your credentials to access your HRMS portal</p>
             </div>
 
             {/* Form */}
             <form onSubmit={handleLogin} className="space-y-4">
-              {/* Role Selection Dropdown */}
-              <div className="relative flex items-center">
-                <div className="absolute left-1.5 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-tr from-orange-400 to-amber-500 text-white shadow-sm pointer-events-none">
-                  <FiUserCheck className="h-4.5 w-4.5" />
-                </div>
-                <select
-                  id="role"
-                  value={role}
-                  onChange={(e) => setRole(e.target.value)}
-                  className="w-full appearance-none rounded-full border border-slate-200 py-3 pl-14 pr-10 text-sm font-medium text-slate-700 bg-white placeholder-slate-400 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-200/40 transition-all shadow-sm cursor-pointer"
-                  required
-                >
-                  <option value="management">Management</option>
-                  <option value="hr">HR</option>
-                  <option value="employee">Employees</option>
-                  <option value="accounts">Accounts</option>
-                  <option value="admin">Admin</option>
-                  <option value="it">IT & Systems</option>
-                </select>
-                <div className="absolute right-4 pointer-events-none text-slate-400">
-                  <FiChevronDown className="h-4 w-4" />
-                </div>
-              </div>
-
               {/* Employee ID Input */}
               <div className="relative flex items-center">
                 <div className="absolute left-1.5 flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-tr from-orange-400 to-amber-500 text-white shadow-sm">
@@ -206,7 +175,7 @@ export default function UnifiedLogin() {
           </div>
 
           {/* Footer & Forgot Password */}
-          <div className="mt-8">
+          <div className="mt-6">
             <div className="flex justify-center">
               <Link
                 to="/forgot-password"

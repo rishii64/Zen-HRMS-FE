@@ -37,7 +37,7 @@ import ChangePasswordModal from "../common/ChangePasswordModal";
 import DailyAttendanceNoticeModal from "../common/DailyAttendanceNoticeModal";
 
 const ALL_STAFF_ROLES = [
-  "employee", "hr", "accounts", "payroll", "hod", "admin", "manager", "teamlead", "ceo", "coo", "cto", "cfo", "vp", "secretary", "management", "it", "hrmanager"
+  "employee", "hr", "accounts", "payroll", "hod", "admin", "manager", "teamlead", "ceo", "coo", "cto", "cfo", "vp", "secretary", "management", "hrmanager"
 ];
 
 const ALL_APPS = [
@@ -178,7 +178,7 @@ const ALL_APPS = [
   },
   {
     id: "app_resignation",
-    title: "Separation & Resignation",
+    title: "Resignation",
     tabId: 13,
     icon: <LuLogOut className="text-red-500" />,
     route: "/resignation",
@@ -191,12 +191,12 @@ const ALL_APPS = [
     tabId: 17,
     icon: <LuBriefcase className="text-cyan-600" />,
     route: "/requisition",
-    roles: ["hr", "admin", "hod", "manager", "teamlead", "ceo", "coo", "hrmanager"],
+    roles: ["hr", "hod", "manager", "teamlead", "ceo", "coo", "hrmanager"],
     keywords: ["requisition", "hiring", "cv", "resume", "candidates", "jobs", "desk", "shortlisting"],
   },
   {
     id: "app_onboarding",
-    title: "Employee Onboarding",
+    title: "Onboarding",
     tabId: 18,
     icon: <LuUserCheck className="text-violet-600" />,
     route: "/onboarding",
@@ -217,8 +217,8 @@ const ALL_APPS = [
     title: "Employee Directory",
     tabId: null,
     icon: <LuUsers className="text-blue-600" />,
-    route: "/admin/manage-employees",
-    roles: ["hr", "admin", "hod", "manager", "accounts", "ceo", "coo", "management", "it"],
+    route: "/hr/manage-employees",
+    roles: ["hr", "admin", "hod", "manager", "accounts", "ceo", "coo", "management"],
     keywords: ["manage", "employees", "directory", "staff", "team", "people", "my teams"],
   },
   {
@@ -227,7 +227,7 @@ const ALL_APPS = [
     tabId: null,
     icon: <LuTrendingUp className="text-emerald-500" />,
     route: "/accounts/dashboard",
-    roles: ["accounts", "payroll", "admin", "ceo", "management"],
+    roles: ["accounts", "payroll", "ceo", "management"],
     keywords: ["accounts", "finance", "billing", "dashboard", "ledger"],
   },
   {
@@ -235,18 +235,9 @@ const ALL_APPS = [
     title: "Admin Tasks & Facilities",
     tabId: null,
     icon: <FaListCheck className="text-slate-700" />,
-    route: "/admin/dashboard",
+    route: "/admin/tasks",
     roles: ["admin", "management", "hr", "ceo", "coo"],
     keywords: ["admin", "unofficial", "tasks", "office", "maintenance", "facilities", "supplies", "logistics", "courier", "cleaning"],
-  },
-  {
-    id: "app_it_desk",
-    title: "IT Systems & Assets",
-    tabId: null,
-    icon: <LuShieldCheck className="text-cyan-600" />,
-    route: "/it/dashboard",
-    roles: ["it", "admin", "management", "ceo"],
-    keywords: ["it", "systems", "hardware", "software", "network", "licenses", "assets"],
   },
 ];
 
@@ -514,8 +505,6 @@ const AppNavbar = () => {
         return "Management (Executive)";
       case "admin":
         return "Admin (Operations)";
-      case "it":
-        return "IT & Systems";
       case "ceo":
       case "coo":
       case "cto":
@@ -527,6 +516,7 @@ const AppNavbar = () => {
       case "hrmanager":
         return "HR Manager";
       case "employee":
+      case "employees":
         return "Employee";
       case "accounts":
         return "Finance & Accounts";
@@ -555,12 +545,11 @@ const AppNavbar = () => {
         return "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-400 dark:border-indigo-900/40";
       case "admin":
         return "bg-slate-100 text-slate-800 border-slate-300 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700";
-      case "it":
-        return "bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-950/30 dark:text-cyan-400 dark:border-cyan-900/40";
       case "hr":
       case "hrmanager":
         return "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900/40";
       case "employee":
+      case "employees":
         return "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-900/40";
       case "accounts":
       case "payroll":
@@ -588,24 +577,15 @@ const AppNavbar = () => {
         return [
           { to: "/management/dashboard", label: "Executive Dashboard" },
           { to: "/attendance", label: "Attendance" },
-          { to: "/admin/manage-employees", label: "Staff Directory" },
+          // { to: "/admin/manage-employees", label: "Staff Directory" },
           { to: "/requisition", label: "Requisitions" },
           { to: "/payroll", label: "Payroll Overview" },
         ];
       case "admin":
         return [
-          { to: "/admin/dashboard", label: "Unofficial Tasks Desk" },
-          { to: "/attendance", label: "Attendance" },
-          { to: "/admin/manage-employees", label: "Directory" },
-          { to: "/schedule", label: "Facilities & Shift" },
+          { to: "/admin/tasks", label: "Unofficial Tasks" },
+          { to: "/attendance", label: "My Attendance" },
           { to: "/leave", label: "Leaves" },
-        ];
-      case "it":
-        return [
-          { to: "/it/dashboard", label: "IT Systems Desk" },
-          { to: "/attendance", label: "Attendance" },
-          { to: "/admin/manage-employees", label: "Directory" },
-          { to: "/it-declaration", label: "Declarations" },
           { to: profRoute, label: "My Profile" },
         ];
       case "hr":
@@ -613,25 +593,26 @@ const AppNavbar = () => {
         return [
           { to: "/hr/dashboard", label: "Dashboard" },
           { to: "/attendance", label: "Attendance" },
-          { to: "/admin/manage-employees", label: "Manage Staff" },
+          { to: "/hr/manage-employees", label: "Manage Staff" },
           { to: "/requisition", label: "Requisition" },
-          { to: "/onboarding", label: "Onboarding" },
+          // { to: "/onboarding", label: "Onboarding" },
         ];
       case "accounts":
       case "payroll":
         return [
           { to: "/accounts/dashboard", label: "Accounts Desk" },
           { to: "/payroll", label: "Payroll" },
-          { to: "/payslip", label: "Salary Slips" },
+          // { to: "/payslip", label: "Salary Slips" },
           { to: "/attendance", label: "Attendance" },
           { to: "/it-declaration", label: "IT Declarations" },
         ];
       case "employee":
+      case "employees":
         return [
           { to: "/employee/dashboard", label: "Dashboard" },
           { to: "/attendance", label: "My Attendance" },
           { to: "/leave", label: "Leaves" },
-          { to: "/payslip", label: "Salary Slips" },
+          // { to: "/payslip", label: "Salary Slips" },
           { to: profRoute, label: "My Profile" },
         ];
       case "hod":
@@ -639,7 +620,7 @@ const AppNavbar = () => {
           { to: "/hod/dashboard", label: "Dashboard" },
           { to: "/attendance", label: "Attendance" },
           { to: "/requisition", label: "Requisition" },
-          { to: "/onboarding", label: "Onboarding" },
+          // { to: "/onboarding", label: "Onboarding" },
           { to: profRoute, label: "My Profile" },
         ];
       case "manager":
@@ -647,7 +628,7 @@ const AppNavbar = () => {
         return [
           { to: "/hod/dashboard", label: "Dashboard" },
           { to: "/attendance", label: "Attendance" },
-          { to: "/leave", label: "Leaves" },
+          // { to: "/leave", label: "Leaves" },
           { to: "/schedule", label: "Schedule" },
           { to: profRoute, label: "My Profile" },
         ];
@@ -664,7 +645,8 @@ const AppNavbar = () => {
   const navLinks = getNavLinks();
 
   // Filter All Apps strictly by active Role, Search Keyword & Employee's Configured Tabs
-  const userRole = (role || "").toLowerCase();
+  const rawRole = (role || "").toLowerCase();
+  const userRole = rawRole === "employees" ? "employee" : rawRole;
   const searchTrimmed = appSearch.trim().toLowerCase();
 
   // For employees, retrieve the tabs configured by HR (via enabled_tabs / tabs_enabled)
@@ -731,16 +713,15 @@ const AppNavbar = () => {
     // Role-based dynamic route resolution
     if (app.id === "app_dashboard") {
       if (["management", "ceo", "coo", "cto", "cfo", "vp", "secretary"].includes(userRole)) route = "/management/dashboard";
-      else if (["admin"].includes(userRole)) route = "/admin/dashboard";
+      else if (["admin"].includes(userRole)) route = "/admin/tasks";
       else if (["hr", "hrmanager"].includes(userRole)) route = "/hr/dashboard";
-      else if (["it"].includes(userRole)) route = "/it/dashboard";
       else if (["accounts", "payroll"].includes(userRole)) route = "/accounts/dashboard";
       else if (["hod", "manager", "teamlead"].includes(userRole)) route = "/hod/dashboard";
       else route = "/employee/dashboard";
     } else if (app.id === "app_profile") route = `/profile/${employeeCode || "me"}`;
     else if (app.id === "app_mediclaim") route = "/mediclaim";
     else if (app.id === "app_leave") {
-      route = ["admin", "hr", "ceo", "coo"].includes(userRole) ? "/admin/leaves" : "/leave";
+      route = ["hr", "ceo", "coo", "management"].includes(userRole) ? "/admin/leaves" : "/leave";
     }
 
     navigate(route);

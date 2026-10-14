@@ -37,23 +37,24 @@ const SHIFT_TYPES = [
 ];
 
 const Schedule = () => {
-  const userRole = (localStorage.getItem("role") || "employee").toLowerCase();
+  const rawRole = (localStorage.getItem("role") || "employee").toLowerCase();
+  const userRole = rawRole === "employees" ? "employee" : rawRole;
   const userName = localStorage.getItem("userName") || "User";
   const userEmpId = localStorage.getItem("employeeCode") || localStorage.getItem("empId") || "";
   
   // Matrix Role Checks
-  const isAdminOrHr = userRole === "hr" || userRole === "admin" || userRole === "hrmanager";
+  const isHr = userRole === "hr" || userRole === "hrmanager";
   const isHod = userRole === "hod" || userRole === "manager";
-  const isEmployee = userRole === "employee" || userRole === "accounts";
+  const isEmployee = userRole === "employee" || userRole === "employees" || userRole === "admin" || userRole === "accounts";
 
   // Permissions according to user matrix
-  const canViewAllSchedules = isAdminOrHr;
-  const canCreateSchedule = isAdminOrHr || isHod;
-  const canEditSchedule = isAdminOrHr || isHod;
-  const canDeleteSchedule = isAdminOrHr;
-  const canPublishSchedule = isAdminOrHr || isHod;
-  const canCopySchedule = isAdminOrHr || isHod;
-  const canManageShiftTemplates = isAdminOrHr;
+  const canViewAllSchedules = isHr;
+  const canCreateSchedule = isHr || isHod;
+  const canEditSchedule = isHr || isHod;
+  const canDeleteSchedule = isHr;
+  const canPublishSchedule = isHr || isHod;
+  const canCopySchedule = isHr || isHod;
+  const canManageShiftTemplates = isHr;
 
   const [loading, setLoading] = useState(true);
   const [schedules, setSchedules] = useState([]);

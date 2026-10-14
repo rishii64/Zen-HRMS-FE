@@ -101,11 +101,11 @@ const MyAttendance = () => {
   const isPayroll = role === "accounts" || role === "payroll";
   const isHOD = role === "hod";
   const isTeamLead = role === "teamlead" || role === "manager";
-  const isEmployeeOnly = role === "employee";
+  const isEmployeeOnly = role === "employee" || role === "admin";
 
   // Permissions Matrix
-  const canManageAll = isAdmin || isHR;
-  const canMarkAttendance = isAdmin || isHR || isHOD || isTeamLead;
+  const canManageAll = isHR;
+  const canMarkAttendance = isHR || isHOD || isTeamLead;
   const isReadOnly = isPayroll || isEmployeeOnly;
 
   // Date Navigator State
@@ -1097,7 +1097,7 @@ const MyAttendance = () => {
                     </span>
                   </div>
                 </th>
-                <th style={{ minWidth: "120px" }}>Department</th>
+                <th style={{ minWidth: "200px" }}>Department</th>
                 <th style={{ minWidth: "150px" }}>Designation</th>
                 <th style={{ minWidth: "110px" }}>Shift</th>
                 <th style={{ minWidth: "100px" }}>Check-In</th>

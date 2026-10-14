@@ -10,7 +10,7 @@ import AppRoute from "./routes/AppRoute";
 function App() {
   return (
     <BrowserRouter>
-      <Toaster position="top-right" reverseOrder={false} containerStyle={{fontSize: "14px"}} />
+      <Toaster position="top-right" reverseOrder={false} containerStyle={{fontSize: "12px"}} />
       <AppNavbar />
       <AppRoute />
     </BrowserRouter>

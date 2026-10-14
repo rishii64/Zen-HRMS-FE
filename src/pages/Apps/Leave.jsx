@@ -70,9 +70,9 @@ const Leave = () => {
   const isPayroll = role === "accounts" || role === "payroll";
   const isHOD = role === "hod";
   const isTeamLead = role === "teamlead" || role === "manager";
-  const isEmployeeOnly = role === "employee";
+  const isEmployeeOnly = role === "employee" || role === "admin";
 
-  const canManageLeaves = isAdmin || isHR || isHOD || isTeamLead;
+  const canManageLeaves = isHR || isHOD || isTeamLead;
 
   // Navigation Pill State ("my_data", "team", "holidays") & Sub-Tab ("summary", "balance", "requests")
   const [activePill, setActivePill] = useState("my_data"); // default to My Data

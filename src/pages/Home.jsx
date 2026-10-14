@@ -80,7 +80,6 @@ const Home = () => {
     if (["management", "ceo", "coo", "cto", "cfo", "vp", "secretary"].includes(userRole)) return "/management/dashboard";
     if (["admin"].includes(userRole)) return "/admin/dashboard";
     if (["hr", "hrmanager"].includes(userRole)) return "/hr/dashboard";
-    if (["it"].includes(userRole)) return "/it/dashboard";
     if (["accounts", "payroll"].includes(userRole)) return "/accounts/dashboard";
     if (["hod", "manager", "teamlead"].includes(userRole)) return "/hod/dashboard";
     return "/employee/dashboard";

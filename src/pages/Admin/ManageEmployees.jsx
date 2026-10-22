@@ -56,6 +56,65 @@ const getEmployeeAvatar = (emp) => {
   return DEFAULT_USER_AVATAR;
 };
 
+function getEmploymentTypeStyle(type) {
+  const norm = String(type || "Permanent").toLowerCase().trim();
+  const base = {
+    fontSize: "12px",
+    fontWeight: "600",
+    lineHeight: "1.2",
+    whiteSpace: "nowrap",
+    letterSpacing: "0.2px",
+  };
+
+  if (norm.includes("probation")) {
+    return {
+      ...base,
+      backgroundColor: "#fffbeb",
+      color: "#b45309",
+      border: "1px solid #c8a000ff",
+    };
+  }
+  if (norm.includes("intern")) {
+    return {
+      ...base,
+      backgroundColor: "#fdf4ff",
+      color: "#a21caf",
+      border: "1px solid #d83dffff",
+    };
+  }
+  if (norm.includes("contract")) {
+    return {
+      ...base,
+      backgroundColor: "#f1f5f9",
+      color: "#475569",
+      border: "1px solid #7e7e7fff",
+    };
+  }
+  if (norm.includes("part")) {
+    return {
+      ...base,
+      backgroundColor: "#f0fdf4",
+      color: "#15803d",
+      border: "1px solid #00ff59ff",
+    };
+  }
+  if (norm.includes("trainee")) {
+    return {
+      ...base,
+      backgroundColor: "#eef2ff",
+      color: "#4338ca",
+      border: "1px solid #315bffff",
+    };
+  }
+  // Default: Permanent / Full Time
+  return {
+    ...base,
+    backgroundColor: "#ffffff",
+    color: "#1d4ed8",
+    border: "1px solid #2989ffff",
+  };
+}
+
 const ALL_TABS = [
   { id: 1, name: "Attendance Tracker", desc: "Track daily shift times, roster logs, and check-in history", badge: "Attendance" },
   { id: 2, name: "Leave Requests", desc: "Apply for leaves, view balances, and check status", badge: "Leaves" },
@@ -434,23 +493,21 @@ const SalaryStructureModal = ({
                   onChange={(e) => handleChange("employment_type", e.target.value)}
                 >
                   <option value="Permanent">Permanent</option>
+                  <option value="Full Time">Full Time</option>
                   <option value="Probation">Probation</option>
                   <option value="Intern">Intern</option>
+                  <option value="Contractual">Contractual</option>
+                  <option value="Trainee">Trainee</option>
+                  <option value="Part Time">Part Time</option>
                 </Form.Select>
               </div>
             ) : (
-              <Badge
-                bg={
-                  formData.employment_type === "Permanent"
-                    ? "success"
-                    : formData.employment_type === "Probation"
-                      ? "warning"
-                      : "secondary"
-                }
-                className="px-2.5 py-1.5"
+              <span
+                style={getEmploymentTypeStyle(formData.employment_type)}
+                className="px-2.5 py-1.5 rounded-pill shadow-xs d-inline-flex align-items-center"
               >
                 {formData.employment_type || "Permanent"}
-              </Badge>
+              </span>
             )}
             <span className="badge bg-light text-dark border px-2 py-1">
               {isHRUser ? "HR Full Rights" : "View-only"}
@@ -2376,8 +2433,12 @@ const ManageEmployees = () => {
                 </Form.Label>
                 <Form.Select size="sm" name="employment_type" value={empForm.employment_type || "Permanent"} onChange={handleChange}>
                   <option value="Permanent">Permanent (Full Facilities)</option>
+                  <option value="Full Time">Full Time</option>
                   <option value="Probation">Probation (Under Evaluation)</option>
                   <option value="Intern">Intern (Training)</option>
+                  <option value="Contractual">Contractual</option>
+                  <option value="Trainee">Trainee</option>
+                  <option value="Part Time">Part Time</option>
                 </Form.Select>
               </Col>
 
@@ -2509,9 +2570,12 @@ const ManageEmployees = () => {
                 <datalist id="designations-list">
                   <option value="Employee" />
                   <option value="TL" />
+                  <option value="HOD" />
+                  <option value="Manager" />
                   <option value="Manager (HOD)" />
-                  <option value="GM" />
                   <option value="AGM" />
+                  <option value="DGM" />
+                  <option value="GM" />
                   <option value="CEO" />
                   <option value="CTO" />
                   <option value="COO" />
@@ -2524,7 +2588,7 @@ const ManageEmployees = () => {
                   <option value="HR Executive" />
                 </datalist>
                 <div className="d-flex flex-wrap gap-1 mt-1">
-                  {["Engineer", "TL", "Manager (HOD)", "GM", "AGM"].map((d) => (
+                  {["TL", "HOD", "Manager", "AGM", "DGM", "GM"].map((d) => (
                     <Badge
                       key={d}
                       bg="light"
@@ -3039,6 +3103,12 @@ const ManageEmployees = () => {
                         <Badge bg="secondary" className="fw-normal">{emp.employee_code}</Badge>
                         <Badge bg="info" className="text-dark fw-semibold">{emp.designation || emp.job_role}</Badge>
                         <Badge bg={emp.status === "Active" ? "success" : emp.status === "Resigned" ? "warning" : "danger"} text={emp.status === "Resigned" ? "dark" : "white"}>{emp.status}</Badge>
+                        <span
+                          className="px-2.5 py-1 rounded-pill d-inline-flex align-items-center gap-1 shadow-xs"
+                          style={getEmploymentTypeStyle(emp.employment_type)}
+                        >
+                          {emp.employment_type || "Permanent"}
+                        </span>
                       </div>
                     </div>
                     {(isAdmin || isHR) && (
@@ -3069,6 +3139,7 @@ const ManageEmployees = () => {
                         <InfoRow label="PAN Number" value={emp.pan_no} />
                         <InfoRow label="Aadhaar Number" value={emp.aadhaar_no} />
                         <InfoRow label="Department" value={emp.dept} />
+                        <InfoRow label="Employment Type" value={emp.employment_type || "Permanent"} />
                         <InfoRow label="Reporting Manager" value={emp.reporting_manager} />
                         <InfoRow label="Joining Date" value={emp.joining_date ? emp.joining_date.split("T")[0] : "—"} />
                       </div>

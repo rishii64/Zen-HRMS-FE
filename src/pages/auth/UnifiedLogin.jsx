@@ -35,19 +35,32 @@ export default function UnifiedLogin() {
       const data = await response.json();
 
       if (response.ok && data.success) {
-        toast.success("Login successful");
+        if (data.attendance?.newCheckIn) {
+          toast.success("Login successful! Attendance registered.");
+        } else {
+          toast.success("Login successful");
+        }
         // Store sensitive authentication credentials and user profile in cookies instead of localStorage
         setAuthCookies(data);
         resetRedirectLock();
 
-        // Clear any temporary session dismiss flags so logging in always presents the daily notice if unacknowledged
+        // Clear any temporary session dismiss flags so logging in presents notice if unacknowledged
         try {
           if (typeof sessionStorage !== "undefined") {
             Object.keys(sessionStorage).forEach((k) => {
-              if (k.startsWith("hrms_daily_notice_session_dismissed_")) {
+              if (
+                k.startsWith("hrms_notice_session_dismissed_") ||
+                k.startsWith("hrms_daily_notice_session_dismissed_")
+              ) {
                 sessionStorage.removeItem(k);
               }
             });
+          }
+          if (data.user?.notice_acknowledged) {
+            const userKey = data.user.employee_code || data.user.employee_id || data.user.id || "";
+            if (userKey) {
+              localStorage.setItem(`hrms_notice_ack_${userKey}`, "true");
+            }
           }
         } catch (_) {}
 
@@ -55,6 +68,14 @@ export default function UnifiedLogin() {
 
         setLoading(false);
         const userRole = (data.user?.role || "employee").toLowerCase().trim();
+        const userDesig = (data.user?.designation || "").toLowerCase().trim();
+        const isLeader =
+          /\b(hod|head|manager|mgr|lead|tl|agm|dgm|gm|director|supervisor)\b/i.test(userDesig) ||
+          userDesig.includes("team lead") ||
+          userDesig.includes("tech lead") ||
+          userDesig.includes("department head") ||
+          userDesig.includes("head of");
+
         let targetRoute = "/employee/dashboard";
         if (["management", "ceo", "cto", "coo", "cfo", "vp", "secretary"].includes(userRole)) {
           targetRoute = "/management/dashboard";
@@ -64,7 +85,7 @@ export default function UnifiedLogin() {
           targetRoute = "/hr/dashboard";
         } else if (["accounts", "payroll"].includes(userRole)) {
           targetRoute = "/accounts/dashboard";
-        } else if (["hod", "manager", "teamlead"].includes(userRole)) {
+        } else if (["hod", "manager", "teamlead"].includes(userRole) || isLeader) {
           targetRoute = "/hod/dashboard";
         } else {
           targetRoute = "/employee/dashboard";

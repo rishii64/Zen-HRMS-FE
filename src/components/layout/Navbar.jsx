@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from "react";
+import logo from '../../assets/zentelex-logo.png';
 import { Link, NavLink, useNavigate, useLocation } from "react-router-dom";
+import toast from "react-hot-toast";
 import { CiCircleAlert } from "react-icons/ci";
 import { FiMenu, FiX, FiMail, FiLogOut, FiHash, FiGrid, FiChevronDown, FiSearch, FiClock } from "react-icons/fi";
 import {
@@ -25,12 +27,21 @@ import {
   LuSparkles,
   LuReceipt,
   LuUserCheck,
+  LuPartyPopper,
 } from "react-icons/lu";
 import { SiGoogledocs } from "react-icons/si";
 import { FaListCheck } from "react-icons/fa6";
-import logo from "../../assets/zentelex-logo.png";
-import { clearAuthSession, getCookie, setCookie, getAuthToken, getAuthRole, getAuthUser } from "../../utils/auth";
-import toast from 'react-hot-toast';
+import {
+  clearAuthSession,
+  getCookie,
+  setCookie,
+  getAuthToken,
+  getAuthRole,
+  getAuthUser,
+  getAuthDesignation,
+  isLeadershipDesignation,
+  isDepartmentHeadOrManager
+} from "../../utils/auth";
 import { TbPassword } from "react-icons/tb";
 import api, { getUploadUrl } from "../../api/axios";
 import ChangePasswordModal from "../common/ChangePasswordModal";
@@ -79,7 +90,7 @@ const ALL_APPS = [
   },
   {
     id: "app_schedule",
-    title: "Work Schedule & Roster",
+    title: "Schedule & Roster",
     tabId: 16,
     icon: <LuClock className="text-orange-500" />,
     route: "/schedule",
@@ -151,12 +162,12 @@ const ALL_APPS = [
   },
   {
     id: "app_training",
-    title: "Training Modules",
+    title: "Training & Development",
     tabId: 7,
     icon: <LuGraduationCap className="text-cyan-600" />,
     route: "/training",
-    roles: ["employee", "hr", "accounts", "payroll", "hod", "admin", "manager", "teamlead",],
-    keywords: ["training", "learning", "modules", "induction", "skills", "onboarding courses"],
+    roles: ALL_STAFF_ROLES,
+    keywords: ["training", "learning", "modules", "induction", "skills", "onboarding courses", "assessments", "certifications"],
   },
   {
     id: "app_kpi_hub",
@@ -239,6 +250,15 @@ const ALL_APPS = [
     roles: ["admin", "management", "hr", "ceo", "coo"],
     keywords: ["admin", "unofficial", "tasks", "office", "maintenance", "facilities", "supplies", "logistics", "courier", "cleaning"],
   },
+  {
+    id: "app_hr_events",
+    title: "HR Events",
+    tabId: null,
+    icon: <LuPartyPopper className="text-pink-600" />,
+    route: "/hr-events",
+    roles: ALL_STAFF_ROLES,
+    keywords: ["event", "events", "hr events", "townhall", "celebration", "meeting", "gathering", "presentation", "announcements"],
+  },
 ];
 
 const HONORIFICS = new Set([
@@ -283,39 +303,71 @@ const getTodayISTString = () => {
   }
 };
 
-const isNoticeAcknowledgedToday = (userKey, todayStr) => {
-  const ackKey = `hrms_daily_notice_ack_${userKey}_${todayStr}`;
-  if (getCookie(ackKey) === "true") return true;
+const isNoticeAcknowledged = (userKey) => {
+  // 1. Check user profile object in auth cookie/session
   try {
-    if (localStorage.getItem(ackKey) === "true") return true;
-  } catch (_) { }
+    const u = getAuthUser();
+    if (u && (u.notice_acknowledged === true || u.notice_acknowledged === "true")) {
+      return true;
+    }
+  } catch (_) {}
+
+  // 2. Check permanent cookie
+  const cookieVal = getCookie(`hrms_notice_ack_${userKey}`);
+  if (cookieVal === "true") return true;
+
+  // 3. Check localStorage
+  try {
+    if (localStorage.getItem(`hrms_notice_ack_${userKey}`) === "true") {
+      return true;
+    }
+  } catch (_) {}
+
   return false;
 };
 
-const saveDailyNoticeAcknowledged = (userKey, todayStr) => {
-  const ackKey = `hrms_daily_notice_ack_${userKey}_${todayStr}`;
+const saveDailyNoticeAcknowledged = (userKey) => {
+  // 1. Persist in permanent cookie (10-year expiry)
   try {
-    setCookie(ackKey, "true", { expires: 1 });
-  } catch (_) { }
+    setCookie(`hrms_notice_ack_${userKey}`, "true", { expires: 3650, path: "/" });
+  } catch (_) {}
+
+  // 2. Persist in localStorage
   try {
-    localStorage.setItem(ackKey, "true");
-  } catch (_) { }
+    localStorage.setItem(`hrms_notice_ack_${userKey}`, "true");
+  } catch (_) {}
+
+  // 3. Update current user cookie object
+  try {
+    const u = getAuthUser();
+    if (u) {
+      u.notice_acknowledged = true;
+      setCookie("user", u);
+    }
+  } catch (_) {}
+
+  // 4. Save to backend database for permanent cross-device persistence
+  try {
+    api.post("/acknowledge-notice").catch((err) => {
+      console.warn("Server notice acknowledge sync:", err?.message);
+    });
+  } catch (_) {}
 };
 
-const isNoticeSessionDismissed = (userKey, todayStr) => {
+const isNoticeSessionDismissed = (userKey) => {
   try {
-    const sessionKey = `hrms_daily_notice_session_dismissed_${userKey}_${todayStr}`;
+    const sessionKey = `hrms_notice_session_dismissed_${userKey}`;
     return sessionStorage.getItem(sessionKey) === "true";
   } catch (_) {
     return false;
   }
 };
 
-const saveDailyNoticeSessionDismissed = (userKey, todayStr) => {
+const saveDailyNoticeSessionDismissed = (userKey) => {
   try {
-    const sessionKey = `hrms_daily_notice_session_dismissed_${userKey}_${todayStr}`;
+    const sessionKey = `hrms_notice_session_dismissed_${userKey}`;
     sessionStorage.setItem(sessionKey, "true");
-  } catch (_) { }
+  } catch (_) {}
 };
 
 const AppNavbar = () => {
@@ -348,7 +400,7 @@ const AppNavbar = () => {
 
   const location = useLocation();
 
-  // Trigger daily attendance notice popup once per day after logging in (unless acknowledged)
+  // Trigger attendance notice popup on login until explicitly acknowledged with Understood
   useEffect(() => {
     if (!isLoggedIn) return;
     if (typeof window === "undefined") return;
@@ -359,12 +411,17 @@ const AppNavbar = () => {
 
     try {
       const userKey = getDailyNoticeUserKey();
-      const todayStr = getTodayISTString();
-      const acknowledged = isNoticeAcknowledgedToday(userKey, todayStr);
-      const sessionDismissed = isNoticeSessionDismissed(userKey, todayStr);
+      const acknowledged = isNoticeAcknowledged(userKey);
+      const sessionDismissed = isNoticeSessionDismissed(userKey);
 
-      // Unless acknowledged by clicking the understood button, the popup should come everyday after logging in
-      if (!acknowledged && !sessionDismissed) {
+      // Once acknowledged, NEVER display on any login!
+      if (acknowledged) {
+        setIsDailyNoticeOpen(false);
+        return;
+      }
+
+      // Appears on portal login until acknowledged by clicking the Understood button
+      if (!sessionDismissed) {
         // Small delay so page content smoothly renders first
         const timer = setTimeout(() => {
           setIsDailyNoticeOpen(true);
@@ -380,9 +437,8 @@ const AppNavbar = () => {
   const handleAcknowledgeDailyNotice = () => {
     try {
       const userKey = getDailyNoticeUserKey();
-      const todayStr = getTodayISTString();
-      saveDailyNoticeAcknowledged(userKey, todayStr);
-      toast.success("Daily attendance protocol acknowledged", {
+      saveDailyNoticeAcknowledged(userKey);
+      toast.success("Attendance protocol acknowledged", {
         id: "daily-notice-ack",
         duration: 2500,
       });
@@ -396,9 +452,8 @@ const AppNavbar = () => {
   const handleDismissDailyNotice = () => {
     try {
       const userKey = getDailyNoticeUserKey();
-      const todayStr = getTodayISTString();
-      // Only dismiss for the current browsing session; daily acknowledgement is NOT recorded!
-      saveDailyNoticeSessionDismissed(userKey, todayStr);
+      // Only dismiss for the current browsing session; permanent acknowledgement is NOT recorded!
+      saveDailyNoticeSessionDismissed(userKey);
     } catch (e) {
       // ignore
     }
@@ -409,7 +464,23 @@ const AppNavbar = () => {
   useEffect(() => {
     setImgError(false);
   }, [profilePhoto]);
-  const handleLogout = () => {
+  const handleLogout = async (e) => {
+    if (e) {
+      e.preventDefault?.();
+      e.stopPropagation?.();
+    }
+
+    // Auto-record check-out before clearing credentials
+    try {
+      await api.post("/attendance/check-out");
+    } catch (err) {
+      console.warn("Auto check-out on signout:", err?.response?.data || err?.message);
+    }
+
+    try {
+      await api.post("/logout");
+    } catch (_) {}
+
     clearAuthSession();
 
     setRole(null);
@@ -425,8 +496,17 @@ const AppNavbar = () => {
     setIsDailyNoticeOpen(false);
 
     window.dispatchEvent(new Event("authChanged"));
-    toast.success("Logged out!");
+    try {
+      toast.success("Logged out!");
+    } catch (_) {}
+
     navigate("/login", { replace: true });
+    // Guarantee authoritative navigation to login page
+    setTimeout(() => {
+      if (window.location.pathname !== "/login") {
+        window.location.href = "/login";
+      }
+    }, 100);
   };
 
   const handleChangePassword = () => {
@@ -500,40 +580,44 @@ const AppNavbar = () => {
   };
 
   const getRoleLabel = (r) => {
+    const desig = getAuthDesignation() || "";
     switch (r) {
       case "management":
-        return "Management (Executive)";
-      case "admin":
-        return "Admin (Operations)";
       case "ceo":
       case "coo":
       case "cto":
       case "cfo":
       case "vp":
       case "secretary":
-        return "Management";
+        return desig || "Management";
+      case "admin":
+        return "Admin (Operations)";
       case "hr":
       case "hrmanager":
-        return "HR Manager";
+        return desig || "HR Manager";
+      case "accounts":
+        return desig || "Finance & Accounts";
+      case "payroll":
+        return desig || "Payroll Specialist";
+      case "hod":
+        return desig || "Department Head";
+      case "manager":
+        return desig || "Manager";
+      case "teamlead":
+        return desig || "Team Lead";
       case "employee":
       case "employees":
-        return "Employee";
-      case "accounts":
-        return "Finance & Accounts";
-      case "payroll":
-        return "Payroll Specialist";
-      case "hod":
-        return "Department Head";
-      case "manager":
-        return "Manager";
-      case "teamlead":
-        return "Team Lead";
+        return desig || "Employee";
       default:
-        return r ? r.toUpperCase() : "User";
+        return desig || (r ? r.toUpperCase() : "User");
     }
   };
 
   const getRoleColor = (r) => {
+    const desig = getAuthDesignation() || "";
+    if (isLeadershipDesignation(desig)) {
+      return "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/30 dark:text-purple-400 dark:border-purple-900/40";
+    }
     switch (r) {
       case "management":
       case "ceo":
@@ -592,6 +676,7 @@ const AppNavbar = () => {
       case "hrmanager":
         return [
           { to: "/hr/dashboard", label: "Dashboard" },
+          // { to: "/hr-events", label: "HR Events" },
           { to: "/attendance", label: "Attendance" },
           { to: "/hr/manage-employees", label: "Manage Staff" },
           { to: "/requisition", label: "Requisition" },
@@ -608,6 +693,15 @@ const AppNavbar = () => {
         ];
       case "employee":
       case "employees":
+        if (isDepartmentHeadOrManager()) {
+          return [
+            { to: "/hod/dashboard", label: "Dashboard" },
+            { to: "/attendance", label: "Attendance" },
+            { to: "/requisition", label: "Requisition" },
+            { to: "/schedule", label: "Department Shifts" },
+            { to: profRoute, label: "My Profile" },
+          ];
+        }
         return [
           { to: "/employee/dashboard", label: "Dashboard" },
           { to: "/attendance", label: "My Attendance" },
@@ -616,23 +710,25 @@ const AppNavbar = () => {
           { to: profRoute, label: "My Profile" },
         ];
       case "hod":
-        return [
-          { to: "/hod/dashboard", label: "Dashboard" },
-          { to: "/attendance", label: "Attendance" },
-          { to: "/requisition", label: "Requisition" },
-          // { to: "/onboarding", label: "Onboarding" },
-          { to: profRoute, label: "My Profile" },
-        ];
       case "manager":
       case "teamlead":
         return [
           { to: "/hod/dashboard", label: "Dashboard" },
           { to: "/attendance", label: "Attendance" },
-          // { to: "/leave", label: "Leaves" },
-          { to: "/schedule", label: "Schedule" },
+          { to: "/requisition", label: "Requisition" },
+          { to: "/schedule", label: "Department Shifts" },
           { to: profRoute, label: "My Profile" },
         ];
       default:
+        if (isDepartmentHeadOrManager()) {
+          return [
+            { to: "/hod/dashboard", label: "Dashboard" },
+            { to: "/attendance", label: "Attendance" },
+            { to: "/requisition", label: "Requisition" },
+            { to: "/schedule", label: "Department Shifts" },
+            { to: profRoute, label: "My Profile" },
+          ];
+        }
         return [
           { to: "/employee/dashboard", label: "Dashboard" },
           { to: "/attendance", label: "Attendance" },
@@ -721,7 +817,7 @@ const AppNavbar = () => {
     } else if (app.id === "app_profile") route = `/profile/${employeeCode || "me"}`;
     else if (app.id === "app_mediclaim") route = "/mediclaim";
     else if (app.id === "app_leave") {
-      route = ["hr", "ceo", "coo", "management"].includes(userRole) ? "/admin/leaves" : "/leave";
+      route = ["hr", "ceo", "coo", "management"].includes(userRole) ? "/hr/leaves" : "/leave";
     }
 
     navigate(route);
@@ -863,8 +959,10 @@ const AppNavbar = () => {
                   </div>
 
                   <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
-                    <button onClick={handleLogout}
-                      className="flex w-full items-center justify-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 hover:text-red-700 dark:bg-slate-800 dark:text-red-400 dark:hover:bg-red-950/30 dark:hover:text-red-300"
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className="flex w-full items-center justify-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 hover:text-red-700 dark:bg-slate-800 dark:text-red-400 dark:hover:bg-red-950/30 dark:hover:text-red-300 cursor-pointer"
                     >
                       <FiLogOut className="h-3.5 w-3.5" />
                       Sign Out
@@ -946,7 +1044,7 @@ const AppNavbar = () => {
             <div className="grid grid-cols-4 gap-y-2 gap-x-3 max-h-[380px] overflow-y-auto pr-1">
               {filteredApps.map((app) => (
                 <div
-                  key={app.id}
+                  key={app.id} title={app.title}
                   onClick={() => handleAppClick(app)}
                   className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl cursor-pointer transition-all duration-150 hover:bg-slate-50 dark:hover:bg-slate-800/70 border border-transparent hover:border-slate-200 dark:hover:border-slate-700 group shadow-xs hover:shadow-xs"
                 >
@@ -1111,8 +1209,10 @@ const AppNavbar = () => {
                       <TbPassword className="h-4 w-4" />
                       Change Password
                     </button>
-                    <button onClick={handleLogout}
-                      className="flex w-full items-center justify-center gap-2 rounded-lg bg-red-50 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-100 dark:bg-red-950/20 dark:text-red-400 dark:hover:bg-red-950/40"
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className="flex w-full items-center justify-center gap-2 rounded-lg bg-red-50 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-100 dark:bg-red-950/20 dark:text-red-400 dark:hover:bg-red-950/40 cursor-pointer"
                     >
                       <FiLogOut className="h-4 w-4" />
                       Sign Out

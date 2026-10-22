@@ -37,7 +37,7 @@ const navItems = [
     iconBg: "rgba(22, 163, 74, 0.08)",
     iconColor: "#16a34a",
     accentColor: "#22c55e",
-    route: "/admin/leaves",
+    route: "/hr/leaves",
     pills: [
       { label: "8 pending", bg: "#fef9c3", color: "#854d0e" },
       { label: "5 approved", bg: "#dcfce7", color: "#166534" },

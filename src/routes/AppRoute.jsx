@@ -7,6 +7,9 @@ import {
   handleSessionExpired,
   getAuthToken,
   getAuthRole,
+  getAuthDesignation,
+  isLeadershipDesignation,
+  isDepartmentHeadOrManager,
 } from "../utils/auth";
 
 // Auth Pages
@@ -35,6 +38,8 @@ import ID_Card from "../pages/Apps/ID_Card";
 import Mediclaim from "../pages/Apps/Mediclaim";
 import Profile from "../pages/Apps/Profile";
 import Requisition from "../pages/Apps/Requisition";
+import HREvents from "../pages/Apps/HREvents";
+import Training from "../pages/Apps/Training";
 
 // Employee Pages
 import EmployeeDashboard from "../pages/Employee/EmployeeDashboard";
@@ -57,7 +62,7 @@ import UnifiedDashboard from "../pages/Dashboard/UnifiedDashboard";
 import Home from "../pages/Home";
 import Appraisal from "../pages/Apps/Apprasial";
 
-// ✅ ProtectedRoute — checks token presence, expiry validity, and role authorization
+// ✅ ProtectedRoute — checks token presence, expiry validity, role authorization & designation RBAC
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const token = getAuthToken() || localStorage.getItem("token");
   const rawRole = getAuthRole() || localStorage.getItem("role") || "";
@@ -77,7 +82,21 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
       const nr = r.toLowerCase().trim();
       return nr === "employees" ? "employee" : nr;
     });
-    if (!normalizedAllowed.includes(role)) {
+
+    let isAuthorized = normalizedAllowed.includes(role);
+
+    // If role is employee (or direct match failed), check designation-based leadership roles
+    if (!isAuthorized) {
+      const desig = (getAuthDesignation() || "").trim();
+      const isLead = isLeadershipDesignation(desig);
+      const isHodOrMgr = isDepartmentHeadOrManager();
+
+      if (normalizedAllowed.includes("hod") && isHodOrMgr) isAuthorized = true;
+      if (normalizedAllowed.includes("manager") && isHodOrMgr) isAuthorized = true;
+      if (normalizedAllowed.includes("teamlead") && isLead) isAuthorized = true;
+    }
+
+    if (!isAuthorized) {
       // If not authorized for this role, redirect to Home page
       return <Navigate to="/" replace />;
     }
@@ -111,8 +130,8 @@ export default function AppRoute() {
 
       {/* HR & Admin Restricted Routes */}
       <Route path="/attendance" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "accounts", "payroll", "hod", "manager", "teamlead", "ceo", "coo", "cto", "cfo", "vp", "secretary", "management", "hrmanager"]}> <MyAttendance /> </ProtectedRoute>} />
-      <Route path="/admin/attendance" element={<Navigate to="/attendance" replace />} />
-      <Route path="/admin/leaves" element={<ProtectedRoute allowedRoles={["hr", "accounts", "payroll", "ceo", "coo", "management"]}> <LeavesPage /> </ProtectedRoute>} />
+      {/* <Route path="/admin/attendance" element={<Navigate to="/attendance" replace />} /> */}
+      <Route path="/hr/leaves" element={<ProtectedRoute allowedRoles={["hr", "accounts", "payroll", "ceo", "coo", "management"]}> <LeavesPage /> </ProtectedRoute>} />
       <Route path="/hr/manage-employees" element={<ProtectedRoute allowedRoles={["hr", "accounts", "ceo", "coo", "management"]}> <ManageEmployees /> </ProtectedRoute>} />
       {/* <Route path="/admin/register-employee" element={<ProtectedRoute allowedRoles={["hr", "admin", "ceo", "management"]}> <Register /> </ProtectedRoute>} /> */}
 
@@ -128,6 +147,10 @@ export default function AppRoute() {
       <Route path="/policies" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "accounts", "payroll", "hod", "manager", "teamlead", "ceo", "coo", "hrmanager", "management"]}> <Policies /> </ProtectedRoute>} />
       <Route path="/schedule" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "accounts", "payroll", "hod", "manager", "teamlead", "ceo", "coo", "hrmanager", "management"]}> <Schedule /> </ProtectedRoute>} />
       <Route path="/leave" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager", "ceo", "coo", "management"]}> <Leave /> </ProtectedRoute>} />
+      <Route path="/hr-events" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "accounts", "payroll", "hod", "manager", "teamlead", "ceo", "coo", "hrmanager", "management"]}> <HREvents /> </ProtectedRoute>} />
+      <Route path="/events" element={<Navigate to="/hr-events" replace />} />
+      <Route path="/training" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "accounts", "payroll", "hod", "manager", "teamlead", "ceo", "coo", "cto", "cfo", "vp", "secretary", "management", "hrmanager"]}> <Training /> </ProtectedRoute>} />
+      <Route path="/Training" element={<Navigate to="/training" replace />} />
 
       <Route path="/profile/:employeeid" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager", "ceo", "coo", "management"]}><Profile /></ProtectedRoute>} />
       <Route path="/kpi" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager", "ceo", "coo", "management"]}> <PerformanceKPI /> </ProtectedRoute>} />

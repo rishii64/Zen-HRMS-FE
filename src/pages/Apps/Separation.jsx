@@ -151,11 +151,26 @@ export default function Separation() {
   const userName = localStorage.getItem("userName") || "User";
 
   // RBAC checks
+  const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+  const userDesig = (storedUser.designation || "").toLowerCase().trim();
+  const isLeadershipDesig =
+    /\b(hod|head|manager|mgr|lead|tl|agm|dgm|gm|director|supervisor)\b/i.test(userDesig) ||
+    userDesig.includes("team lead") ||
+    userDesig.includes("tech lead") ||
+    userDesig.includes("department head") ||
+    userDesig.includes("head of");
+  const isHodDesig =
+    /\b(hod|head|agm|dgm|gm|director)\b/i.test(userDesig) ||
+    userDesig.includes("department head") ||
+    userDesig.includes("head of");
+  const isManagerDesig = /\b(manager|mgr)\b/i.test(userDesig);
+  const isTlDesig = /\b(lead|tl|supervisor)\b/i.test(userDesig) || userDesig.includes("team lead");
+
   const isAdmin = storedRole === "admin";
   const isHR = storedRole === "hr" || storedRole === "hrmanager";
-  const isHOD = storedRole === "hod";
-  const isManager = storedRole === "manager";
-  const isTeamLead = storedRole === "teamlead";
+  const isHOD = storedRole === "hod" || (!isHR && isHodDesig);
+  const isManager = storedRole === "manager" || (!isHR && !isHOD && isManagerDesig);
+  const isTeamLead = storedRole === "teamlead" || (!isHR && !isHOD && !isManager && isTlDesig);
   const isAccounts = storedRole === "accounts" || storedRole === "payroll";
   const isEmployeeOnly = !isHR && !isAdmin && !isHOD && !isManager && !isTeamLead && !isAccounts;
 

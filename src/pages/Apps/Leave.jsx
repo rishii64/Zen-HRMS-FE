@@ -65,12 +65,24 @@ const Leave = () => {
   const [userDept, setUserDept] = useState(storedUser.dept || "General");
 
   // RBAC Checks
+  const userDesig = (storedUser.designation || "").toLowerCase().trim();
+  const isLeadershipDesig =
+    /\b(hod|head|manager|mgr|lead|tl|agm|dgm|gm|director|supervisor)\b/i.test(userDesig) ||
+    userDesig.includes("team lead") ||
+    userDesig.includes("tech lead") ||
+    userDesig.includes("department head") ||
+    userDesig.includes("head of");
+  const isHodDesig =
+    /\b(hod|head|manager|mgr|agm|dgm|gm|director)\b/i.test(userDesig) ||
+    userDesig.includes("department head") ||
+    userDesig.includes("head of");
+
   const isAdmin = role === "admin";
   const isHR = role === "hr" || role === "hrmanager";
   const isPayroll = role === "accounts" || role === "payroll";
-  const isHOD = role === "hod";
-  const isTeamLead = role === "teamlead" || role === "manager";
-  const isEmployeeOnly = role === "employee" || role === "admin";
+  const isHOD = role === "hod" || (!isHR && isHodDesig);
+  const isTeamLead = role === "teamlead" || role === "manager" || (!isHR && !isHOD && isLeadershipDesig);
+  const isEmployeeOnly = !isHR && !isHOD && !isTeamLead && !isPayroll;
 
   const canManageLeaves = isHR || isHOD || isTeamLead;
 
@@ -212,6 +224,18 @@ const Leave = () => {
   // Submit Apply Leave Form
   const handleApplySubmit = async (e) => {
     e.preventDefault();
+
+    if (leaveBalances.isPermanent === false) {
+      const lt = (applyForm.leave_type || "").toLowerCase();
+      const isCasual = lt.includes("casual") || lt.includes("cl");
+      const isComp = lt.includes("comp") || lt.includes("co");
+      const isUnpaid = lt.includes("unpaid") || lt.includes("lwp") || lt.includes("without pay");
+      if (!isCasual && !isComp && !isUnpaid) {
+        toast.error(`Non-permanent employees (${leaveBalances.employment_type || "Probation"}) are only eligible for Casual Leave (CL).`);
+        return;
+      }
+    }
+
     setSaving(true);
 
     try {
@@ -594,7 +618,29 @@ const Leave = () => {
       {/* LEAVE BALANCE CARDS GRID */}
       {(activeTab === "summary" || activeTab === "balance") && (
       <div className="mb-6 px-2">
-        <h3 className="text-sm font-extrabold text-slate-900 mb-3 uppercase tracking-wider">Leave Balances</h3>
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h3 className="text-sm font-extrabold text-slate-900 uppercase tracking-wider mb-0">Leave Balances</h3>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+              Yearly Calculation (Not Monthly)
+            </span>
+            {leaveBalances.employment_type && (
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                leaveBalances.isPermanent
+                  ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                  : "bg-amber-100 text-amber-800 border border-amber-200"
+              }`}>
+                {leaveBalances.employment_type} {leaveBalances.isPermanent ? "• Full Annual Quota" : "• CL Only Exception"}
+              </span>
+            )}
+          </div>
+          {leaveBalances.isPermanent === false && (
+            <div className="text-[11px] text-amber-800 bg-amber-50 px-3 py-1 rounded-xl border border-amber-200 font-medium">
+              ℹ️ Leaves are calculated yearly. Non-permanent employees can only take <strong>Casual Leave (CL)</strong>. Other leaves require permanent status.
+            </div>
+          )}
+        </div>
+
         <Row className="g-3">
           {/* Casual Leave */}
           <Col xs={6} sm={4} lg={3}>
@@ -603,68 +649,105 @@ const Leave = () => {
                 <span className="text-[11px] font-bold text-emerald-800">Casual Leave</span>
                 <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800">CL</span>
               </div>
-              <div className="text-lg font-extrabold text-slate-900">{leaveBalances.casual?.remaining ?? 5} / 5</div>
-              <div className="text-[10px] text-slate-400 mt-1 font-semibold">Short Urgent Personal Leave</div>
+              <div className="text-lg font-extrabold text-slate-900">
+                {leaveBalances.casual?.remaining ?? 5} / {leaveBalances.casual?.total ?? 5}
+              </div>
+              <div className="text-[10px] text-slate-400 mt-1 font-semibold">Short Urgent Personal Leave (All Staff)</div>
             </div>
           </Col>
 
           {/* Sick Leave */}
           <Col xs={6} sm={4} lg={3}>
-            <div className="leave-bal-card border-blue-100 bg-blue-50/30">
+            <div className={`leave-bal-card ${leaveBalances.isPermanent === false ? "border-slate-200 bg-slate-50/50 opacity-80" : "border-blue-100 bg-blue-50/30"}`}>
               <div className="flex items-center justify-between mb-1">
-                <span className="text-[11px] font-bold text-blue-800">Sick Leave</span>
-                <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-blue-100 text-blue-800">SL</span>
+                <span className={`text-[11px] font-bold ${leaveBalances.isPermanent === false ? "text-slate-500" : "text-blue-800"}`}>Sick Leave</span>
+                <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded ${leaveBalances.isPermanent === false ? "bg-slate-200 text-slate-600" : "bg-blue-100 text-blue-800"}`}>SL</span>
               </div>
-              <div className="text-lg font-extrabold text-slate-900">{leaveBalances.sick?.remaining ?? 5} / 5</div>
-              <div className="text-[10px] text-slate-400 mt-1 font-semibold">Illness / Medical Treatment</div>
+              <div className={`text-lg font-extrabold ${leaveBalances.isPermanent === false ? "text-slate-400" : "text-slate-900"}`}>
+                {leaveBalances.isPermanent === false ? "0 / 0" : `${leaveBalances.sick?.remaining ?? 5} / ${leaveBalances.sick?.total ?? 5}`}
+              </div>
+              <div className="text-[10px] text-slate-400 mt-1 font-semibold flex items-center justify-between">
+                <span>Illness / Medical Treatment</span>
+                {leaveBalances.isPermanent === false && (
+                  <span className="text-[9px] font-bold text-amber-700 bg-amber-100/80 px-1 py-0.2 rounded">Permanent Only</span>
+                )}
+              </div>
             </div>
           </Col>
 
           {/* Earned Leave */}
           <Col xs={6} sm={4} lg={3}>
-            <div className="leave-bal-card border-purple-100 bg-purple-50/30">
+            <div className={`leave-bal-card ${leaveBalances.isPermanent === false ? "border-slate-200 bg-slate-50/50 opacity-80" : "border-purple-100 bg-purple-50/30"}`}>
               <div className="flex items-center justify-between mb-1">
-                <span className="text-[11px] font-bold text-purple-800">Earned Leave</span>
-                <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-purple-100 text-purple-800">EL</span>
+                <span className={`text-[11px] font-bold ${leaveBalances.isPermanent === false ? "text-slate-500" : "text-purple-800"}`}>Earned Leave</span>
+                <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded ${leaveBalances.isPermanent === false ? "bg-slate-200 text-slate-600" : "bg-purple-100 text-purple-800"}`}>EL</span>
               </div>
-              <div className="text-lg font-extrabold text-slate-900">{leaveBalances.earned?.remaining ?? 12} / 12</div>
-              <div className="text-[10px] text-slate-400 mt-1 font-semibold">Accrued Service Leave</div>
+              <div className={`text-lg font-extrabold ${leaveBalances.isPermanent === false ? "text-slate-400" : "text-slate-900"}`}>
+                {leaveBalances.isPermanent === false ? "0 / 0" : `${leaveBalances.earned?.remaining ?? 12} / ${leaveBalances.earned?.total ?? 12}`}
+              </div>
+              <div className="text-[10px] text-slate-400 mt-1 font-semibold flex items-center justify-between">
+                <span>Accrued Service Leave</span>
+                {leaveBalances.isPermanent === false && (
+                  <span className="text-[9px] font-bold text-amber-700 bg-amber-100/80 px-1 py-0.2 rounded">Permanent Only</span>
+                )}
+              </div>
             </div>
           </Col>
 
           {/* Holidays */}
           <Col xs={6} sm={4} lg={3}>
-            <div className="leave-bal-card border-amber-100 bg-amber-50/30">
+            <div className={`leave-bal-card ${leaveBalances.isPermanent === false ? "border-slate-200 bg-slate-50/50 opacity-80" : "border-amber-100 bg-amber-50/30"}`}>
               <div className="flex items-center justify-between mb-1">
-                <span className="text-[11px] font-bold text-amber-800">Holidays</span>
-                <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">HL</span>
+                <span className={`text-[11px] font-bold ${leaveBalances.isPermanent === false ? "text-slate-500" : "text-amber-800"}`}>Holidays</span>
+                <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded ${leaveBalances.isPermanent === false ? "bg-slate-200 text-slate-600" : "bg-amber-100 text-amber-800"}`}>HL</span>
               </div>
-              <div className="text-lg font-extrabold text-slate-900">{leaveBalances.holidays?.remaining ?? 10} / 10</div>
-              <div className="text-[10px] text-slate-400 mt-1 font-semibold">Public & Gazetted Holidays</div>
+              <div className={`text-lg font-extrabold ${leaveBalances.isPermanent === false ? "text-slate-400" : "text-slate-900"}`}>
+                {leaveBalances.isPermanent === false ? "0 / 0" : `${leaveBalances.holidays?.remaining ?? 10} / ${leaveBalances.holidays?.total ?? 10}`}
+              </div>
+              <div className="text-[10px] text-slate-400 mt-1 font-semibold flex items-center justify-between">
+                <span>Public & Gazetted Holidays</span>
+                {leaveBalances.isPermanent === false && (
+                  <span className="text-[9px] font-bold text-amber-700 bg-amber-100/80 px-1 py-0.2 rounded">Permanent Only</span>
+                )}
+              </div>
             </div>
           </Col>
 
           {/* Maternity Leave (Female) or Paternity Leave (Male) */}
           {isFemale ? (
             <Col xs={6} sm={4} lg={3}>
-              <div className="leave-bal-card border-pink-100 bg-pink-50/30">
+              <div className={`leave-bal-card ${leaveBalances.isPermanent === false ? "border-slate-200 bg-slate-50/50 opacity-80" : "border-pink-100 bg-pink-50/30"}`}>
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-[11px] font-bold text-pink-800">Maternity Leave</span>
-                  <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-pink-100 text-pink-800">ML</span>
+                  <span className={`text-[11px] font-bold ${leaveBalances.isPermanent === false ? "text-slate-500" : "text-pink-800"}`}>Maternity Leave</span>
+                  <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded ${leaveBalances.isPermanent === false ? "bg-slate-200 text-slate-600" : "bg-pink-100 text-pink-800"}`}>ML</span>
                 </div>
-                <div className="text-lg font-extrabold text-slate-900">{leaveBalances.maternity?.remaining ?? 90} / 90</div>
-                <div className="text-[10px] text-slate-400 mt-1 font-semibold">Childbirth & Recovery</div>
+                <div className={`text-lg font-extrabold ${leaveBalances.isPermanent === false ? "text-slate-400" : "text-slate-900"}`}>
+                  {leaveBalances.isPermanent === false ? "0 / 0" : `${leaveBalances.maternity?.remaining ?? 90} / ${leaveBalances.maternity?.total ?? 90}`}
+                </div>
+                <div className="text-[10px] text-slate-400 mt-1 font-semibold flex items-center justify-between">
+                  <span>Childbirth & Recovery</span>
+                  {leaveBalances.isPermanent === false && (
+                    <span className="text-[9px] font-bold text-amber-700 bg-amber-100/80 px-1 py-0.2 rounded">Permanent Only</span>
+                  )}
+                </div>
               </div>
             </Col>
           ) : (
             <Col xs={6} sm={4} lg={3}>
-              <div className="leave-bal-card border-sky-100 bg-sky-50/30">
+              <div className={`leave-bal-card ${leaveBalances.isPermanent === false ? "border-slate-200 bg-slate-50/50 opacity-80" : "border-sky-100 bg-sky-50/30"}`}>
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-[11px] font-bold text-sky-800">Paternity Leave</span>
-                  <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-sky-100 text-sky-800">PL</span>
+                  <span className={`text-[11px] font-bold ${leaveBalances.isPermanent === false ? "text-slate-500" : "text-sky-800"}`}>Paternity Leave</span>
+                  <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded ${leaveBalances.isPermanent === false ? "bg-slate-200 text-slate-600" : "bg-sky-100 text-sky-800"}`}>PL</span>
                 </div>
-                <div className="text-lg font-extrabold text-slate-900">{leaveBalances.paternity?.remaining ?? 5} / 5</div>
-                <div className="text-[10px] text-slate-400 mt-1 font-semibold">New Fathers Leave</div>
+                <div className={`text-lg font-extrabold ${leaveBalances.isPermanent === false ? "text-slate-400" : "text-slate-900"}`}>
+                  {leaveBalances.isPermanent === false ? "0 / 0" : `${leaveBalances.paternity?.remaining ?? 5} / ${leaveBalances.paternity?.total ?? 5}`}
+                </div>
+                <div className="text-[10px] text-slate-400 mt-1 font-semibold flex items-center justify-between">
+                  <span>New Fathers Leave</span>
+                  {leaveBalances.isPermanent === false && (
+                    <span className="text-[9px] font-bold text-amber-700 bg-amber-100/80 px-1 py-0.2 rounded">Permanent Only</span>
+                  )}
+                </div>
               </div>
             </Col>
           )}
@@ -888,18 +971,40 @@ const Leave = () => {
                 onChange={(e) => setApplyForm({ ...applyForm, leave_type: e.target.value })}
                 className="text-xs py-2.5 rounded-xl"
               >
-                <option value="Casual Leave">Casual Leave (CL) — 5 Days Allocation (Paid)</option>
-                <option value="Sick Leave">Sick Leave (SL) — 5 Days Allocation (Paid)</option>
-                <option value="Earned Leave">Earned Leave (EL) — 12 Days Allocation (Paid)</option>
-                <option value="Holidays">Public Holiday (HL) — 10 Days Allocation (Paid)</option>
-                {isFemale ? (
-                  <option value="Maternity Leave">Maternity Leave (ML) — 90 Days Allocation (Paid)</option>
+                <option value="Casual Leave">
+                  Casual Leave (CL) — {leaveBalances.casual?.total ?? 5} Days Allocation (Paid • All Staff)
+                </option>
+                {leaveBalances.isPermanent !== false ? (
+                  <>
+                    <option value="Sick Leave">Sick Leave (SL) — 5 Days Yearly Allocation (Paid)</option>
+                    <option value="Earned Leave">Earned Leave (EL) — 12 Days Yearly Allocation (Paid)</option>
+                    <option value="Holidays">Public Holiday (HL) — 10 Days Yearly Allocation (Paid)</option>
+                    {isFemale ? (
+                      <option value="Maternity Leave">Maternity Leave (ML) — 90 Days Allocation (Paid)</option>
+                    ) : (
+                      <option value="Paternity Leave">Paternity Leave (PL) — 5 Days Allocation (Paid)</option>
+                    )}
+                  </>
                 ) : (
-                  <option value="Paternity Leave">Paternity Leave (PL) — 5 Days Allocation (Paid)</option>
+                  <>
+                    <option value="Sick Leave" disabled>Sick Leave (SL) — Permanent Staff Only (0 Days)</option>
+                    <option value="Earned Leave" disabled>Earned Leave (EL) — Permanent Staff Only (0 Days)</option>
+                    <option value="Holidays" disabled>Public Holiday (HL) — Permanent Staff Only (0 Days)</option>
+                    {isFemale ? (
+                      <option value="Maternity Leave" disabled>Maternity Leave (ML) — Permanent Staff Only (0 Days)</option>
+                    ) : (
+                      <option value="Paternity Leave" disabled>Paternity Leave (PL) — Permanent Staff Only (0 Days)</option>
+                    )}
+                  </>
                 )}
                 <option value="Comp Off">Compensatory Off (Comp Off) — As Earned (Paid)</option>
                 <option value="Unpaid Leave">Unpaid Leave (LWP) — Unlimited (Loss of Pay)</option>
               </Form.Select>
+              {leaveBalances.isPermanent === false && (
+                <div className="text-[11px] text-amber-700 mt-1.5 font-medium bg-amber-50 p-2 rounded-lg border border-amber-200">
+                  ⚠️ <strong>Notice:</strong> Your employment status is <strong>{leaveBalances.employment_type || "Probation"}</strong>. Non-permanent staff are eligible only for Casual Leave (CL). Other categories are credited annually upon permanent confirmation.
+                </div>
+              )}
             </Form.Group>
 
             <Form.Group className="mb-3">

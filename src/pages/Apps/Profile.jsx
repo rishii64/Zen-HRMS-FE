@@ -73,6 +73,65 @@ function calculateAgeFromDob(dobStr) {
   return age >= 0 ? String(age) : "0";
 }
 
+function getEmploymentTypeStyle(type) {
+  const norm = String(type || "Permanent").toLowerCase().trim();
+  const base = {
+    fontSize: "12px",
+    fontWeight: "600",
+    lineHeight: "1.2",
+    whiteSpace: "nowrap",
+    letterSpacing: "0.2px",
+  };
+
+  if (norm.includes("probation")) {
+    return {
+      ...base,
+      backgroundColor: "#fffbeb",
+      color: "#b45309",
+      border: "1px solid #c8a000ff",
+    };
+  }
+  if (norm.includes("intern")) {
+    return {
+      ...base,
+      backgroundColor: "#fdf4ff",
+      color: "#a21caf",
+      border: "1px solid #d83dffff",
+    };
+  }
+  if (norm.includes("contract")) {
+    return {
+      ...base,
+      backgroundColor: "#f1f5f9",
+      color: "#475569",
+      border: "1px solid #7e7e7fff",
+    };
+  }
+  if (norm.includes("part")) {
+    return {
+      ...base,
+      backgroundColor: "#f0fdf4",
+      color: "#15803d",
+      border: "1px solid #00ff59ff",
+    };
+  }
+  if (norm.includes("trainee")) {
+    return {
+      ...base,
+      backgroundColor: "#eef2ff",
+      color: "#4338ca",
+      border: "1px solid #315bffff",
+    };
+  }
+  // Default: Permanent / Full Time
+  return {
+    ...base,
+    backgroundColor: "#ffffff",
+    color: "#1d4ed8",
+    border: "1px solid #2989ffff",
+  };
+}
+
 // --- Experience Calculation Utilities ---
 function parseExperienceToMonths(str) {
   if (!str || typeof str !== "string") return 0;
@@ -808,15 +867,15 @@ export default function Profile() {
   }
 
   return (
-    <Container className="py-4" style={{ maxWidth: "980px" }}>
+    <Container className="py-4">
       <div className="d-flex justify-content-between align-items-center mb-4">
         <div>
           <h2 className="fw-bold text-primary mb-1">Employee Profile & Records</h2>
           <p className="text-muted mb-0">Manage complete personal details, work experience, qualifications, and verification documents.</p>
         </div>
-        <Button variant="outline-secondary" onClick={() => navigate("/employee/dashboard")} className="rounded-pill px-4 shadow-sm">
+        {/* <Button variant="outline-secondary" onClick={() => navigate("/employee/dashboard")} className="rounded-pill px-4 shadow-sm">
           Dashboard
-        </Button>
+        </Button> */}
       </div>
 
       <Form onSubmit={handleSubmit}>
@@ -902,10 +961,10 @@ export default function Profile() {
               />
             </Col>
 
-            {/* Employment Status */}
+            {/* Employment Status & Type */}
             <Col md={3}>
-              <Form.Label className="small fw-bold text-muted">Employment Status</Form.Label>
-              <div className="pt-1">
+              <Form.Label className="small fw-bold text-muted">Employment Status & Type</Form.Label>
+              <div className="pt-1 d-flex flex-wrap align-items-center gap-2">
                 <Badge
                   bg={
                     empData?.status === "Active"
@@ -915,7 +974,8 @@ export default function Profile() {
                       : "secondary"
                   }
                   text={empData?.status === "Resigned" ? "dark" : "white"}
-                  className="px-3 py-2 fs-6 rounded-pill d-inline-flex align-items-center gap-1 shadow-xs"
+                  className="px-3 py-2 rounded-pill d-inline-flex align-items-center gap-1 shadow-xs"
+                  style={{ fontSize: "12px", fontWeight: "600" }}
                 >
                   {empData?.status === "Active"
                     ? "● Active"
@@ -923,6 +983,13 @@ export default function Profile() {
                     ? "● Resigned"
                     : `● ${empData?.status || "Inactive"}`}
                 </Badge>
+
+                <span
+                  className="px-3 py-2 rounded-pill d-inline-flex align-items-center gap-1 shadow-xs"
+                  style={getEmploymentTypeStyle(empData?.employment_type)}
+                >
+                  {empData?.employment_type || "Permanent"}
+                </span>
               </div>
             </Col>
 

@@ -83,12 +83,17 @@ const Requisition = () => {
     const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
     const rawRole = (localStorage.getItem("role") || storedUser.role || "").toLowerCase();
     const designation = (storedUser.designation || "").toLowerCase();
+    const isLeadershipDesig =
+        /\b(hod|head|manager|mgr|lead|tl|agm|dgm|gm|director|supervisor)\b/i.test(designation) ||
+        designation.includes("team lead") ||
+        designation.includes("tech lead") ||
+        designation.includes("department head") ||
+        designation.includes("head of");
     const isHodRole =
-        ["hod", "manager", "department head"].includes(rawRole) ||
-        designation.includes("hod") ||
-        designation.includes("head") ||
-        designation.includes("manager");
-    const activeRole = isHodRole ? "hod" : "hr";
+        !["hr", "admin", "hrmanager"].includes(rawRole) && (
+            ["hod", "manager", "teamlead", "department head"].includes(rawRole) || isLeadershipDesig
+        );
+    const activeRole = ["hr", "admin", "hrmanager"].includes(rawRole) ? "hr" : (isHodRole ? "hod" : "employee");
     const employeeId = storedUser.employee_id || localStorage.getItem("employeeCode") || "EMP-001";
     const userName = storedUser.name || localStorage.getItem("userName") || "User";
     const userDept = storedUser.dept || localStorage.getItem("dept") || "IT";

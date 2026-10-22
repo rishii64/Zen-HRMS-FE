@@ -23,6 +23,7 @@ import {
 import { FaCheckCircle } from "react-icons/fa";
 import toast from "react-hot-toast";
 import { getApiBaseUrl } from "../../api/axios";
+import { isDepartmentHeadOrManager } from "../../utils/auth";
 import { exportToExcel } from "../../utils/excelExport";
 
 const API = getApiBaseUrl();
@@ -43,18 +44,20 @@ const Schedule = () => {
   const userEmpId = localStorage.getItem("employeeCode") || localStorage.getItem("empId") || "";
   
   // Matrix Role Checks
+  const isAdmin = userRole === "admin" || userRole === "superadmin";
   const isHr = userRole === "hr" || userRole === "hrmanager";
-  const isHod = userRole === "hod" || userRole === "manager";
-  const isEmployee = userRole === "employee" || userRole === "employees" || userRole === "admin" || userRole === "accounts";
+  const isAdminOrHr = isAdmin || isHr;
+  const isHod = !isAdminOrHr && (userRole === "hod" || userRole === "manager" || isDepartmentHeadOrManager());
+  const isEmployee = !isAdminOrHr && !isHod;
 
   // Permissions according to user matrix
-  const canViewAllSchedules = isHr;
-  const canCreateSchedule = isHr || isHod;
-  const canEditSchedule = isHr || isHod;
-  const canDeleteSchedule = isHr;
-  const canPublishSchedule = isHr || isHod;
-  const canCopySchedule = isHr || isHod;
-  const canManageShiftTemplates = isHr;
+  const canViewAllSchedules = isAdminOrHr;
+  const canCreateSchedule = isAdminOrHr || isHod;
+  const canEditSchedule = isAdminOrHr || isHod;
+  const canDeleteSchedule = isAdminOrHr;
+  const canPublishSchedule = isAdminOrHr || isHod;
+  const canCopySchedule = isAdminOrHr || isHod;
+  const canManageShiftTemplates = isAdminOrHr;
 
   const [loading, setLoading] = useState(true);
   const [schedules, setSchedules] = useState([]);

@@ -100,10 +100,12 @@ export default function InterviewForm() {
   const rawRole = (localStorage.getItem("role") || storedUser.role || "").toLowerCase();
   const designation = (storedUser.designation || "").toLowerCase();
   const isHodRole =
-    ["hod", "manager", "department head"].includes(rawRole) ||
-    designation.includes("hod") ||
-    designation.includes("head") ||
-    designation.includes("manager");
+    ["hod", "manager", "teamlead", "department head"].includes(rawRole) ||
+    /\b(hod|head|manager|mgr|lead|tl|agm|dgm|gm|director|supervisor)\b/i.test(designation) ||
+    designation.includes("team lead") ||
+    designation.includes("tech lead") ||
+    designation.includes("department head") ||
+    designation.includes("head of");
   const isHR = ["hr", "admin", "hrmanager"].includes(rawRole);
   const isHOD = isHodRole && !isHR;
 

@@ -8,6 +8,7 @@ import AccountsDashboardView from "./components/AccountsDashboardView";
 import HODDashboardView from "./components/HODDashboardView";
 import AdminTasksView from "./components/AdminTasksView";
 import api, { getUploadUrl } from "../../api/axios";
+import { isDepartmentHeadOrManager } from "../../utils/auth";
 
 export default function UnifiedDashboard() {
   const location = useLocation();
@@ -129,13 +130,14 @@ export default function UnifiedDashboard() {
   // State for view mode for leadership/management roles: "management" | "workspace"
   const [dashboardViewMode, setDashboardViewMode] = useState("management");
 
-  // Determine active view based on role
+  // Determine active view based on role & designation
+  const isLeader = isDepartmentHeadOrManager();
   const isAdmin = currentRole === "admin";
   const isManagement = ["management", "ceo", "coo", "cfo", "vp", "secretary"].includes(currentRole);
   const isHr = ["hr", "hrmanager"].includes(currentRole);
   const isAccounts = ["accounts", "payroll"].includes(currentRole);
-  const isHod = ["hod", "manager", "teamlead"].includes(currentRole);
-  const isEmployee = currentRole === "employee" || (!isAdmin && !isManagement && !isHr && !isAccounts && !isHod);
+  const isHod = ["hod", "manager", "teamlead"].includes(currentRole) || (currentRole === "employee" && isLeader);
+  const isEmployee = (currentRole === "employee" && !isLeader) || (!isAdmin && !isManagement && !isHr && !isAccounts && !isHod);
 
   return (
     <div
@@ -268,7 +270,7 @@ export default function UnifiedDashboard() {
                 className={`role-switch-btn ${dashboardViewMode === "workspace" ? "active" : ""}`}
                 onClick={() => setDashboardViewMode("workspace")}
               >
-                👤 My Employee Workspace (18 Modules)
+                👤 My Employee Workspace
               </button>
             </div>
             <div className="small text-muted pe-2 py-1">
@@ -295,7 +297,7 @@ export default function UnifiedDashboard() {
                 className={`role-switch-btn ${dashboardViewMode === "workspace" ? "active" : ""}`}
                 onClick={() => setDashboardViewMode("workspace")}
               >
-                👤 My Employee Workspace (18 Modules)
+                👤 My Employee Workspace
               </button>
             </div>
             <div className="small text-muted pe-2 py-1">

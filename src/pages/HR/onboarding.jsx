@@ -519,6 +519,19 @@ export default function Onboarding() {
   // STAGE C: 4-STAGE INTRO & TRAINING (HR, ADMIN, POS, DEPT)
   // =========================================================================
 
+  const handleAssignOnboardingMandatory = async (empId) => {
+    if (!empId) {
+      toast.error("Employee code has not been issued yet in Stage A.");
+      return;
+    }
+    try {
+      const res = await api.post(`/training/onboarding/${empId}/assign`);
+      toast.success(res.data?.message || "Mandatory induction trainings assigned successfully!");
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Failed to assign induction courses");
+    }
+  };
+
   const openTrainingModal = (moduleKey) => {
     setEditingModuleKey(moduleKey);
     const mod = selectedOnboarding?.[`${moduleKey}_training`] || {};
@@ -1961,7 +1974,7 @@ export default function Onboarding() {
               <LuGraduationCap className="text-amber-600" /> c) Intro & 4-Stage Training
             </h4>
             <p className="text-xs sm:text-sm text-slate-500 mt-0.5 whitespace-nowrap">
-              Mandatory completion of all 4 tracks: (i) HR Training, (ii) Admin Training, (iii) POS Training, and (iv) Dept. Training.
+              Mandatory completion of all 4 tracks: (i) HR Training, (ii) Admin Training, (iii) POSH Training, and (iv) Dept. Training.
             </p>
           </div>
           <div>
@@ -1974,6 +1987,38 @@ export default function Onboarding() {
             >
               {trSummary.count} of 4 Modules Done ({trSummary.pct}%)
             </span>
+          </div>
+        </div>
+
+        {/* Dedicated Enterprise Training Module Link Banner */}
+        <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-gradient-to-r from-cyan-50 via-blue-50 to-indigo-50 border border-cyan-200/80 rounded-2xl shadow-2xs">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-600 to-blue-700 text-white flex items-center justify-center font-bold shadow-2xs flex-shrink-0">
+              <LuGraduationCap size={22} />
+            </div>
+            <div>
+              <div className="text-sm font-bold text-slate-900">
+                Centralized Training & Development Module
+              </div>
+              <div className="text-xs text-slate-600">
+                Manage mandatory induction schedules, post-training examinations, interactive feedback, and external certifications.
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => handleAssignOnboardingMandatory(selectedOnboarding.employee_id)}
+              className="px-3.5 py-2 bg-white hover:bg-cyan-50 border border-cyan-300 text-cyan-800 rounded-xl text-xs font-bold transition-all shadow-2xs"
+            >
+              + Auto-Assign Induction Courses
+            </button>
+            <button
+              onClick={() => navigate(`/training?tab=hr&employee_id=${selectedOnboarding.employee_id || ""}`)}
+              className="px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5"
+            >
+              <span>Open Dedicated Hub</span>
+              <LuExternalLink size={14} />
+            </button>
           </div>
         </div>
 

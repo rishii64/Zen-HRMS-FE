@@ -126,10 +126,10 @@ const Policies = () => {
               <LuBuilding className="text-blue-600 h-4 w-4" /> <span className="font-bold">Zentelex Pvt Ltd Head Office</span>
             </div>
             <div className="flex items-center gap-3 text-xs text-slate-700">
-              <LuMail className="text-blue-600 h-4 w-4" /> <span className="font-semibold">hr@zentelex.com</span>
+              <LuMail className="text-blue-600 h-4 w-4" /> <span className="font-semibold">contact@zentelex.com</span>
             </div>
             <div className="flex items-center gap-3 text-xs text-slate-700">
-              <LuPhone className="text-blue-600 h-4 w-4" /> <span className="font-semibold">+91 (033) 4058-9900</span>
+              <LuPhone className="text-blue-600 h-4 w-4" /> <span className="font-semibold">+91 62896 72904</span>
             </div>
           </div>
         </>

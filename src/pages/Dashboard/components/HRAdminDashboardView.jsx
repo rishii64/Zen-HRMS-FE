@@ -88,6 +88,7 @@ export default function HRAdminDashboardView() {
     dept: "IT",
     designation: "",
     status: "Active",
+    employment_type: "Permanent",
     phone_no: "",
     joining_date: "",
     reporting_manager: "",
@@ -126,6 +127,7 @@ export default function HRAdminDashboardView() {
             department: emp.dept || emp.department || "General",
             dept: emp.dept || emp.department || "General",
             status: emp.status || "Active",
+            employment_type: emp.employment_type || "Permanent",
             performance: emp.kpi || "4.8",
             kpi: emp.kpi || "4.8",
             phone_no: emp.phone_no || "",
@@ -154,6 +156,7 @@ export default function HRAdminDashboardView() {
       dept: emp.department || emp.dept || "IT",
       designation: emp.role || emp.designation || "Staff",
       status: emp.status || "Active",
+      employment_type: emp.employment_type || "Permanent",
       phone_no: emp.phone_no || "",
       joining_date: emp.joining_date ? String(emp.joining_date).split("T")[0] : "",
       reporting_manager: emp.reporting_manager || "Admin",
@@ -429,14 +432,86 @@ export default function HRAdminDashboardView() {
     return { bg: "#f8fafc", color: "#475569", border: "#e2e8f0" };
   };
 
+  const getEmploymentTypeStyle = (type) => {
+    const norm = String(type || "Permanent").toLowerCase().trim();
+    const base = {
+      fontSize: "12px",
+      fontWeight: "600",
+      lineHeight: "1.2",
+      whiteSpace: "nowrap",
+      letterSpacing: "0.2px",
+    };
+
+    if (norm.includes("probation")) {
+      return {
+        ...base,
+        backgroundColor: "#fffbeb",
+        color: "#b45309",
+        border: "1px solid #c8a000ff",
+      };
+    }
+    if (norm.includes("intern")) {
+      return {
+        ...base,
+        backgroundColor: "#fdf4ff",
+        color: "#a21caf",
+        border: "1px solid #d83dffff",
+      };
+    }
+    if (norm.includes("contract")) {
+      return {
+        ...base,
+        backgroundColor: "#f1f5f9",
+        color: "#475569",
+        border: "1px solid #7e7e7fff",
+      };
+    }
+    if (norm.includes("part")) {
+      return {
+        ...base,
+        backgroundColor: "#f0fdf4",
+        color: "#15803d",
+        border: "1px solid #00ff59ff",
+      };
+    }
+    if (norm.includes("trainee")) {
+      return {
+        ...base,
+        backgroundColor: "#eef2ff",
+        color: "#4338ca",
+        border: "1px solid #315bffff",
+      };
+    }
+    // Default: Permanent / Full Time
+    return {
+      ...base,
+      backgroundColor: "#ffffff",
+      color: "#1d4ed8",
+      border: "1px solid #2989ffff",
+    };
+  };
+
   const filteredEmployees = employeeData.filter((emp) => {
     const matchesSearch =
       emp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       emp.empId.toLowerCase().includes(searchTerm.toLowerCase()) ||
       emp.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      emp.role.toLowerCase().includes(searchTerm.toLowerCase());
+      emp.role.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (emp.employment_type && emp.employment_type.toLowerCase().includes(searchTerm.toLowerCase()));
 
-    const matchesStatus = statusFilter === "All" || emp.status.toLowerCase() === statusFilter.toLowerCase();
+    const sFilter = statusFilter.toLowerCase();
+    const empStatus = (emp.status || "").toLowerCase();
+    const empType = (emp.employment_type || "permanent").toLowerCase();
+
+    const matchesStatus =
+      statusFilter === "All" ||
+      empStatus === sFilter ||
+      empType === sFilter ||
+      (sFilter === "fulltime" && (empType.includes("full") || empType.includes("permanent"))) ||
+      (sFilter === "parttime" && empType.includes("part")) ||
+      (sFilter === "internship" && empType.includes("intern")) ||
+      (sFilter === "contract" && empType.includes("contract"));
+
     const matchesDept = deptFilter === "All" || emp.department.toLowerCase() === deptFilter.toLowerCase();
 
     return matchesSearch && matchesStatus && matchesDept;
@@ -596,11 +671,11 @@ export default function HRAdminDashboardView() {
         {/* Card 4: Today Absents */}
         <Col xs={12} sm={6} lg={3}>
           <div
-            onClick={() => navigate("/admin/leaves")}
+            onClick={() => navigate("/hr/leaves")}
             className="dash-card p-4 h-100 flex flex-col justify-between shadow-2xs cursor-pointer group hover:border-rose-300 hover:shadow-md transition-all duration-200"
             role="button"
             tabIndex={0}
-            onKeyDown={(e) => { if (e.key === "Enter") navigate("/admin/leaves"); }}
+            onKeyDown={(e) => { if (e.key === "Enter") navigate("/hr/leaves"); }}
           >
             <div>
               {/* Header: Icon + Titles + Action Arrow */}
@@ -832,11 +907,16 @@ export default function HRAdminDashboardView() {
               onChange={(e) => setStatusFilter(e.target.value)}
               className="text-xs font-semibold border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 text-slate-700 focus:outline-none"
             >
-              <option value="All">All Status ▾</option>
-              <option value="Fulltime">Fulltime</option>
-              <option value="Parttime">Parttime</option>
-              <option value="Internship">Internship</option>
-              <option value="Contract">Contract</option>
+              <option value="All">All Status / Type ▾</option>
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
+              <option value="Permanent">Permanent</option>
+              <option value="Fulltime">Full Time</option>
+              <option value="Probation">Probation</option>
+              <option value="Internship">Intern</option>
+              <option value="Contract">Contractual</option>
+              <option value="Trainee">Trainee</option>
+              <option value="Parttime">Part Time</option>
             </select>
 
             <select
@@ -874,7 +954,7 @@ export default function HRAdminDashboardView() {
                 <th>Email</th>
                 <th>Role</th>
                 <th>Departments</th>
-                <th>Status</th>
+                <th>Status ー Type</th>
                 <th className="text-center">Actions</th>
               </tr>
             </thead>
@@ -914,16 +994,24 @@ export default function HRAdminDashboardView() {
                         </span>
                       </td>
                       <td>
-                        <span
-                          className="inline-block px-2.5 py-1 text-xs font-semibold rounded-md border"
-                          style={{
-                            backgroundColor: statusBadge.bg,
-                            color: statusBadge.color,
-                            borderColor: statusBadge.border
-                          }}
-                        >
-                          {emp.status}
-                        </span>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span
+                            className="inline-block px-2.5 py-1 text-xs font-semibold rounded-md border"
+                            style={{
+                              backgroundColor: statusBadge.bg,
+                              color: statusBadge.color,
+                              borderColor: statusBadge.border
+                            }}
+                          >
+                            {emp.status}
+                          </span>
+                          <span
+                            className="inline-flex items-center px-2.5 py-1 text-xs font-semibold rounded-md border shadow-2xs"
+                            style={getEmploymentTypeStyle(emp.employment_type)}
+                          >
+                            {emp.employment_type || "Permanent"}
+                          </span>
+                        </div>
                       </td>
                       <td className="text-center">
                         <div className="flex items-center justify-center gap-1.5">
@@ -1073,6 +1161,12 @@ export default function HRAdminDashboardView() {
                           style={{ backgroundColor: getStatusBadgeStyle(viewEmployee.status).color }}
                         />
                         {viewEmployee.status}
+                      </span>
+                      <span
+                        className="inline-flex items-center px-2.5 py-0.5 rounded-lg text-xs font-semibold border backdrop-blur-xs shadow-2xs"
+                        style={getEmploymentTypeStyle(viewEmployee.employment_type)}
+                      >
+                        {viewEmployee.employment_type || "Permanent"}
                       </span>
                     </div>
                   </div>
@@ -1507,10 +1601,25 @@ export default function HRAdminDashboardView() {
                     <option value="Resigned">Resigned</option>
                     <option value="Relieved">Relieved</option>
                     <option value="Separated">Separated</option>
-                    <option value="Fulltime">Fulltime</option>
-                    <option value="Parttime">Parttime</option>
-                    <option value="Internship">Internship</option>
-                    <option value="Contract">Contract</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Employment Type
+                  </label>
+                  <select
+                    value={editForm.employment_type || "Permanent"}
+                    onChange={(e) => setEditForm({ ...editForm, employment_type: e.target.value })}
+                    className="w-full text-xs font-semibold text-slate-800 bg-slate-50/50 hover:bg-white focus:bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-indigo-600 focus:ring-4 focus:ring-indigo-600/10 transition-all shadow-2xs"
+                  >
+                    <option value="Permanent">Permanent</option>
+                    <option value="Full Time">Full Time</option>
+                    <option value="Probation">Probation</option>
+                    <option value="Intern">Intern</option>
+                    <option value="Contractual">Contractual</option>
+                    <option value="Trainee">Trainee</option>
+                    <option value="Part Time">Part Time</option>
                   </select>
                 </div>
 

@@ -96,12 +96,24 @@ const MyAttendance = () => {
   const [userDept, setUserDept] = useState(storedUser.dept || "General");
 
   // RBAC Checks
+  const userDesig = (storedUser.designation || "").toLowerCase().trim();
+  const isLeadershipDesig =
+    /\b(hod|head|manager|mgr|lead|tl|agm|dgm|gm|director|supervisor)\b/i.test(userDesig) ||
+    userDesig.includes("team lead") ||
+    userDesig.includes("tech lead") ||
+    userDesig.includes("department head") ||
+    userDesig.includes("head of");
+  const isHodDesig =
+    /\b(hod|head|manager|mgr|agm|dgm|gm|director)\b/i.test(userDesig) ||
+    userDesig.includes("department head") ||
+    userDesig.includes("head of");
+
   const isAdmin = role === "admin";
   const isHR = role === "hr" || role === "hrmanager";
   const isPayroll = role === "accounts" || role === "payroll";
-  const isHOD = role === "hod";
-  const isTeamLead = role === "teamlead" || role === "manager";
-  const isEmployeeOnly = role === "employee" || role === "admin";
+  const isHOD = role === "hod" || (!isHR && isHodDesig);
+  const isTeamLead = role === "teamlead" || role === "manager" || (!isHR && !isHOD && isLeadershipDesig);
+  const isEmployeeOnly = !isHR && !isHOD && !isTeamLead && !isPayroll;
 
   // Permissions Matrix
   const canManageAll = isHR;

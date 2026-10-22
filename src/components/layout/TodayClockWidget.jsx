@@ -1,13 +1,11 @@
 import React, { useState, useEffect } from "react";
-import { Card, Button, Badge, Spinner } from "react-bootstrap";
-import { LuFingerprint, LuClock } from "react-icons/lu";
-import toast from "react-hot-toast";
+import { Card, Badge } from "react-bootstrap";
+import { LuFingerprint } from "react-icons/lu";
 import api from "../../api";
 
 export default function TodayClockWidget({ onStatusChange }) {
   const [todayRecord, setTodayRecord] = useState(null);
   const [schedule, setSchedule] = useState(null);
-  const [checking, setChecking] = useState(false);
   const [now, setNow] = useState(new Date());
 
   // Ticking clock for time remaining calculation
@@ -18,15 +16,28 @@ export default function TodayClockWidget({ onStatusChange }) {
     return () => clearInterval(timer);
   }, []);
 
-  // Fetch today status
+  // Fetch today status and auto-check in if not yet registered for today
   const fetchTodayStatus = async () => {
     try {
       const res = await api.get("/attendance/today-status");
       if (res.data?.success) {
-        setTodayRecord(res.data.record || null);
+        let record = res.data.record || null;
         if (res.data.schedule) {
           setSchedule(res.data.schedule);
         }
+
+        // Auto-check in on portal load if user is logged into portal and not yet marked today
+        if (!record || !record.check_in || record.check_in === "—") {
+          try {
+            const checkInRes = await api.post("/attendance/check-in");
+            if (checkInRes.data?.success && checkInRes.data.record) {
+              record = checkInRes.data.record;
+              if (onStatusChange) onStatusChange();
+            }
+          } catch (_) {}
+        }
+
+        setTodayRecord(record);
       }
     } catch (err) {
       console.error("Error fetching today status:", err);
@@ -35,6 +46,8 @@ export default function TodayClockWidget({ onStatusChange }) {
 
   useEffect(() => {
     fetchTodayStatus();
+    window.addEventListener("authChanged", fetchTodayStatus);
+    return () => window.removeEventListener("authChanged", fetchTodayStatus);
   }, []);
 
   // Safely parses a shift time string (24h or 12h or with fallbacks) into valid { h, m }
@@ -165,48 +178,17 @@ export default function TodayClockWidget({ onStatusChange }) {
 
     const percent = Math.min(100, Math.max(0, Math.round((workedHours / totalShiftHours) * 100)));
 
+    if (todayRecord.check_out && todayRecord.check_out !== "—") {
+      return {
+        percent: isNaN(percent) ? 100 : percent,
+        label: "COMPLETED"
+      };
+    }
+
     return {
       percent: isNaN(percent) ? 0 : percent,
       label: percent >= 70 ? "AVERAGE" : "IN PROGRESS"
     };
-  };
-
-  const handleCheckIn = async () => {
-    setChecking(true);
-    try {
-      const res = await api.post("/attendance/check-in");
-      if (res.data?.success) {
-        toast.success(res.data.message || "Checked in successfully!");
-        fetchTodayStatus();
-        if (onStatusChange) onStatusChange();
-      } else {
-        toast.error(res.data?.error || "Check-in failed");
-      }
-    } catch (err) {
-      const errMsg = err.response?.data?.error || "Check-in request failed";
-      toast.error(errMsg);
-    } finally {
-      setChecking(false);
-    }
-  };
-
-  const handleCheckOut = async () => {
-    setChecking(true);
-    try {
-      const res = await api.post("/attendance/check-out");
-      if (res.data?.success) {
-        toast.success(res.data.message || "Checked out successfully!");
-        fetchTodayStatus();
-        if (onStatusChange) onStatusChange();
-      } else {
-        toast.error(res.data?.error || "Check-out failed");
-      }
-    } catch (err) {
-      const errMsg = err.response?.data?.error || "Check-out request failed";
-      toast.error(errMsg);
-    } finally {
-      setChecking(false);
-    }
   };
 
   const todayProgress = getTodayProgress();
@@ -219,14 +201,18 @@ export default function TodayClockWidget({ onStatusChange }) {
           <Badge
             pill
             style={{
-              backgroundColor: isMarked ? "#16a34a" : "#ef4444",
+              backgroundColor: isMarked
+                ? (todayRecord?.check_out && todayRecord.check_out !== "—" ? "#6366f1" : "#16a34a")
+                : "#ef4444",
               color: "#ffffff",
               padding: "6px 14px",
               fontSize: "12px",
               fontWeight: "600"
             }}
           >
-            {isMarked ? "Present" : "Not Marked"}
+            {isMarked
+              ? (todayRecord?.check_out && todayRecord.check_out !== "—" ? "Completed" : "Present")
+              : "Not Marked"}
           </Badge>
         </div>
         <hr style={{ borderColor: "#e2e8f0", opacity: 0.8, margin: "12px 0 20px 0" }} />
@@ -239,8 +225,10 @@ export default function TodayClockWidget({ onStatusChange }) {
             </div>
             <p className="text-dark mb-0 font-bold" style={{ fontSize: "13px", lineHeight: "1.35" }}>
               {isMarked
-                ? "You have marked yourself as present today!"
-                : "You have not marked yourself as present today!"
+                ? (todayRecord?.check_out && todayRecord.check_out !== "—"
+                    ? "Shift completed for today!"
+                    : "You are marked present today!")
+                : "Not marked present today"
               }
             </p>
 
@@ -250,6 +238,15 @@ export default function TodayClockWidget({ onStatusChange }) {
                   <span className="text-dark font-semibold me-1 text-[11px]">Checked-in :</span>
                   <strong style={{ fontSize: "11px", color: "#059669", fontWeight: "700" }}>
                     {formatCheckInTime(todayRecord.check_in)}
+                  </strong>
+                </div>
+              )}
+
+              {todayRecord?.check_out && todayRecord.check_out !== "—" && (
+                <div className="d-flex align-items-center" style={{ borderLeft: "3px solid #6366f1", paddingLeft: "8px" }}>
+                  <span className="text-dark font-semibold me-1 text-[11px]">Checked-out :</span>
+                  <strong style={{ fontSize: "11px", color: "#4f46e5", fontWeight: "700" }}>
+                    {formatCheckInTime(todayRecord.check_out)}
                   </strong>
                 </div>
               )}
@@ -290,36 +287,34 @@ export default function TodayClockWidget({ onStatusChange }) {
         </div>
       </div>
 
-      <div className="mt-[2vh]">
-        {(() => {
-          if (checking) {
-            return (
-              <Button variant="primary" disabled className="w-100 py-2.5 rounded-3 fw-semibold shadow-xs">
-                <Spinner animation="border" size="sm" className="me-2" />
-                Processing...
-              </Button>
-            );
-          }
-          if (!isMarked) {
-            return (
-              <Button variant="primary" className="w-100 py-2.5 rounded-3 fw-semibold shadow-xs bg-blue-600 hover:bg-blue-700" onClick={handleCheckIn}>
-                Mark Present
-              </Button>
-            );
-          }
-          if (!todayRecord.check_out || todayRecord.check_out === "—") {
-            return (
-              <Button variant="danger" className="w-100 py-2.5 rounded-3 fw-semibold shadow-xs bg-red-600 hover:bg-red-700" onClick={handleCheckOut}>
-                Clock Out
-              </Button>
-            );
-          }
-          return (
-            <Button variant="secondary" disabled className="w-100 py-2.5 rounded-3 fw-semibold opacity-75">
-              Completed Today
-            </Button>
-          );
-        })()}
+      {/* Auto attendance status indicator */}
+      <div className="mt-3 pt-2.5 border-t border-slate-100 d-flex align-items-center justify-content-between text-[11px] text-slate-500">
+        <div className="d-flex align-items-center gap-1.5">
+          <span
+            className="rounded-circle d-inline-block"
+            style={{
+              width: "7px",
+              height: "7px",
+              backgroundColor: isMarked
+                ? (todayRecord?.check_out && todayRecord.check_out !== "—" ? "#6366f1" : "#10b981")
+                : "#94a3b8"
+            }}
+          ></span>
+          <span className="text-muted fw-medium">Auto-recorded on login & logout</span>
+        </div>
+        <span
+          className="fw-bold"
+          style={{
+            fontSize: "11px",
+            color: isMarked
+              ? (todayRecord?.check_out && todayRecord.check_out !== "—" ? "#4f46e5" : "#059669")
+              : "#64748b"
+          }}
+        >
+          {isMarked
+            ? (todayRecord?.check_out && todayRecord.check_out !== "—" ? "Checked Out" : "Active Session")
+            : "Synced"}
+        </span>
       </div>
     </Card>
   );

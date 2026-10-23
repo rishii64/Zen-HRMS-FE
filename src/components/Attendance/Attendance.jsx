@@ -1459,7 +1459,7 @@ const MyAttendance = () => {
             <LuClock className="text-emerald-600" /> {markForm.id ? "Edit Attendance & Notes" : "Mark / Update Attendance"}
           </Modal.Title>
         </Modal.Header>
-        <Modal.Body className="pt-3">
+        <Modal.Body className="pt-3 px-4">
           <Form onSubmit={handleMarkSubmit}>
             <Form.Group className="mb-3">
               <Form.Label className="small fw-bold text-slate-700">Select Employee</Form.Label>
@@ -1467,7 +1467,7 @@ const MyAttendance = () => {
                 value={markForm.employee_id}
                 onChange={(e) => setMarkForm({ ...markForm, employee_id: e.target.value })}
                 required
-                className="text-xs py-2 rounded-xl"
+                className="!text-sm py-2 rounded-xl"
               >
                 <option value="">Choose Employee ▾</option>
                 {employees.map((emp) => (
@@ -1483,7 +1483,7 @@ const MyAttendance = () => {
               <Form.Select
                 value={markForm.status}
                 onChange={(e) => setMarkForm({ ...markForm, status: e.target.value })}
-                className="text-xs py-2 rounded-xl"
+                className="!text-sm py-2 rounded-xl"
               >
                 <option value="Present">Present</option>
                 <option value="Late Present">Late Present</option>
@@ -1502,7 +1502,7 @@ const MyAttendance = () => {
                   type="time"
                   value={markForm.check_in}
                   onChange={(e) => setMarkForm({ ...markForm, check_in: e.target.value })}
-                  className="text-xs py-2 rounded-xl"
+                  className="!text-sm py-2 rounded-xl"
                 />
               </Col>
               <Col md={6}>
@@ -1511,12 +1511,12 @@ const MyAttendance = () => {
                   type="time"
                   value={markForm.check_out}
                   onChange={(e) => setMarkForm({ ...markForm, check_out: e.target.value })}
-                  className="text-xs py-2 rounded-xl"
+                  className="!text-sm py-2 rounded-xl"
                 />
               </Col>
             </Row>
 
-            <Form.Group className="mb-4">
+            <Form.Group className="mb-3">
               <Form.Label className="small fw-bold text-slate-700 flex items-center gap-1.5">
                 Notes / Remarks <span className="text-slate-400 font-normal text-[11px]">(Visible to Employee)</span>
               </Form.Label>
@@ -1526,15 +1526,15 @@ const MyAttendance = () => {
                 placeholder="Reason for late/leave or remarks visible to employee..."
                 value={markForm.notes}
                 onChange={(e) => setMarkForm({ ...markForm, notes: e.target.value })}
-                className="text-xs py-2 rounded-xl"
+                className="!text-sm py-2 rounded-xl"
               />
             </Form.Group>
 
             <div className="flex justify-end gap-2">
-              <Button variant="light" onClick={() => setShowMarkModal(false)} className="text-xs font-semibold rounded-xl">
+              <Button variant="light" onClick={() => setShowMarkModal(false)} className="!text-xs !font-semibold !bg-gray-200 !rounded-lg">
                 Cancel
               </Button>
-              <Button type="submit" disabled={saving} className="bg-emerald-600 text-xs font-bold rounded-xl border-0">
+              <Button type="submit" disabled={saving} className="!bg-emerald-600 !text-xs !font-bold !rounded-lg border-0">
                 {saving ? "Saving..." : "Save Attendance"}
               </Button>
             </div>

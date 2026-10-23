@@ -21,6 +21,7 @@ import {
   LuUserCheck,
   LuPartyPopper,
 } from "react-icons/lu";
+import { FaListCheck } from "react-icons/fa6";
 
 export default function EmployeeModulesView({ employee = {} }) {
   const navigate = useNavigate();
@@ -72,13 +73,15 @@ export default function EmployeeModulesView({ employee = {} }) {
     },
     {
       id: 5,
-      title: "Interviews",
-      desc: "Manage schedules and view candidate interview panels.",
-      btnText: "View Schedule",
+      title: "Candidate Evaluation",
+      desc: "Manage candidate interview evaluations, question bank, and feedback scorecards.",
+      btnText: "Open Evaluations",
       icon: <LuUsers size={24} />,
       iconBg: "rgba(219, 39, 119, 0.08)",
       iconColor: "#db2777",
-      onClick: () => navigate("/interviews"),
+      isLink: true,
+      linkTo: "/interview",
+      onClick: () => navigate("/interview"),
     },
     {
       id: 6,
@@ -234,10 +237,27 @@ export default function EmployeeModulesView({ employee = {} }) {
       isLink: true,
       linkTo: "/hr-events",
     },
+    {
+      id: 20,
+      title: "Admin Tasks & Facilities",
+      desc: "Oversee office supplies, facilities maintenance, logistics, and admin requests.",
+      btnText: "Open Tasks Desk",
+      icon: <FaListCheck size={24} />,
+      iconBg: "rgba(71, 85, 105, 0.08)",
+      iconColor: "#475569",
+      isLink: true,
+      linkTo: "/admin/tasks",
+      onClick: () => navigate("/admin/tasks"),
+    },
   ];
 
   const enabledTabIds = (() => {
-    // 1. Check employee.enabled_tabs or localStorage
+    // 1. If tabs_enabled is true, all 20 modules are granted
+    if (employee?.tabs_enabled || localStorage.getItem("tabs_enabled") === "true") {
+      return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
+    }
+
+    // 2. Check employee.enabled_tabs or localStorage
     const rawTabs =
       employee && employee.enabled_tabs !== undefined && employee.enabled_tabs !== null
         ? employee.enabled_tabs
@@ -254,11 +274,6 @@ export default function EmployeeModulesView({ employee = {} }) {
       } else if (Array.isArray(rawTabs)) {
         return rawTabs.map(Number).filter((id) => !isNaN(id));
       }
-    }
-
-    // 2. If tabs_enabled is true, all 18 modules are granted
-    if (employee?.tabs_enabled || localStorage.getItem("tabs_enabled") === "true") {
-      return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
     }
 
     // 3. Standard default modules

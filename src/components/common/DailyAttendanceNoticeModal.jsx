@@ -364,7 +364,7 @@ export default function DailyAttendanceNoticeModal({ isOpen, onClose, onAcknowle
               {/* Micro Takeaway Note */}
               <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 mb-3 px-0.5">
                 <FiInfo className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-blue-500 flex-shrink-0" />
-                <span>Attendance is automatically registered on login and finalized on sign out.</span>
+                <span>Attendance is auto-registered on login. Remember to use the dedicated Check-Out button before concluding your day.</span>
               </div>
 
               {/* Actions for Step 2 */}

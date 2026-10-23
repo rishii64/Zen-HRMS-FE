@@ -536,7 +536,7 @@ export default function Mediclaim() {
               variant="outline-secondary"
               size="sm"
               onClick={fetchMyMediclaim}
-              className="d-flex align-items-center gap-1.5 rounded-lg py-2 px-3 text-xs bg-white shadow-2xs"
+              className="d-flex align-items-center gap-1.5 !rounded-xl py-1 px-3 text-xs bg-white shadow-2xs hover:!text-blue-600 hover:!border-blue-600"
             >
               <LuRefreshCw size={14} /> Refresh
             </Button>

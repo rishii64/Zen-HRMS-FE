@@ -524,7 +524,7 @@ export default function HRAdminDashboardView() {
         {/* Card 1: Total Employees */}
         <Col xs={12} sm={6} lg={3}>
           <div
-            onClick={() => navigate("/admin/manage-employees")}
+            onClick={() => navigate("/hr/manage-employees")}
             className="dash-card p-4 h-100 flex flex-col justify-between shadow-2xs cursor-pointer group hover:border-violet-300 hover:shadow-md transition-all duration-200"
             role="button"
             tabIndex={0}
@@ -572,7 +572,7 @@ export default function HRAdminDashboardView() {
         {/* Card 2: Departments */}
         <Col xs={12} sm={6} lg={3}>
           <div
-            onClick={() => navigate("/admin/manage-employees")}
+            onClick={() => navigate("/hr/manage-employees")}
             className="dash-card p-4 h-100 flex flex-col justify-between shadow-2xs cursor-pointer group hover:border-sky-300 hover:shadow-md transition-all duration-200"
             role="button"
             tabIndex={0}

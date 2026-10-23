@@ -1,12 +1,19 @@
 import React, { useState, useEffect } from "react";
-import { Card, Badge } from "react-bootstrap";
-import { LuFingerprint } from "react-icons/lu";
+import { Card, Badge, Modal, Button, Spinner } from "react-bootstrap";
+import {
+  LuFingerprint,
+  LuLogOut
+} from "react-icons/lu";
+import { FiCheckCircle, FiAlertTriangle } from "react-icons/fi";
+import toast from "react-hot-toast";
 import api from "../../api";
 
 export default function TodayClockWidget({ onStatusChange }) {
   const [todayRecord, setTodayRecord] = useState(null);
   const [schedule, setSchedule] = useState(null);
   const [now, setNow] = useState(new Date());
+  const [checkingOut, setCheckingOut] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   // Ticking clock for time remaining calculation
   useEffect(() => {
@@ -47,7 +54,11 @@ export default function TodayClockWidget({ onStatusChange }) {
   useEffect(() => {
     fetchTodayStatus();
     window.addEventListener("authChanged", fetchTodayStatus);
-    return () => window.removeEventListener("authChanged", fetchTodayStatus);
+    window.addEventListener("attendanceChanged", fetchTodayStatus);
+    return () => {
+      window.removeEventListener("authChanged", fetchTodayStatus);
+      window.removeEventListener("attendanceChanged", fetchTodayStatus);
+    };
   }, []);
 
   // Safely parses a shift time string (24h or 12h or with fallbacks) into valid { h, m }
@@ -139,6 +150,52 @@ export default function TodayClockWidget({ onStatusChange }) {
   };
 
   const isMarked = Boolean(todayRecord && todayRecord.check_in && todayRecord.check_in !== "—" && todayRecord.status !== "Absent");
+  const isCheckedOut = Boolean(todayRecord && todayRecord.check_out && todayRecord.check_out !== "—");
+
+  // Calculate elapsed active duration for modal summary
+  const getElapsedDuration = () => {
+    if (!todayRecord?.check_in || todayRecord.check_in === "—") return "0h 0m";
+    const recordDate = todayRecord.date || new Date().toISOString().split("T")[0];
+    let checkInTime = new Date(`${recordDate}T${todayRecord.check_in}`);
+    if (isNaN(checkInTime.getTime())) {
+      const { h: ciH, m: ciM } = parseShiftTime(todayRecord.check_in, 10, 0);
+      checkInTime = new Date(now);
+      checkInTime.setHours(ciH, ciM, 0, 0);
+    }
+    const endRef = (todayRecord.check_out && todayRecord.check_out !== "—")
+      ? new Date(`${recordDate}T${todayRecord.check_out}`)
+      : now;
+    const diffMs = Math.max(0, endRef.getTime() - checkInTime.getTime());
+    const hrs = Math.floor(diffMs / (1000 * 60 * 60));
+    const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    return `${hrs}h ${mins}m`;
+  };
+
+  // Dedicated check-out action
+  const handleCheckOut = async () => {
+    if (checkingOut) return;
+    setCheckingOut(true);
+    try {
+      const res = await api.post("/attendance/check-out");
+      if (res.data?.success && res.data.record) {
+        setTodayRecord(res.data.record);
+        setShowConfirmModal(false);
+        try {
+          toast.success("Checked out successfully for today!");
+        } catch (_) {}
+        if (onStatusChange) onStatusChange();
+        window.dispatchEvent(new Event("attendanceChanged"));
+        window.dispatchEvent(new Event("authChanged"));
+      } else {
+        toast.error(res.data?.error || "Failed to record check-out");
+      }
+    } catch (err) {
+      console.error("Check-out error:", err);
+      toast.error(err?.response?.data?.error || "Failed to record check-out. Please try again.");
+    } finally {
+      setCheckingOut(false);
+    }
+  };
 
   // Calculate gauge progress (% of assigned shift completed)
   const getTodayProgress = () => {
@@ -285,6 +342,58 @@ export default function TodayClockWidget({ onStatusChange }) {
             </div>
           </div>
         </div>
+
+        {/* Dedicated Check-Out Action Area */}
+        {isMarked && !isCheckedOut && (
+          <div className="mt-3">
+            <button
+              type="button"
+              id="btn-dedicated-checkout"
+              onClick={() => setShowConfirmModal(true)}
+              disabled={checkingOut}
+              className="w-100 btn d-flex align-items-center justify-content-center gap-2 py-2 px-3 rounded-3 font-bold shadow-sm"
+              style={{
+                background: "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)",
+                color: "#ffffff",
+                border: "none",
+                fontSize: "13px",
+                letterSpacing: "0.02em",
+                boxShadow: "0 3px 10px rgba(220, 38, 38, 0.25)",
+                cursor: "pointer",
+                transition: "all 0.2s ease"
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "translateY(-1px)";
+                e.currentTarget.style.boxShadow = "0 5px 14px rgba(220, 38, 38, 0.35)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "0 3px 10px rgba(220, 38, 38, 0.25)";
+              }}
+            >
+              <LuLogOut size={16} />
+              <span>{checkingOut ? "Checking Out..." : "Check-Out"}</span>
+            </button>
+          </div>
+        )}
+
+        {/* Completed Shift Banner */}
+        {isMarked && isCheckedOut && (
+          <div className="mt-3">
+            <div
+              className="w-100 d-flex align-items-center justify-content-center gap-2 py-2 px-3 rounded-3 font-semibold"
+              style={{
+                backgroundColor: "#f8fafc",
+                color: "#475569",
+                border: "1px solid #e2e8f0",
+                fontSize: "12px"
+              }}
+            >
+              <FiCheckCircle size={15} style={{ color: "#6366f1" }} />
+              <span>Shift Concluded • Checked out at {formatCheckInTime(todayRecord.check_out)}</span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Auto attendance status indicator */}
@@ -296,26 +405,125 @@ export default function TodayClockWidget({ onStatusChange }) {
               width: "7px",
               height: "7px",
               backgroundColor: isMarked
-                ? (todayRecord?.check_out && todayRecord.check_out !== "—" ? "#6366f1" : "#10b981")
+                ? (isCheckedOut ? "#6366f1" : "#10b981")
                 : "#94a3b8"
             }}
           ></span>
-          <span className="text-muted fw-medium">Auto-recorded on login & logout</span>
+          <span className="text-muted fw-medium">
+            {isCheckedOut ? "Shift completed today" : "Auto-check-in on login • Manual check-out"}
+          </span>
         </div>
         <span
           className="fw-bold"
           style={{
             fontSize: "11px",
             color: isMarked
-              ? (todayRecord?.check_out && todayRecord.check_out !== "—" ? "#4f46e5" : "#059669")
+              ? (isCheckedOut ? "#4f46e5" : "#059669")
               : "#64748b"
           }}
         >
           {isMarked
-            ? (todayRecord?.check_out && todayRecord.check_out !== "—" ? "Checked Out" : "Active Session")
+            ? (isCheckedOut ? "Checked Out" : "Active Session")
             : "Synced"}
         </span>
       </div>
+
+      {/* Check-Out Confirmation Modal */}
+      <Modal
+        show={showConfirmModal}
+        onHide={() => !checkingOut && setShowConfirmModal(false)}
+        centered
+        backdrop="static"
+        keyboard={!checkingOut}
+        contentClassName="border-0 shadow-lg rounded-4 overflow-hidden"
+      >
+        <div className="p-4 bg-white">
+          <div className="d-flex align-items-center gap-3 mb-3">
+            <div
+              className="d-flex align-items-center justify-content-center rounded-circle flex-shrink-0"
+              style={{
+                width: "46px",
+                height: "46px",
+                backgroundColor: "#fef2f2",
+                border: "1px solid #fee2e2"
+              }}
+            >
+              <LuLogOut size={22} style={{ color: "#dc2626" }} />
+            </div>
+            <div>
+              <h5 className="fw-bold text-dark mb-0" style={{ fontSize: "17px" }}>Confirm Check-Out</h5>
+              <p className="text-muted mb-0" style={{ fontSize: "12px" }}>
+                Ready to conclude your shift for today?
+              </p>
+            </div>
+          </div>
+
+          <div
+            className="p-3 rounded-3 mb-3"
+            style={{ backgroundColor: "#f8fafc", border: "1px solid #e2e8f0" }}
+          >
+            <div className="d-flex justify-content-between align-items-center mb-2">
+              <span className="text-muted font-medium" style={{ fontSize: "12px" }}>Check-In Time:</span>
+              <strong className="text-dark" style={{ fontSize: "13px" }}>
+                {formatCheckInTime(todayRecord?.check_in) || "—"}
+              </strong>
+            </div>
+            <div className="d-flex justify-content-between align-items-center mb-2">
+              <span className="text-muted font-medium" style={{ fontSize: "12px" }}>Check-Out Time:</span>
+              <strong style={{ fontSize: "13px", color: "#dc2626" }}>
+                {now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })}
+              </strong>
+            </div>
+            <div className="d-flex justify-content-between align-items-center pt-2 border-top border-slate-200">
+              <span className="text-muted font-medium" style={{ fontSize: "12px" }}>Active Duration:</span>
+              <strong style={{ fontSize: "13px", color: "#2563eb" }}>
+                {getElapsedDuration()}
+              </strong>
+            </div>
+          </div>
+
+          <div className="d-flex align-items-start gap-2 mb-3 px-1 text-slate-500" style={{ fontSize: "11.5px" }}>
+            <FiAlertTriangle size={16} className="text-amber-500 flex-shrink-0 mt-0.5" />
+            <span>
+              Checking out will finalize your attendance record and calculate your total work hours for today.
+            </span>
+          </div>
+
+          <div className="d-flex align-items-center justify-content-end gap-2 pt-2 border-top">
+            <Button
+              variant="light"
+              disabled={checkingOut}
+              onClick={() => setShowConfirmModal(false)}
+              className="px-3 py-2 rounded-3 fw-semibold border text-secondary"
+              style={{ fontSize: "13px" }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              disabled={checkingOut}
+              onClick={handleCheckOut}
+              className="px-4 py-2 rounded-3 fw-semibold d-flex align-items-center gap-2 text-white border-0 shadow-sm"
+              style={{
+                background: "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)",
+                fontSize: "13px"
+              }}
+            >
+              {checkingOut ? (
+                <>
+                  <Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" />
+                  <span>Checking Out...</span>
+                </>
+              ) : (
+                <>
+                  <LuLogOut size={15} />
+                  <span>Yes, Check Out</span>
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </Card>
   );
 }

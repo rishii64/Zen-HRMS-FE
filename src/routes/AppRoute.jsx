@@ -121,7 +121,7 @@ export default function AppRoute() {
       {/* Unified Role-Based Dashboard Routes */}
       {/* <Route path="/dashboard" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "accounts", "payroll", "hod", "manager", "teamlead", "ceo", "coo", "cto", "cfo", "vp", "secretary", "management", "hrmanager"]}> <UnifiedDashboard /> </ProtectedRoute>} /> */}
       <Route path="/admin/dashboard" element={<Navigate to="/admin/tasks" replace />} />
-      <Route path="/admin/tasks" element={<ProtectedRoute allowedRoles={["admin", "hr", "management", "ceo", "coo", "cto", "cfo", "vp", "secretary", "hrmanager"]}> <UnifiedDashboard /> </ProtectedRoute>} />
+      <Route path="/admin/tasks" element={<ProtectedRoute allowedRoles={["employee", "admin", "hr", "management", "ceo", "coo", "cto", "cfo", "vp", "secretary", "hrmanager"]}> <UnifiedDashboard /> </ProtectedRoute>} />
       <Route path="/management/dashboard" element={<ProtectedRoute allowedRoles={["management", "ceo", "coo", "cto", "cfo", "vp", "secretary"]}> <UnifiedDashboard /> </ProtectedRoute>} />
       <Route path="/hr/dashboard" element={<ProtectedRoute allowedRoles={["hr", "management", "hrmanager", "ceo", "coo"]}> <UnifiedDashboard /> </ProtectedRoute>} />
       <Route path="/employee/dashboard" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "accounts", "payroll", "hod", "manager", "teamlead", "ceo", "coo", "cto", "cfo", "vp", "secretary", "management", "hrmanager"]}> <UnifiedDashboard /> </ProtectedRoute>} />

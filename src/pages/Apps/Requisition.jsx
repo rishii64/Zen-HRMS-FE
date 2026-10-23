@@ -2762,12 +2762,16 @@ const Requisition = () => {
                         </Row>
                     </Modal.Body>
                     <Modal.Footer className="bg-slate-50 border-top border-slate-200 py-2.5">
-                        <Button variant="outline-secondary" size="sm" onClick={() => setShowAddCandidateModal(false)} className="text-xs">
+                        <Button variant="outline-secondary" size="sm" onClick={() => setShowAddCandidateModal(false)} className="text-sm px-4 !rounded-lg">
                             Cancel
                         </Button>
-                        <Button variant="primary" size="sm" type="submit" disabled={submittingCandidate} className="text-xs px-3 bg-blue-600 border-blue-600">
-                            {submittingCandidate ? <Spinner size="sm" animation="border" /> : <LuUpload size={12} className="me-1" />}
-                            List in Portal for HOD Review
+                        <Button variant="primary" size="sm" type="submit" disabled={submittingCandidate} className="text-sm px-4 !rounded-lg">
+                            {submittingCandidate ? <Spinner size="sm" animation="border" /> :
+                                <div className="d-flex align-items-center gap-1">
+                                    <LuUpload size={14} className="me-1" />
+                                    List in Portal for HOD Review
+                                </div>
+                            }
                         </Button>
                     </Modal.Footer>
                 </Form>
@@ -2858,7 +2862,7 @@ const Requisition = () => {
             {/* ───────────────────────────────────────────────────────────────── */}
             {/* MODAL 5: HR INTERVIEW SCHEDULING                                 */}
             {/* ───────────────────────────────────────────────────────────────── */}
-            <Modal show={showScheduleModal} onHide={() => setShowScheduleModal(false)} size="md" centered>
+            <Modal show={showScheduleModal} onHide={() => setShowScheduleModal(false)} size="lg" centered>
                 <Modal.Header closeButton className="bg-slate-50 border-bottom border-slate-200 py-3">
                     <Modal.Title className="fs-6 fw-bold d-flex align-items-center gap-2 text-slate-900">
                         <LuCalendar className="text-blue-600" /> Schedule Interview
@@ -3031,7 +3035,7 @@ const Requisition = () => {
                             </div>
 
                             <div className="bg-slate-50 p-3 rounded-2 border border-slate-200 mb-3 text-xs">
-                                <Row className="g-2.5">
+                                <Row className="g-3">
                                     <Col md={4}>
                                         <span className="text-slate-500 d-block text-2xs">Max Salary Budget:</span>
                                         <strong className="text-slate-900 font-mono fs-6">
@@ -3062,7 +3066,7 @@ const Requisition = () => {
 
                                     <Col md={4}>
                                         <span className="text-slate-500 d-block text-2xs">Vacancies:</span>
-                                        <strong className="text-slate-900">{selectedRequisition.vacancies_count}</strong>
+                                        <strong className="text-slate-900 fs-6">{selectedRequisition.vacancies_count}</strong>
                                     </Col>
 
                                     <Col md={4}>
@@ -3113,7 +3117,7 @@ const Requisition = () => {
                     )}
                 </Modal.Body>
                 <Modal.Footer className="bg-slate-50 border-top border-slate-200 py-2">
-                    <Button variant="secondary" size="sm" onClick={() => setShowViewReqModal(false)} className="text-xs">
+                    <Button variant="secondary" size="sm" onClick={() => setShowViewReqModal(false)} className="!text-sm px-4 !rounded-lg">
                         Close
                     </Button>
                 </Modal.Footer>

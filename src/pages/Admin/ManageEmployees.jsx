@@ -40,7 +40,22 @@ import {
   LuExternalLink,
   LuFilter,
   LuArrowUpDown,
+  LuFingerprint,
+  LuWallet,
+  LuFileCheck,
+  LuUsers,
+  LuTrendingUp,
+  LuAward,
+  LuGraduationCap,
+  LuReceipt,
+  LuBadgeCheck,
+  LuStethoscope,
+  LuClock,
+  LuUserCheck,
+  LuPartyPopper,
+  LuLogOut,
 } from "react-icons/lu";
+import { FaListCheck } from "react-icons/fa6";
 import { BsThreeDots } from "react-icons/bs";
 import { getApiBaseUrl, getBackendBaseUrl, getUploadUrl, UPLOADS_BASE } from "../../api/axios";
 
@@ -116,25 +131,52 @@ function getEmploymentTypeStyle(type) {
 }
 
 const ALL_TABS = [
-  { id: 1, name: "Attendance Tracker", desc: "Track daily shift times, roster logs, and check-in history", badge: "Attendance" },
-  { id: 2, name: "Leave Requests", desc: "Apply for leaves, view balances, and check status", badge: "Leaves" },
-  { id: 3, name: "Payroll & Salary", desc: "Review monthly salary slips, tax records, and allowances", badge: "Payroll" },
-  { id: 14, name: "Salary Slips (Payslips)", desc: "Download and view official monthly salary payslips and earnings", badge: "Payslip" },
-  { id: 4, name: "Profile & Documents", desc: "Update personal records and upload files for HR review", badge: "Profile" },
-  { id: 5, name: "Candidate Evaluation", desc: "Manage candidate interview evaluations, question bank, and feedback scorecards", badge: "Hiring" },
-  { id: 6, name: "Performance Appraisal", desc: "Review annual/probation appraisals, feedback loops, and rating scorecards", badge: "Appraisal" },
-  { id: 15, name: "Performance KPI", desc: "Set performance goals, track KPI achievements, and review PMS scorecards", badge: "KPI" },
-  { id: 7, name: "Training Modules", desc: "Access company training modules, induction resources, and onboarding tasks", badge: "Training" },
-  { id: 8, name: "IT Declaration", desc: "Declare tax investments, 80C/80D deductions, and tax regime", badge: "Taxation" },
-  { id: 9, name: "ID-Card & Documents", desc: "Preview official corporate badge, upload ID proofs, and download digital ID", badge: "Identity" },
-  { id: 10, name: "Mediclaim & Health Insurance", desc: "Digital health E-card, covered dependents, hospital list, and insurance claims", badge: "Mediclaim" },
-  { id: 11, name: "Holiday Calendar", desc: "View company holiday list, festival breaks, and official days off", badge: "Calendar" },
-  { id: 12, name: "Company Policies", desc: "Access company policies, code of conduct, and employee handbook", badge: "Policy" },
-  { id: 13, name: "Separation & Resignation", desc: "Submit formal resignation notice, track clearances, and exit tasks", badge: "Exit" },
-  { id: 16, name: "Work Schedule & Roster", desc: "View weekly shift schedules, roster duties, and timing allocations", badge: "Schedule" },
-  { id: 17, name: "Job Requisition Desk", desc: "Raise workforce requisitions, job vacancies, and review candidate applications", badge: "Requisition" },
-  { id: 18, name: "Employee Onboarding", desc: "Complete employee onboarding checklists, doc verification, and asset allocation", badge: "Onboarding" },
+  { id: 1, name: "Attendance Tracker", desc: "Track daily shift times, roster logs, and check-in / check-out history", badge: "Attendance", category: "Core", icon: "fingerprint" },
+  { id: 16, name: "Work Schedule & Roster", desc: "View weekly shift schedules, roster duties, and timing allocations", badge: "Schedule", category: "Core", icon: "clock" },
+  { id: 2, name: "Leave Requests", desc: "Apply for leaves, view balances, and check approval status", badge: "Leaves", category: "Core", icon: "calendar" },
+  { id: 11, name: "Holiday Calendar", desc: "View company holiday list, festival breaks, and official days off", badge: "Calendar", category: "Core", icon: "calendar" },
+  { id: 4, name: "Profile & Documents", desc: "Update personal records and upload files for HR review", badge: "Profile", category: "Core", icon: "user" },
+  { id: 9, name: "ID-Card & Documents", desc: "Preview official corporate badge, upload ID proofs, and download digital ID", badge: "Identity", category: "Core", icon: "badgecheck" },
+  { id: 3, name: "Payroll & Salary", desc: "Review monthly salary slips, tax records, and allowances", badge: "Payroll", category: "Finance", icon: "wallet" },
+  { id: 14, name: "Salary Slips (Payslips)", desc: "Download and view official monthly salary payslips and earnings", badge: "Payslip", category: "Finance", icon: "filecheck" },
+  { id: 8, name: "IT Declaration", desc: "Declare tax investments, 80C/80D deductions, and tax regime", badge: "Taxation", category: "Finance", icon: "receipt" },
+  { id: 10, name: "Mediclaim & Health Insurance", desc: "Digital health E-card, covered dependents, hospital list, and insurance claims", badge: "Mediclaim", category: "Finance", icon: "stethoscope" },
+  { id: 15, name: "Performance KPI", desc: "Set performance goals, track KPI achievements, and review PMS scorecards", badge: "KPI", category: "Growth", icon: "award" },
+  { id: 6, name: "Performance Appraisal", desc: "Review annual/probation appraisals, feedback loops, and rating scorecards", badge: "Appraisal", category: "Growth", icon: "trendingup" },
+  { id: 7, name: "Training Modules", desc: "Access company training modules, induction resources, and onboarding tasks", badge: "Training", category: "Growth", icon: "graduationcap" },
+  { id: 13, name: "Separation & Resignation", desc: "Submit formal resignation notice, track clearances, and exit tasks", badge: "Exit", category: "Growth", icon: "logout" },
+  { id: 5, name: "Candidate Evaluation", desc: "Manage candidate interview evaluations, question bank, and feedback scorecards", badge: "Hiring", category: "Operations", icon: "users" },
+  { id: 17, name: "Job Requisition Desk", desc: "Raise workforce requisitions, job vacancies, and review candidate applications", badge: "Requisition", category: "Operations", icon: "briefcase" },
+  { id: 18, name: "Employee Onboarding", desc: "Complete employee onboarding checklists, doc verification, and asset allocation", badge: "Onboarding", category: "Operations", icon: "usercheck" },
+  { id: 19, name: "HR Events & Townhalls", desc: "View corporate gatherings, celebrations, meetings, and official event announcements", badge: "Events", category: "Operations", icon: "partypopper" },
+  { id: 20, name: "Admin Tasks & Facilities", desc: "Oversee office supplies, facilities maintenance, logistics, and admin requests", badge: "Admin", category: "Operations", icon: "listcheck" },
+  { id: 12, name: "Company Policies", desc: "Access company policies, code of conduct, and employee handbook", badge: "Policy", category: "Operations", icon: "shieldcheck" },
 ];
+
+const renderTabIcon = (iconName) => {
+  switch (iconName) {
+    case "fingerprint": return <LuFingerprint size={16} className="text-sky-600" />;
+    case "calendar": return <LuCalendar size={16} className="text-emerald-600" />;
+    case "wallet": return <LuWallet size={16} className="text-orange-600" />;
+    case "filecheck": return <LuFileCheck size={16} className="text-purple-600" />;
+    case "user": return <LuUser size={16} className="text-indigo-600" />;
+    case "users": return <LuUsers size={16} className="text-pink-600" />;
+    case "trendingup": return <LuTrendingUp size={16} className="text-indigo-600" />;
+    case "award": return <LuAward size={16} className="text-amber-600" />;
+    case "graduationcap": return <LuGraduationCap size={16} className="text-cyan-600" />;
+    case "receipt": return <LuReceipt size={16} className="text-blue-600" />;
+    case "badgecheck": return <LuBadgeCheck size={16} className="text-teal-600" />;
+    case "stethoscope": return <LuStethoscope size={16} className="text-rose-600" />;
+    case "shieldcheck": return <LuShieldCheck size={16} className="text-blue-600" />;
+    case "logout": return <LuLogOut size={16} className="text-red-600" />;
+    case "clock": return <LuClock size={16} className="text-orange-500" />;
+    case "briefcase": return <LuBriefcase size={16} className="text-cyan-700" />;
+    case "usercheck": return <LuUserCheck size={16} className="text-violet-600" />;
+    case "partypopper": return <LuPartyPopper size={16} className="text-pink-600" />;
+    case "listcheck": return <FaListCheck size={15} className="text-slate-600" />;
+    default: return <LuLayoutGrid size={16} className="text-primary" />;
+  }
+};
 
 const EMPTY_FORM = {
   employee_code: "",
@@ -1166,6 +1208,8 @@ const ManageEmployees = () => {
     selectedTabs: []
   });
   const [savingTabs, setSavingTabs] = useState(false);
+  const [tabSearch, setTabSearch] = useState("");
+  const [tabCategoryFilter, setTabCategoryFilter] = useState("All");
   const [role, setRole] = useState(localStorage.getItem("role") || "admin");
   const [globalEsiThreshold, setGlobalEsiThreshold] = useState(21000);
   const [showEsiModal, setShowEsiModal] = useState(false);
@@ -1578,6 +1622,8 @@ const ManageEmployees = () => {
     } else if (emp.tabs_enabled) {
       currentTabs = ALL_TABS.map(t => t.id);
     }
+    setTabSearch("");
+    setTabCategoryFilter("All");
     setTabsModal({
       show: true,
       employee: emp,
@@ -1598,15 +1644,24 @@ const ManageEmployees = () => {
       const data = await res.json();
       if (data.success) {
         toast.success("Module permissions updated successfully!");
+        const newTabsStr = tabsModal.selectedTabs.join(",");
         setEmployees(prev =>
           prev.map(emp =>
             (emp.employee_code || emp.employee_id) === empCode
-              ? { ...emp, enabled_tabs: tabsModal.selectedTabs.join(",") }
+              ? { ...emp, enabled_tabs: newTabsStr }
               : emp
           )
         );
         fetchEmployees();
         setTabsModal({ show: false, employee: null, selectedTabs: [] });
+
+        const myCode = localStorage.getItem("employeeCode");
+        if (myCode && String(myCode).toLowerCase().trim() === String(empCode).toLowerCase().trim()) {
+          localStorage.setItem("enabled_tabs", newTabsStr);
+        }
+        window.dispatchEvent(new CustomEvent("tabsUpdated", {
+          detail: { employee_code: empCode, enabled_tabs: newTabsStr, selectedTabs: tabsModal.selectedTabs }
+        }));
       } else {
         toast.error(data.error || "Failed to update tabs");
       }
@@ -1974,7 +2029,7 @@ const ManageEmployees = () => {
 
               const tabCount = emp.enabled_tabs
                 ? emp.enabled_tabs.split(",").filter(Boolean).length
-                : 4;
+                : (emp.tabs_enabled ? ALL_TABS.length : 4);
 
               return (
                 <Col key={emp.employee_code || idx}>
@@ -1985,7 +2040,7 @@ const ManageEmployees = () => {
                         <Dropdown.Toggle as="button" className="emp-dots-btn">
                           <BsThreeDots size={18} />
                         </Dropdown.Toggle>
-                        <Dropdown.Menu className="shadow-lg border-0 rounded-3 py-2">
+                        <Dropdown.Menu className="shadow-lg border-0 rounded-3 py-2 !text-sm">
                           {canManageEmployees && (
                             <>
                               <Dropdown.Item
@@ -2195,7 +2250,7 @@ const ManageEmployees = () => {
                   const avatarSrc = getEmployeeAvatar(emp);
                   const tabCount = emp.enabled_tabs
                     ? emp.enabled_tabs.split(",").filter(Boolean).length
-                    : 4;
+                    : (emp.tabs_enabled ? ALL_TABS.length : 4);
 
                   return (
                     <tr key={emp.employee_code || idx}>
@@ -2875,8 +2930,9 @@ const ManageEmployees = () => {
           </Modal.Body>
           <Modal.Footer className="p-2">
             <Button
+            size="sm"
               variant="link"
-              className="text-muted text-decoration-none"
+              className="text-muted text-decoration-none !font-semibold !bg-gray-200 !rounded-lg px-3"
               onClick={() => setShowModal(false)}
             >
               Cancel
@@ -2886,6 +2942,7 @@ const ManageEmployees = () => {
               size="sm"
               onClick={handleSave}
               disabled={saving}
+              className="!rounded-lg px-3"
             >
               {saving ? "Saving..." : editMode ? "Update" : "Save"}
             </Button>
@@ -2921,7 +2978,11 @@ const ManageEmployees = () => {
         {/* ══ CONFIGURE TABS MODAL ══ */}
         <Modal
           show={tabsModal.show}
-          onHide={() => setTabsModal({ show: false, employee: null, selectedTabs: [] })}
+          onHide={() => {
+            setTabSearch("");
+            setTabCategoryFilter("All");
+            setTabsModal({ show: false, employee: null, selectedTabs: [] });
+          }}
           size="lg"
           centered
         >
@@ -2936,24 +2997,74 @@ const ManageEmployees = () => {
             </div>
           </Modal.Header>
           <Modal.Body className="pt-2">
+            {/* Search and Category Filter Controls */}
+            <div className="d-flex flex-column gap-2 mb-3">
+              <InputGroup size="sm">
+                <InputGroup.Text className="bg-white border-end-0">
+                  <LuSearch className="text-muted" size={14} />
+                </InputGroup.Text>
+                <Form.Control
+                  type="text"
+                  placeholder="Search modules by title, badge, or keywords..."
+                  value={tabSearch}
+                  onChange={(e) => setTabSearch(e.target.value)}
+                  className="border-start-0 ps-1"
+                  style={{ fontSize: "12.5px" }}
+                />
+                {tabSearch && (
+                  <Button
+                    variant="outline-secondary"
+                    className="border-start-0"
+                    onClick={() => setTabSearch("")}
+                  >
+                    <LuX size={13} />
+                  </Button>
+                )}
+              </InputGroup>
+
+              {/* Category Pills */}
+              <div className="d-flex flex-wrap gap-1.5 align-items-center">
+                {[
+                  { key: "All", label: "All Modules", count: ALL_TABS.length },
+                  { key: "Core", label: "Core & Time", count: ALL_TABS.filter(t => t.category === "Core").length },
+                  { key: "Finance", label: "Payroll & Tax", count: ALL_TABS.filter(t => t.category === "Finance").length },
+                  { key: "Growth", label: "PMS & Growth", count: ALL_TABS.filter(t => t.category === "Growth").length },
+                  { key: "Operations", label: "HR Operations", count: ALL_TABS.filter(t => t.category === "Operations").length },
+                ].map((cat) => (
+                  <button
+                    key={cat.key}
+                    type="button"
+                    onClick={() => setTabCategoryFilter(cat.key)}
+                    className={`btn btn-sm py-0.5 px-2.5 rounded-pill !text-xs fw-semibold transition-all ${tabCategoryFilter === cat.key
+                      ? "btn-primary text-white shadow-xs"
+                      : "btn-light text-secondary border hover:bg-slate-100"
+                      }`}
+                  >
+                    {cat.label} ({cat.count})
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Selection Status & Quick Actions Bar */}
             <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 bg-light p-2.5 rounded-3 mb-3 border">
               <div className="small fw-semibold text-secondary">
                 Selected: <span className="badge bg-primary text-white rounded-pill px-2.5 py-1">{tabsModal.selectedTabs.length} of {ALL_TABS.length} Modules</span>
               </div>
-              <div className="d-flex gap-1.5">
+              <div className="d-flex flex-wrap gap-1.5">
                 <Button
                   variant="outline-secondary"
                   size="sm"
                   onClick={() => setTabsModal(prev => ({ ...prev, selectedTabs: ALL_TABS.map(t => t.id) }))}
-                  className="py-1 px-2 text-xs"
+                  className="py-1 px-2 !text-xs"
                 >
-                  Select All
+                  Select All ({ALL_TABS.length})
                 </Button>
                 <Button
                   variant="outline-secondary"
                   size="sm"
                   onClick={() => setTabsModal(prev => ({ ...prev, selectedTabs: [] }))}
-                  className="py-1 px-2 text-xs"
+                  className="py-1 px-2 !text-xs"
                 >
                   Deselect All
                 </Button>
@@ -2961,65 +3072,108 @@ const ManageEmployees = () => {
                   variant="outline-primary"
                   size="sm"
                   onClick={() => setTabsModal(prev => ({ ...prev, selectedTabs: [1, 2, 3, 4, 8, 9, 10, 11, 12, 14, 16] }))}
-                  className="py-1 px-2 text-xs"
+                  className="py-1 px-2 !text-xs"
                 >
-                  Standard Default
+                  Standard Default (11)
                 </Button>
               </div>
             </div>
 
-            <Row className="g-2">
-              {ALL_TABS.map((tab) => {
-                const isChecked = tabsModal.selectedTabs.includes(tab.id);
-                return (
-                  <Col xs={12} sm={6} key={tab.id}>
-                    <div
-                      onClick={() => {
-                        setTabsModal(prev => {
-                          const updated = isChecked
-                            ? prev.selectedTabs.filter(id => id !== tab.id)
-                            : [...prev.selectedTabs, tab.id];
-                          return { ...prev, selectedTabs: updated };
-                        });
-                      }}
-                      className={`p-3 rounded-3 border h-100 d-flex align-items-start gap-2.5 transition-all ${isChecked
-                        ? "bg-primary-subtle border-primary shadow-xs"
-                        : "bg-white border-light-subtle hover:bg-light"
-                        }`}
-                      style={{ cursor: "pointer", transition: "all 0.15s ease-in-out" }}
-                    >
-                      <Form.Check
-                        type="checkbox"
-                        id={`tab-checkbox-${tab.id}`}
-                        checked={isChecked}
-                        onChange={() => { }} // Controlled by card click
-                        className="mt-0.5"
-                      />
-                      <div className="flex-grow-1" style={{ minWidth: 0 }}>
-                        <div className="d-flex justify-content-between align-items-center mb-0.5">
-                          <strong className={`small text-truncate ${isChecked ? "text-primary fw-bold" : "text-dark fw-semibold"}`}>
-                            {tab.name}
-                          </strong>
-                          <span className={`badge text-[10px] rounded-pill ${isChecked ? "bg-primary text-white" : "bg-light text-secondary border"}`}>
-                            {tab.badge}
-                          </span>
-                        </div>
-                        <p className="text-muted small m-0 text-[12px] line-clamp-1" style={{ lineHeight: "1.25" }}>
-                          {tab.desc}
-                        </p>
-                      </div>
+            {/* Scrollable Modules Grid */}
+            <div style={{ maxHeight: "56vh", overflowY: "auto", paddingRight: "4px" }}>
+              {(() => {
+                const filtered = ALL_TABS.filter((tab) => {
+                  const matchesCat = tabCategoryFilter === "All" || tab.category === tabCategoryFilter;
+                  if (!matchesCat) return false;
+                  if (!tabSearch.trim()) return true;
+                  const q = tabSearch.toLowerCase().trim();
+                  return (
+                    tab.name.toLowerCase().includes(q) ||
+                    tab.desc.toLowerCase().includes(q) ||
+                    tab.badge.toLowerCase().includes(q)
+                  );
+                });
+
+                if (filtered.length === 0) {
+                  return (
+                    <div className="text-center py-4 text-muted small">
+                      No modules match "<strong>{tabSearch}</strong>".
                     </div>
-                  </Col>
+                  );
+                }
+
+                return (
+                  <Row className="g-2">
+                    {filtered.map((tab) => {
+                      const isChecked = tabsModal.selectedTabs.includes(tab.id);
+                      return (
+                        <Col xs={12} sm={6} key={tab.id}>
+                          <div
+                            onClick={() => {
+                              setTabsModal(prev => {
+                                const updated = isChecked
+                                  ? prev.selectedTabs.filter(id => id !== tab.id)
+                                  : [...prev.selectedTabs, tab.id];
+                                return { ...prev, selectedTabs: updated };
+                              });
+                            }}
+                            className={`p-2.5 rounded-3 border h-100 d-flex align-items-start gap-2.5 transition-all ${isChecked
+                              ? "bg-primary-subtle border-primary shadow-xs"
+                              : "bg-white border-light-subtle hover:bg-light"
+                              }`}
+                            style={{ cursor: "pointer", transition: "all 0.15s ease-in-out" }}
+                          >
+                            <Form.Check
+                              type="checkbox"
+                              id={`tab-checkbox-${tab.id}`}
+                              checked={isChecked}
+                              onChange={() => { }} // Controlled by card click
+                              className="mt-1"
+                            />
+                            <div
+                              className="p-1.5 rounded-2 d-flex align-items-center justify-content-center flex-shrink-0 mt-0.5"
+                              style={{
+                                backgroundColor: isChecked ? "#ffffff" : "#f8fafc",
+                                border: "1px solid",
+                                borderColor: isChecked ? "#bfdbfe" : "#e2e8f0",
+                                width: "32px",
+                                height: "32px"
+                              }}
+                            >
+                              {renderTabIcon(tab.icon)}
+                            </div>
+                            <div className="flex-grow-1" style={{ minWidth: 0 }}>
+                              <div className="d-flex justify-content-between align-items-center mb-0.5">
+                                <strong className={`small text-truncate ${isChecked ? "text-primary fw-bold" : "text-dark fw-semibold"}`}>
+                                  {tab.name}
+                                </strong>
+                                <span className={`badge text-[10px] rounded-pill ${isChecked ? "bg-primary text-white" : "bg-light text-secondary border"}`}>
+                                  {tab.badge}
+                                </span>
+                              </div>
+                              <p className="text-muted small m-0 text-[11.5px] line-clamp-1" style={{ lineHeight: "1.25" }}>
+                                {tab.desc}
+                              </p>
+                            </div>
+                          </div>
+                        </Col>
+                      );
+                    })}
+                  </Row>
                 );
-              })}
-            </Row>
+              })()}
+            </div>
           </Modal.Body>
           <Modal.Footer className="border-0 pt-0">
             <Button
               variant="light"
               size="sm"
               disabled={savingTabs}
-              onClick={() => setTabsModal({ show: false, employee: null, selectedTabs: [] })}
+              onClick={() => {
+                setTabSearch("");
+                setTabCategoryFilter("All");
+                setTabsModal({ show: false, employee: null, selectedTabs: [] });
+              }}
               className="px-3"
             >
               Cancel
@@ -3170,7 +3324,7 @@ const ManageEmployees = () => {
                         <div className="d-flex justify-content-between align-items-center border-bottom mb-1 pb-1">
                           <small className="text-muted fw-bold text-nowrap me-2">Tabs Enabled:</small>
                           <div className="d-flex align-items-center gap-1">
-                            <small className="fw-bold">{emp.enabled_tabs ? emp.enabled_tabs.split(",").filter(Boolean).length : 4} Tabs</small>
+                            <small className="fw-bold">{emp.enabled_tabs ? emp.enabled_tabs.split(",").filter(Boolean).length : (emp.tabs_enabled ? ALL_TABS.length : 4)} Tabs</small>
                             {(isAdmin || isHR) && (
                               <Button
                                 variant="link"

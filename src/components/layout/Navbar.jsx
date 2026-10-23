@@ -62,58 +62,67 @@ const ALL_APPS = [
     keywords: ["home", "dashboard", "overview", "analytics", "stats"],
   },
   {
-    id: "app_profile",
-    title: "My Profile",
-    tabId: 4,
-    icon: <LuUser className="text-indigo-500" />,
-    route: "/profile",
-    roles: ALL_STAFF_ROLES,
-    keywords: ["profile", "user", "personal", "account", "details", "info"],
-  },
-  {
     id: "app_attendance",
-    title: "Attendance Tracking",
+    title: "Attendance Tracker",
     tabId: 1,
     icon: <LuCalendar className="text-emerald-500" />,
     route: "/attendance",
     roles: ALL_STAFF_ROLES,
-    keywords: ["attendance", "clock in", "check in", "roster", "logs", "timesheet", "checkin"],
+    keywords: ["attendance", "tracker", "attendance tracking", "clock in", "check in", "roster", "logs", "timesheet", "checkin"],
   },
   {
     id: "app_leave",
-    title: "Leave Management",
+    title: "Leave Requests",
     tabId: 2,
     icon: <LuFileText className="text-teal-500" />,
     route: "/leave",
     roles: ALL_STAFF_ROLES,
-    keywords: ["leave", "apply leave", "vacation", "pto", "holiday leave", "time off", "absence"],
-  },
-  {
-    id: "app_schedule",
-    title: "Schedule & Roster",
-    tabId: 16,
-    icon: <LuClock className="text-orange-500" />,
-    route: "/schedule",
-    roles: ALL_STAFF_ROLES,
-    keywords: ["schedule", "duty", "roster", "shift", "shift timings", "timetable"],
-  },
-  {
-    id: "app_payslip",
-    title: "Salary Slips",
-    tabId: 14,
-    icon: <LuFileCheck className="text-purple-600" />,
-    route: "/payslip",
-    roles: ALL_STAFF_ROLES,
-    keywords: ["salary", "slip", "payslip", "earnings", "wage", "pay", "slips"],
+    keywords: ["leave", "leaves", "leave requests", "leave management", "apply leave", "vacation", "pto", "holiday leave", "time off", "absence"],
   },
   {
     id: "app_payroll_mgmt",
-    title: "Payroll Management",
+    title: "Payroll & Salary",
     tabId: 3,
     icon: <LuWallet className="text-emerald-600" />,
     route: "/payroll",
     roles: ALL_STAFF_ROLES,
-    keywords: ["payroll", "tax", "compensation", "salary structure", "ctc"],
+    keywords: ["payroll", "salary", "payroll management", "tax", "compensation", "salary structure", "ctc"],
+  },
+  {
+    id: "app_profile",
+    title: "Profile & Documents",
+    tabId: 4,
+    icon: <LuUser className="text-indigo-500" />,
+    route: "/profile",
+    roles: ALL_STAFF_ROLES,
+    keywords: ["profile", "my profile", "user", "personal", "account", "details", "info", "documents", "files"],
+  },
+  {
+    id: "app_interview",
+    title: "Candidate Evaluation",
+    tabId: 5,
+    icon: <SiGoogledocs className="text-indigo-600" />,
+    route: "/interview",
+    roles: ALL_STAFF_ROLES,
+    keywords: ["interview", "candidate", "candidate evaluation", "evaluation", "assessment", "question bank", "scorecard"],
+  },
+  {
+    id: "app_appraisal",
+    title: "Performance Appraisal",
+    tabId: 6,
+    icon: <LuTrendingUp className="text-indigo-500" />,
+    route: "/appraisal",
+    roles: ALL_STAFF_ROLES,
+    keywords: ["appraisal", "performance", "performance appraisal", "review", "scorecard", "evaluation", "rating"],
+  },
+  {
+    id: "app_training",
+    title: "Training Modules",
+    tabId: 7,
+    icon: <LuGraduationCap className="text-cyan-600" />,
+    route: "/training",
+    roles: ALL_STAFF_ROLES,
+    keywords: ["training", "learning", "modules", "training modules", "training & development", "induction", "skills", "onboarding courses", "assessments", "certifications"],
   },
   {
     id: "app_it_declaration",
@@ -131,16 +140,16 @@ const ALL_APPS = [
     icon: <LuBadgeCheck className="text-cyan-600" />,
     route: "/id-card",
     roles: ALL_STAFF_ROLES,
-    keywords: ["id", "id card", "documents", "identity", "aadhaar", "pan", "badge", "corporate id"],
+    keywords: ["id", "id card", "id-card", "documents", "identity", "aadhaar", "pan", "badge", "corporate id"],
   },
   {
     id: "app_mediclaim",
-    title: "Mediclaim & Insurance",
+    title: "Mediclaim & Health Insurance",
     tabId: 10,
     icon: <LuStethoscope className="text-rose-600" />,
     route: "/mediclaim",
     roles: ALL_STAFF_ROLES,
-    keywords: ["mediclaim", "medical", "insurance", "health", "hospital", "claims", "coverage", "card"],
+    keywords: ["mediclaim", "medical", "insurance", "health", "health insurance", "hospital", "claims", "coverage", "card"],
   },
   {
     id: "app_holidays",
@@ -149,7 +158,7 @@ const ALL_APPS = [
     icon: <LuCalendar className="text-rose-500" />,
     route: "/holidays",
     roles: ALL_STAFF_ROLES,
-    keywords: ["holiday", "calendar", "festival", "off days", "events"],
+    keywords: ["holiday", "calendar", "festival", "off days", "events", "holiday calendar"],
   },
   {
     id: "app_policies",
@@ -158,70 +167,79 @@ const ALL_APPS = [
     icon: <LuShieldCheck className="text-blue-600" />,
     route: "/policies",
     roles: ALL_STAFF_ROLES,
-    keywords: ["policy", "policies", "rules", "compliance", "handbook", "guidelines", "terms"],
-  },
-  {
-    id: "app_training",
-    title: "Training & Development",
-    tabId: 7,
-    icon: <LuGraduationCap className="text-cyan-600" />,
-    route: "/training",
-    roles: ALL_STAFF_ROLES,
-    keywords: ["training", "learning", "modules", "induction", "skills", "onboarding courses", "assessments", "certifications"],
-  },
-  {
-    id: "app_kpi_hub",
-    title: "KPI & Goal Tracker",
-    tabId: 15,
-    icon: <LuAward className="text-amber-600" />,
-    route: "/kpi",
-    roles: ALL_STAFF_ROLES,
-    keywords: ["kpi", "goals", "appraisal", "performance", "pms", "progression", "review", "rating", "scorecard", "evaluation"],
-  },
-  {
-    id: "app_appraisal",
-    title: "Performance Appraisal",
-    tabId: 6,
-    icon: <LuTrendingUp className="text-indigo-500" />,
-    route: "/appraisal",
-    roles: ALL_STAFF_ROLES,
-    keywords: ["appraisal", "performance", "review", "scorecard", "evaluation", "rating"],
+    keywords: ["policy", "policies", "rules", "compliance", "handbook", "guidelines", "terms", "company policies"],
   },
   {
     id: "app_resignation",
-    title: "Resignation",
+    title: "Separation & Resignation",
     tabId: 13,
     icon: <LuLogOut className="text-red-500" />,
     route: "/resignation",
     roles: ALL_STAFF_ROLES,
-    keywords: ["resignation", "separation", "exit", "quit", "clearance"],
+    keywords: ["resignation", "separation", "exit", "quit", "clearance", "separation & resignation"],
+  },
+  {
+    id: "app_payslip",
+    title: "Salary Slips (Payslips)",
+    tabId: 14,
+    icon: <LuFileCheck className="text-purple-600" />,
+    route: "/payslip",
+    roles: ALL_STAFF_ROLES,
+    keywords: ["salary", "slip", "payslip", "payslips", "salary slips", "earnings", "wage", "pay", "slips"],
+  },
+  {
+    id: "app_kpi_hub",
+    title: "Performance KPI",
+    tabId: 15,
+    icon: <LuAward className="text-amber-600" />,
+    route: "/kpi",
+    roles: ALL_STAFF_ROLES,
+    keywords: ["kpi", "goals", "performance kpi", "kpi & goal tracker", "appraisal", "performance", "pms", "progression", "review", "rating", "scorecard", "evaluation"],
+  },
+  {
+    id: "app_schedule",
+    title: "Work Schedule & Roster",
+    tabId: 16,
+    icon: <LuClock className="text-orange-500" />,
+    route: "/schedule",
+    roles: ALL_STAFF_ROLES,
+    keywords: ["schedule", "duty", "roster", "shift", "shift timings", "timetable", "work schedule & roster"],
   },
   {
     id: "app_requisition",
-    title: "Requisition Desk",
+    title: "Job Requisition Desk",
     tabId: 17,
     icon: <LuBriefcase className="text-cyan-600" />,
     route: "/requisition",
-    roles: ["hr", "hod", "manager", "teamlead", "ceo", "coo", "hrmanager"],
-    keywords: ["requisition", "hiring", "cv", "resume", "candidates", "jobs", "desk", "shortlisting"],
+    roles: ALL_STAFF_ROLES,
+    keywords: ["requisition", "hiring", "cv", "resume", "candidates", "jobs", "desk", "shortlisting", "job requisition desk"],
   },
   {
     id: "app_onboarding",
-    title: "Onboarding",
+    title: "Employee Onboarding",
     tabId: 18,
     icon: <LuUserCheck className="text-violet-600" />,
     route: "/onboarding",
-    roles: ["hr", "admin", "hod", "manager", "teamlead", "ceo", "coo", "accounts", "payroll"],
-    keywords: ["onboarding", "joining", "induction", "training", "probation", "assets", "documentation", "permanent"],
+    roles: ALL_STAFF_ROLES,
+    keywords: ["onboarding", "joining", "induction", "training", "probation", "assets", "documentation", "permanent", "employee onboarding"],
   },
   {
-    id: "app_interview",
-    title: "Candidate Evaluation",
-    tabId: 5,
-    icon: <SiGoogledocs className="text-indigo-600" />,
-    route: "/interview",
-    roles: ["hr", "hod", "admin", "manager", "teamlead", "ceo", "coo", "hrmanager"],
-    keywords: ["interview", "candidate", "evaluation", "assessment", "question bank"],
+    id: "app_hr_events",
+    title: "HR Events & Townhalls",
+    tabId: 19,
+    icon: <LuPartyPopper className="text-pink-600" />,
+    route: "/hr-events",
+    roles: ALL_STAFF_ROLES,
+    keywords: ["event", "events", "hr events", "townhall", "townhalls", "celebration", "meeting", "gathering", "presentation", "announcements", "hr events & townhalls"],
+  },
+  {
+    id: "app_admin_tasks",
+    title: "Admin Tasks & Facilities",
+    tabId: 20,
+    icon: <FaListCheck className="text-slate-700" />,
+    route: "/admin/tasks",
+    roles: ALL_STAFF_ROLES,
+    keywords: ["admin", "unofficial", "tasks", "office", "maintenance", "facilities", "supplies", "logistics", "courier", "cleaning", "admin tasks & facilities"],
   },
   {
     id: "app_manage_emp",
@@ -240,24 +258,6 @@ const ALL_APPS = [
     route: "/accounts/dashboard",
     roles: ["accounts", "payroll", "ceo", "management"],
     keywords: ["accounts", "finance", "billing", "dashboard", "ledger"],
-  },
-  {
-    id: "app_admin_tasks",
-    title: "Admin Tasks & Facilities",
-    tabId: null,
-    icon: <FaListCheck className="text-slate-700" />,
-    route: "/admin/tasks",
-    roles: ["admin", "management", "hr", "ceo", "coo"],
-    keywords: ["admin", "unofficial", "tasks", "office", "maintenance", "facilities", "supplies", "logistics", "courier", "cleaning"],
-  },
-  {
-    id: "app_hr_events",
-    title: "HR Events",
-    tabId: null,
-    icon: <LuPartyPopper className="text-pink-600" />,
-    route: "/hr-events",
-    roles: ALL_STAFF_ROLES,
-    keywords: ["event", "events", "hr events", "townhall", "celebration", "meeting", "gathering", "presentation", "announcements"],
   },
 ];
 
@@ -398,6 +398,46 @@ const AppNavbar = () => {
   const [appSearch, setAppSearch] = useState("");
   const [isDailyNoticeOpen, setIsDailyNoticeOpen] = useState(false);
 
+  // Synced employee tabs state
+  const [enabledTabsState, setEnabledTabsState] = useState(() => {
+    const rawLocal = localStorage.getItem("enabled_tabs");
+    if (rawLocal !== null && rawLocal !== undefined) return rawLocal;
+    const userObj = getAuthUser();
+    return userObj?.enabled_tabs || null;
+  });
+  const [tabsEnabledState, setTabsEnabledState] = useState(() => {
+    const rawLocal = localStorage.getItem("tabs_enabled");
+    if (rawLocal !== null && rawLocal !== undefined) return rawLocal === "true";
+    const userObj = getAuthUser();
+    return userObj?.tabs_enabled !== undefined
+      ? (userObj.tabs_enabled === true || userObj.tabs_enabled === "true")
+      : false;
+  });
+
+  // Proactively refresh user's latest tab permissions configured by HR
+  const refreshEmployeeTabs = async () => {
+    const token = getAuthToken() || localStorage.getItem("token");
+    if (!token) return;
+
+    try {
+      const code = getCookie("employeeCode") || localStorage.getItem("employeeCode") || "me";
+      const res = await api.get(`/employee/${code}`);
+      const emp = res.data?.employee || res.data?.data || res.data;
+      if (emp) {
+        if (emp.enabled_tabs !== undefined && emp.enabled_tabs !== null) {
+          const tabsStr = String(emp.enabled_tabs);
+          setEnabledTabsState(tabsStr);
+          localStorage.setItem("enabled_tabs", tabsStr);
+        }
+        if (emp.tabs_enabled !== undefined) {
+          const flag = emp.tabs_enabled === true || emp.tabs_enabled === "true";
+          setTabsEnabledState(flag);
+          localStorage.setItem("tabs_enabled", flag ? "true" : "false");
+        }
+      }
+    } catch (_) {}
+  };
+
   const location = useLocation();
 
   // Trigger attendance notice popup on login until explicitly acknowledged with Understood
@@ -470,13 +510,6 @@ const AppNavbar = () => {
       e.stopPropagation?.();
     }
 
-    // Auto-record check-out before clearing credentials
-    try {
-      await api.post("/attendance/check-out");
-    } catch (err) {
-      console.warn("Auto check-out on signout:", err?.response?.data || err?.message);
-    }
-
     try {
       await api.post("/logout");
     } catch (_) {}
@@ -537,12 +570,30 @@ const AppNavbar = () => {
       setEmail((prev) => (prev !== currentEmail ? currentEmail : prev));
       setEmployeeCode((prev) => (prev !== currentEmpCode ? currentEmpCode : prev));
       setProfilePhoto((prev) => (prev !== currentPhoto ? currentPhoto : prev));
+
+      // Synchronize configured dashboard modules
+      const localTabs = localStorage.getItem("enabled_tabs");
+      const userObj = getAuthUser();
+      const currentTabs = localTabs !== null && localTabs !== undefined ? localTabs : userObj?.enabled_tabs;
+      const localTabsFlag = localStorage.getItem("tabs_enabled");
+      const currentTabsFlag = localTabsFlag !== null && localTabsFlag !== undefined
+        ? (localTabsFlag === "true")
+        : (userObj?.tabs_enabled === true || userObj?.tabs_enabled === "true");
+      setEnabledTabsState((prev) => (prev !== currentTabs ? currentTabs : prev));
+      setTabsEnabledState((prev) => (prev !== currentTabsFlag ? currentTabsFlag : prev));
     };
 
     const handleProfileUpdate = (e) => {
       const p = e.detail?.profile_photo || localStorage.getItem("profile_photo") || "";
       setProfilePhoto(p);
       setImgError(false);
+    };
+
+    const handleTabsUpdated = (e) => {
+      checkLogin();
+      if (e.detail?.enabled_tabs !== undefined) {
+        setEnabledTabsState(e.detail.enabled_tabs);
+      }
     };
 
     const closeDropdowns = (e) => {
@@ -554,11 +605,14 @@ const AppNavbar = () => {
       }
     };
 
+    refreshEmployeeTabs();
+
     const interval = setInterval(checkLogin, 2500);
     document.addEventListener("click", closeDropdowns);
     window.addEventListener("profileUpdated", handleProfileUpdate);
     window.addEventListener("authChanged", checkLogin);
     window.addEventListener("storage", checkLogin);
+    window.addEventListener("tabsUpdated", handleTabsUpdated);
 
     return () => {
       clearInterval(interval);
@@ -566,6 +620,7 @@ const AppNavbar = () => {
       window.removeEventListener("profileUpdated", handleProfileUpdate);
       window.removeEventListener("authChanged", checkLogin);
       window.removeEventListener("storage", checkLogin);
+      window.removeEventListener("tabsUpdated", handleTabsUpdated);
     };
   }, []);
 
@@ -745,23 +800,35 @@ const AppNavbar = () => {
   const userRole = rawRole === "employees" ? "employee" : rawRole;
   const searchTrimmed = appSearch.trim().toLowerCase();
 
-  // For employees, retrieve the tabs configured by HR (via enabled_tabs / tabs_enabled)
-  const employeeEnabledTabs = (() => {
-    if (userRole !== "employee") return null;
+  // Retrieve the configured tab IDs set by HR (via enabled_tabs / tabs_enabled)
+  const configuredTabIds = (() => {
+    // 1. If tabs_enabled is true, full access to all 20 modules
+    const isFullAccess =
+      tabsEnabledState === true ||
+      tabsEnabledState === "true" ||
+      (() => {
+        const raw = localStorage.getItem("tabs_enabled");
+        if (raw !== null && raw !== undefined) return raw === "true";
+        const u = getAuthUser();
+        return u?.tabs_enabled === true || u?.tabs_enabled === "true";
+      })();
 
-    const userObj = getAuthUser();
-    const tabsEnabledFlag =
-      userObj?.tabs_enabled !== undefined
-        ? userObj.tabs_enabled
-        : localStorage.getItem("tabs_enabled") === "true";
+    if (isFullAccess) {
+      return new Set([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]);
+    }
 
-    // If tabs_enabled is true, the employee has full access to all tabs
-    if (tabsEnabledFlag) return null;
-
-    const rawTabs =
-      userObj?.enabled_tabs !== undefined && userObj?.enabled_tabs !== null
-        ? userObj.enabled_tabs
-        : localStorage.getItem("enabled_tabs");
+    // 2. Read explicit enabled_tabs set by HR
+    let rawTabs = localStorage.getItem("enabled_tabs");
+    if (rawTabs === undefined || rawTabs === null) {
+      rawTabs = enabledTabsState;
+    }
+    if (rawTabs === undefined || rawTabs === null) {
+      const u = getAuthUser();
+      rawTabs =
+        u?.enabled_tabs !== undefined && u?.enabled_tabs !== null
+          ? u.enabled_tabs
+          : null;
+    }
 
     if (rawTabs !== undefined && rawTabs !== null) {
       if (typeof rawTabs === "string") {
@@ -778,19 +845,14 @@ const AppNavbar = () => {
       }
     }
 
-    // Standard default tabs if not explicitly set
+    // 3. Fallback standard default tabs if not explicitly set
     return new Set([1, 2, 3, 4, 8, 9, 10, 11, 12, 14, 16]);
   })();
 
   const filteredApps = ALL_APPS.filter((app) => {
-    const matchesRole = !userRole || app.roles.some((r) => r.toLowerCase() === userRole);
-    if (!matchesRole) return false;
-
-    // For employees, respect HR's configured dashboard modules
-    if (employeeEnabledTabs !== null && app.tabId) {
-      if (!employeeEnabledTabs.has(app.tabId)) {
-        return false;
-      }
+    // Only display the exact modules configured by HR (matching individual dashboard)
+    if (!app.tabId || !configuredTabIds.has(app.tabId)) {
+      return false;
     }
 
     if (!searchTrimmed) return true;
@@ -855,7 +917,11 @@ const AppNavbar = () => {
               <div className="relative all-apps-container ml-1">
                 <button
                   type="button"
-                  onClick={() => setIsAppsOpen(!isAppsOpen)}
+                  onClick={() => {
+                    const next = !isAppsOpen;
+                    setIsAppsOpen(next);
+                    if (next) refreshEmployeeTabs();
+                  }}
                   className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold rounded-md transition-all duration-200 border ${isAppsOpen
                     ? "bg-slate-100 text-blue-600 border-blue-300 dark:bg-slate-800 dark:text-blue-400 dark:border-blue-800 shadow-sm"
                     : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 hover:text-slate-900 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700"
@@ -1092,7 +1158,11 @@ const AppNavbar = () => {
                 <div className="pt-2 border-t border-slate-100 dark:border-slate-800 all-apps-container">
                   <button
                     type="button"
-                    onClick={() => setIsMobileAppsOpen(!isMobileAppsOpen)}
+                    onClick={() => {
+                      const next = !isMobileAppsOpen;
+                      setIsMobileAppsOpen(next);
+                      if (next) refreshEmployeeTabs();
+                    }}
                     className="flex w-full items-center justify-between px-3 py-2 rounded-lg text-base font-medium text-slate-700 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-200 transition-colors"
                   >
                     <span className="flex items-center gap-2">

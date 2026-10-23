@@ -126,7 +126,7 @@ export default function ForgotPassword() {
             </div>
 
             {/* Title Section */}
-            <div className="flex flex-col mb-6 border-b border-slate-100 pb-4">
+            <div className="flex flex-col mb-2 border-b border-slate-100">
               <div className="relative pb-1 select-none">
                 <h2 className="text-xl font-bold text-slate-800">
                   {step === 1 ? "Forgot Password" : "Verify & Reset"}
@@ -223,7 +223,7 @@ export default function ForgotPassword() {
           </div>
 
           {/* Footer navigation */}
-          <div className="mt-8 text-center text-xs text-slate-500">
+          <div className="mt-6 text-center text-xs text-slate-500">
             Back to{" "}
             <Link to="/login" className="text-orange-500 font-bold hover:underline">
               Login

@@ -23,6 +23,7 @@ import {
 import { FaCheckCircle } from "react-icons/fa";
 import toast from "react-hot-toast";
 import { getApiBaseUrl } from "../../api/axios";
+import { isDepartmentHeadOrManager } from "../../utils/auth";
 import { exportToExcel } from "../../utils/excelExport";
 
 const API = getApiBaseUrl();
@@ -37,14 +38,17 @@ const SHIFT_TYPES = [
 ];
 
 const Schedule = () => {
-  const userRole = (localStorage.getItem("role") || "employee").toLowerCase();
+  const rawRole = (localStorage.getItem("role") || "employee").toLowerCase();
+  const userRole = rawRole === "employees" ? "employee" : rawRole;
   const userName = localStorage.getItem("userName") || "User";
   const userEmpId = localStorage.getItem("employeeCode") || localStorage.getItem("empId") || "";
   
   // Matrix Role Checks
-  const isAdminOrHr = userRole === "hr" || userRole === "admin" || userRole === "hrmanager";
-  const isHod = userRole === "hod" || userRole === "manager";
-  const isEmployee = userRole === "employee" || userRole === "accounts";
+  const isAdmin = userRole === "admin" || userRole === "superadmin";
+  const isHr = userRole === "hr" || userRole === "hrmanager";
+  const isAdminOrHr = isAdmin || isHr;
+  const isHod = !isAdminOrHr && (userRole === "hod" || userRole === "manager" || isDepartmentHeadOrManager());
+  const isEmployee = !isAdminOrHr && !isHod;
 
   // Permissions according to user matrix
   const canViewAllSchedules = isAdminOrHr;

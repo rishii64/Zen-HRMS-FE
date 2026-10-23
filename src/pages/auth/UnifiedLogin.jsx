@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { FiHash, FiLock, FiEye, FiEyeOff, FiLoader, FiUserCheck, FiChevronDown } from "react-icons/fi";
+import { FiHash, FiLock, FiEye, FiEyeOff, FiLoader } from "react-icons/fi";
 import loginIllustration from "../../assets/login_illustration.png";
 import toast from 'react-hot-toast';
 import { getApiBaseUrl } from "../../api/axios";
@@ -10,21 +10,18 @@ import { resetRedirectLock } from "../../utils/auth";
 export default function UnifiedLogin() {
   const [employeeId, setEmployeeId] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState("employee");
   const [loading, setLoading] = useState(false);
-  // const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    if (!employeeId || !password || !role) {
-      toast.error("Please fill in all fields.");
+    if (!employeeId.trim() || !password) {
+      toast.error("Please enter Employee ID and password.");
       return;
     }
 
     setLoading(true);
-    // setError("");
 
     try {
       const API = getApiBaseUrl();
@@ -32,51 +29,74 @@ export default function UnifiedLogin() {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ employee_id: employeeId.trim(), password, role }),
+        body: JSON.stringify({ employee_id: employeeId.trim(), password }),
       });
 
       const data = await response.json();
 
       if (response.ok && data.success) {
-        toast.success("Login successful");
+        if (data.attendance?.newCheckIn) {
+          toast.success("Login successful! Attendance registered.");
+        } else {
+          toast.success("Login successful");
+        }
         // Store sensitive authentication credentials and user profile in cookies instead of localStorage
         setAuthCookies(data);
         resetRedirectLock();
 
-        // Clear any temporary session dismiss flags so logging in always presents the daily notice if unacknowledged
+        // Clear any temporary session dismiss flags so logging in presents notice if unacknowledged
         try {
           if (typeof sessionStorage !== "undefined") {
             Object.keys(sessionStorage).forEach((k) => {
-              if (k.startsWith("hrms_daily_notice_session_dismissed_")) {
+              if (
+                k.startsWith("hrms_notice_session_dismissed_") ||
+                k.startsWith("hrms_daily_notice_session_dismissed_")
+              ) {
                 sessionStorage.removeItem(k);
               }
             });
+          }
+          if (data.user?.notice_acknowledged) {
+            const userKey = data.user.employee_code || data.user.employee_id || data.user.id || "";
+            if (userKey) {
+              localStorage.setItem(`hrms_notice_ack_${userKey}`, "true");
+            }
           }
         } catch (_) {}
 
         window.dispatchEvent(new Event("authChanged"));
 
         setLoading(false);
-        const userRole = (data.user?.role || role || "").toLowerCase().trim();
+        const userRole = (data.user?.role || "employee").toLowerCase().trim();
+        const userDesig = (data.user?.designation || "").toLowerCase().trim();
+        const isLeader =
+          /\b(hod|head|manager|mgr|lead|tl|agm|dgm|gm|director|supervisor)\b/i.test(userDesig) ||
+          userDesig.includes("team lead") ||
+          userDesig.includes("tech lead") ||
+          userDesig.includes("department head") ||
+          userDesig.includes("head of");
+
         let targetRoute = "/employee/dashboard";
-        if (userRole === "hr" || userRole === "admin" || userRole === "hrmanager") {
-          targetRoute = "/admin/dashboard";
-        } else if (userRole === "employee") {
-          targetRoute = "/employee/dashboard";
-        } else if (userRole === "accounts" || userRole === "payroll") {
+        if (["management", "ceo", "cto", "coo", "cfo", "vp", "secretary"].includes(userRole)) {
+          targetRoute = "/management/dashboard";
+        } else if (userRole === "admin") {
+          targetRoute = "/admin/tasks";
+        } else if (["hr", "hrmanager"].includes(userRole)) {
+          targetRoute = "/hr/dashboard";
+        } else if (["accounts", "payroll"].includes(userRole)) {
           targetRoute = "/accounts/dashboard";
-        } else if (userRole === "hod") {
+        } else if (["hod", "manager", "teamlead"].includes(userRole) || isLeader) {
           targetRoute = "/hod/dashboard";
+        } else {
+          targetRoute = "/employee/dashboard";
         }
 
         navigate(targetRoute, { replace: true });
       } else {
         toast.error(data.error || "Login failed. Please check your credentials.");
-        // setError(data.error || "Login failed. Please check your credentials.");
       }
     } catch (err) {
       toast.error("Unable to connect to the authentication service. Is the backend running?");
-      // setError("Unable to connect to the authentication service. Is the backend running?");
       console.error(err);
     } finally {
       setLoading(false);
@@ -116,38 +136,16 @@ export default function UnifiedLogin() {
             </div>
 
             {/* Title */}
-            <div className="mb-6 border-b border-slate-100 pb-3">
+            <div className="mb-2 border-b border-slate-100">
               <div className="relative pb-1 select-none inline-block">
                 <h2 className="text-xl font-bold text-slate-800">Sign In</h2>
                 <div className="absolute bottom-0 left-0 w-8 h-0.5 bg-amber-500 rounded-full"></div>
               </div>
-              <p className="text-xs text-slate-400 mt-1">Select your role and enter credentials to continue</p>
+              <p className="text-xs text-slate-400 mt-1">Enter your credentials to access your HRMS portal</p>
             </div>
 
             {/* Form */}
             <form onSubmit={handleLogin} className="space-y-4">
-              {/* Role Selection Dropdown */}
-              <div className="relative flex items-center">
-                <div className="absolute left-1.5 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-tr from-orange-400 to-amber-500 text-white shadow-sm pointer-events-none">
-                  <FiUserCheck className="h-4.5 w-4.5" />
-                </div>
-                <select
-                  id="role"
-                  value={role}
-                  onChange={(e) => setRole(e.target.value)}
-                  className="w-full appearance-none rounded-full border border-slate-200 py-3 pl-14 pr-10 text-sm font-medium text-slate-700 bg-white placeholder-slate-400 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-200/40 transition-all shadow-sm cursor-pointer"
-                  required
-                >
-                  <option value="employee">Employee</option>
-                  <option value="hr">HR Manager</option>
-                  <option value="accounts">Finance & Accounts</option>
-                  <option value="hod">Department Head (HOD)</option>
-                </select>
-                <div className="absolute right-4 pointer-events-none text-slate-400">
-                  <FiChevronDown className="h-4 w-4" />
-                </div>
-              </div>
-
               {/* Employee ID Input */}
               <div className="relative flex items-center">
                 <div className="absolute left-1.5 flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-tr from-orange-400 to-amber-500 text-white shadow-sm">
@@ -198,7 +196,7 @@ export default function UnifiedLogin() {
           </div>
 
           {/* Footer & Forgot Password */}
-          <div className="mt-8">
+          <div className="mt-6">
             <div className="flex justify-center">
               <Link
                 to="/forgot-password"

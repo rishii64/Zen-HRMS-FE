@@ -100,10 +100,12 @@ export default function InterviewForm() {
   const rawRole = (localStorage.getItem("role") || storedUser.role || "").toLowerCase();
   const designation = (storedUser.designation || "").toLowerCase();
   const isHodRole =
-    ["hod", "manager", "department head"].includes(rawRole) ||
-    designation.includes("hod") ||
-    designation.includes("head") ||
-    designation.includes("manager");
+    ["hod", "manager", "teamlead", "department head"].includes(rawRole) ||
+    /\b(hod|head|manager|mgr|lead|tl|agm|dgm|gm|director|supervisor)\b/i.test(designation) ||
+    designation.includes("team lead") ||
+    designation.includes("tech lead") ||
+    designation.includes("department head") ||
+    designation.includes("head of");
   const isHR = ["hr", "admin", "hrmanager"].includes(rawRole);
   const isHOD = isHodRole && !isHR;
 
@@ -347,7 +349,7 @@ export default function InterviewForm() {
 
   return (
     <div className="interview-assessment-page bg-slate-50 min-vh-100 py-4 px-3 px-md-4">
-      <Container fluid="xl">
+      <Container fluid="2xl px-5">
         {/* ── TOP HEADER / BREADCRUMB ─────────────────────────────────── */}
         <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
           <div className="d-flex align-items-center gap-3">

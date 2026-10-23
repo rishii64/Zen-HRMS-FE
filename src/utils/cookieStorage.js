@@ -228,7 +228,11 @@ export const setAuthCookies = (data) => {
 
   const token = data.token;
   const user = data.user || {};
-  const role = user.role || data.role || "";
+  let role = (user.role || data.role || "").toLowerCase().trim();
+  if (role === "employees") role = "employee";
+  if (user && user.role && String(user.role).toLowerCase().trim() === "employees") {
+    user.role = "employee";
+  }
   const empCode = user.employee_code || user.employee_id || data.employee_id || "";
   const userName = user.name || data.userName || "";
 
@@ -262,19 +266,26 @@ export const getAuthToken = () => {
 };
 
 export const getAuthRole = () => {
-  const role = getCookieRaw("role");
-  if (role) return role;
-  const user = getAuthUser();
-  if (user && user.role) return user.role;
-  const token = getAuthToken();
-  if (token) {
-    try {
-      const parts = token.split(".");
-      if (parts.length >= 2) {
-        const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
-        if (payload && payload.role) return payload.role;
-      }
-    } catch (_) {}
+  let role = getCookieRaw("role");
+  if (!role) {
+    const user = getAuthUser();
+    if (user && user.role) role = user.role;
+  }
+  if (!role) {
+    const token = getAuthToken();
+    if (token) {
+      try {
+        const parts = token.split(".");
+        if (parts.length >= 2) {
+          const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
+          if (payload && payload.role) role = payload.role;
+        }
+      } catch (_) {}
+    }
+  }
+  if (role) {
+    const cleanRole = String(role).toLowerCase().trim();
+    return cleanRole === "employees" ? "employee" : cleanRole;
   }
   return null;
 };
@@ -299,6 +310,88 @@ export const getAuthUser = () => {
     }
   }
   return null;
+};
+
+export const getAuthDesignation = () => {
+  let designation = "";
+  const user = getAuthUser();
+  if (user && user.designation) {
+    designation = user.designation;
+  }
+  if (!designation) {
+    try {
+      const stored = JSON.parse(localStorage.getItem("user") || "{}");
+      if (stored.designation) designation = stored.designation;
+    } catch (_) {}
+  }
+  if (!designation) {
+    const direct = getCookieRaw("designation");
+    if (direct) designation = direct;
+  }
+  if (!designation) {
+    const token = getAuthToken();
+    if (token) {
+      try {
+        const parts = token.split(".");
+        if (parts.length >= 2) {
+          const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
+          if (payload && payload.designation) designation = payload.designation;
+        }
+      } catch (_) {}
+    }
+  }
+  return designation || "";
+};
+
+export const getAuthDept = () => {
+  const user = getAuthUser();
+  if (user && (user.dept || user.department)) return user.dept || user.department;
+  try {
+    const stored = JSON.parse(localStorage.getItem("user") || "{}");
+    if (stored.dept || stored.department) return stored.dept || stored.department;
+  } catch (_) {}
+  return "";
+};
+
+/**
+ * Checks if a designation string represents a leadership/management position:
+ * TL, Team Lead, HOD, Head, Manager, AGM, DGM, GM, Director, Supervisor, etc.
+ */
+export const isLeadershipDesignation = (designation = "") => {
+  if (!designation || typeof designation !== "string") return false;
+  const d = designation.trim().toLowerCase();
+  return (
+    /\b(hod|head|manager|mgr|lead|tl|agm|dgm|gm|director|supervisor)\b/i.test(d) ||
+    d.includes("team lead") ||
+    d.includes("tech lead") ||
+    d.includes("department head") ||
+    d.includes("head of") ||
+    d.includes("project manager") ||
+    d.includes("general manager") ||
+    d.includes("assistant general manager") ||
+    d.includes("deputy general manager")
+  );
+};
+
+/**
+ * Comprehensive check across RBAC modules:
+ * Evaluates whether current user has Department Head / Manager authority,
+ * checking their designation (e.g. TL, HOD, Manager, AGM, DGM) or system role.
+ */
+export const isDepartmentHeadOrManager = () => {
+  const role = (getAuthRole() || localStorage.getItem("role") || "").toLowerCase().trim();
+  if (["admin", "management", "ceo", "coo", "cto", "cfo", "vp", "secretary", "hr", "hrmanager"].includes(role)) {
+    return true;
+  }
+  if (["hod", "manager", "teamlead"].includes(role)) {
+    return true;
+  }
+  const designation = getAuthDesignation();
+  return isLeadershipDesignation(designation);
+};
+
+export const isTeamLeadOrAbove = () => {
+  return isDepartmentHeadOrManager();
 };
 
 /**

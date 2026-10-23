@@ -56,6 +56,65 @@ const getEmployeeAvatar = (emp) => {
   return DEFAULT_USER_AVATAR;
 };
 
+function getEmploymentTypeStyle(type) {
+  const norm = String(type || "Permanent").toLowerCase().trim();
+  const base = {
+    fontSize: "12px",
+    fontWeight: "600",
+    lineHeight: "1.2",
+    whiteSpace: "nowrap",
+    letterSpacing: "0.2px",
+  };
+
+  if (norm.includes("probation")) {
+    return {
+      ...base,
+      backgroundColor: "#fffbeb",
+      color: "#b45309",
+      border: "1px solid #c8a000ff",
+    };
+  }
+  if (norm.includes("intern")) {
+    return {
+      ...base,
+      backgroundColor: "#fdf4ff",
+      color: "#a21caf",
+      border: "1px solid #d83dffff",
+    };
+  }
+  if (norm.includes("contract")) {
+    return {
+      ...base,
+      backgroundColor: "#f1f5f9",
+      color: "#475569",
+      border: "1px solid #7e7e7fff",
+    };
+  }
+  if (norm.includes("part")) {
+    return {
+      ...base,
+      backgroundColor: "#f0fdf4",
+      color: "#15803d",
+      border: "1px solid #00ff59ff",
+    };
+  }
+  if (norm.includes("trainee")) {
+    return {
+      ...base,
+      backgroundColor: "#eef2ff",
+      color: "#4338ca",
+      border: "1px solid #315bffff",
+    };
+  }
+  // Default: Permanent / Full Time
+  return {
+    ...base,
+    backgroundColor: "#ffffff",
+    color: "#1d4ed8",
+    border: "1px solid #2989ffff",
+  };
+}
+
 const ALL_TABS = [
   { id: 1, name: "Attendance Tracker", desc: "Track daily shift times, roster logs, and check-in history", badge: "Attendance" },
   { id: 2, name: "Leave Requests", desc: "Apply for leaves, view balances, and check status", badge: "Leaves" },
@@ -153,11 +212,11 @@ const SalaryStructureModal = ({
   const [successMsg, setSuccessMsg] = useState(null);
   const [quickGross, setQuickGross] = useState("");
 
-  // Determine if editing is allowed (HR, Accounts, Payroll, or Admin)
+  // Determine if editing is allowed (HR, Management, Accounts, Payroll)
   const isHRUser =
     canEdit ||
-    ["hr", "hrmanager", "admin", "accounts", "payroll"].includes(
-      (role || localStorage.getItem("role") || "").toLowerCase()
+    ["hr", "hrmanager", "management", "ceo", "coo", "cto", "cfo", "vp", "secretary", "accounts", "payroll"].includes(
+      (role || localStorage.getItem("role") || "").toLowerCase().trim()
     );
 
   useEffect(() => {
@@ -434,23 +493,21 @@ const SalaryStructureModal = ({
                   onChange={(e) => handleChange("employment_type", e.target.value)}
                 >
                   <option value="Permanent">Permanent</option>
+                  <option value="Full Time">Full Time</option>
                   <option value="Probation">Probation</option>
                   <option value="Intern">Intern</option>
+                  <option value="Contractual">Contractual</option>
+                  <option value="Trainee">Trainee</option>
+                  <option value="Part Time">Part Time</option>
                 </Form.Select>
               </div>
             ) : (
-              <Badge
-                bg={
-                  formData.employment_type === "Permanent"
-                    ? "success"
-                    : formData.employment_type === "Probation"
-                    ? "warning"
-                    : "secondary"
-                }
-                className="px-2.5 py-1.5"
+              <span
+                style={getEmploymentTypeStyle(formData.employment_type)}
+                className="px-2.5 py-1.5 rounded-pill shadow-xs d-inline-flex align-items-center"
               >
                 {formData.employment_type || "Permanent"}
-              </Badge>
+              </span>
             )}
             <span className="badge bg-light text-dark border px-2 py-1">
               {isHRUser ? "HR Full Rights" : "View-only"}
@@ -1117,15 +1174,22 @@ const ManageEmployees = () => {
 
   const [viewMode, setViewMode] = useState("grid"); // "grid" | "list"
   const [selectedDesignation, setSelectedDesignation] = useState("All");
+  const [selectedDept, setSelectedDept] = useState("All");
   const [selectedStatus, setSelectedStatus] = useState("All");
   const [sortBy, setSortBy] = useState("newest");
   const [quickViewModal, setQuickViewModal] = useState({ show: false, employee: null });
+  const [isCustomDept, setIsCustomDept] = useState(false);
+  const [customDeptInput, setCustomDeptInput] = useState("");
 
-  const isAdmin = role === "admin";
-  const isHR = role === "hr" || role === "hrmanager";
-  const isManager = role === "manager";
-  const isEmployee = role === "employee";
-  const canEditKpi = isAdmin || isHR;
+  const normalizedRole = (role || localStorage.getItem("role") || "").toLowerCase().trim();
+  const isManagement = ["management", "ceo", "coo", "cto", "cfo", "vp", "secretary"].includes(normalizedRole);
+  const isHR = ["hr", "hrmanager"].includes(normalizedRole);
+  const isManager = ["manager", "hod", "teamlead"].includes(normalizedRole);
+  const isEmployee = normalizedRole === "employee";
+  const isFacilitiesAdmin = normalizedRole === "admin";
+  const canManageEmployees = isHR || isManagement;
+  const isAdmin = isManagement;
+  const canEditKpi = isHR || isManagement;
 
   const [refreshing, setRefreshing] = useState(false);
 
@@ -1221,7 +1285,10 @@ const ManageEmployees = () => {
   const handleChange = (e) => {
     const { name, value } = e.target;
     const isEmailField = name === "email" || name === "work_email" || name === "personal_email";
-    const formattedVal = isEmailField ? value.toLowerCase() : value;
+    let formattedVal = isEmailField ? value.toLowerCase() : value;
+    if (name === "job_role" && String(formattedVal).toLowerCase().trim() === "employees") {
+      formattedVal = "employee";
+    }
     setEmpForm((prev) => ({
       ...prev,
       [name]: formattedVal,
@@ -1261,11 +1328,13 @@ const ManageEmployees = () => {
   };
 
   const openAdd = () => {
-    if (isManager || isEmployee) {
-      toast.error("Not allowed!");
+    if (!canManageEmployees) {
+      toast.error("Only HR and Management can add employees!");
       return;
     }
     setEditMode(false);
+    setIsCustomDept(false);
+    setCustomDeptInput("");
     setEmpForm({
       ...EMPTY_FORM,
       facilities: { advance: true, loan: true, insurance: true, gratuity: true },
@@ -1276,11 +1345,39 @@ const ManageEmployees = () => {
   };
 
   const openEdit = (emp) => {
-    if (isManager || isEmployee) {
-      toast.error("Not allowed!");
+    if (!canManageEmployees) {
+      toast.error("Only HR and Management can edit employee profiles!");
       return;
     }
     setEditMode(true);
+
+    const PRESET_DEPTS = [
+      "Management / Executive",
+      "Human Resources (HR)",
+      "Accounts & Finance",
+      "Administration & Facilities",
+      "IT & Systems",
+      "Legal Cell",
+      "Operations",
+      "Sales & Marketing",
+      "Engineering / Tech",
+      "Customer Support",
+      "HR",
+      "Accounts",
+      "Finance",
+      "IT",
+      "Marketing",
+      "Sales",
+      "Executive",
+    ];
+    const isStandardDept = PRESET_DEPTS.includes(emp.dept);
+    if (emp.dept && !isStandardDept) {
+      setIsCustomDept(true);
+      setCustomDeptInput(emp.dept);
+    } else {
+      setIsCustomDept(false);
+      setCustomDeptInput("");
+    }
 
     let salutation = emp.salutation || "Mr.";
     let cleanName = emp.name || "";
@@ -1299,12 +1396,15 @@ const ManageEmployees = () => {
     if (emp.facilities) {
       try {
         fac = typeof emp.facilities === "string" ? JSON.parse(emp.facilities) : emp.facilities;
-      } catch (e) {}
+      } catch (e) { }
     }
     const hasCustomEsi = emp.esi_threshold != null && emp.esi_threshold !== "" && !isNaN(parseFloat(emp.esi_threshold));
 
+    const cleanJobRole = (emp.job_role || "employee").toLowerCase().trim() === "employees" ? "employee" : (emp.job_role || "employee");
+
     setEmpForm({
       ...emp,
+      job_role: cleanJobRole,
       salutation,
       name: cleanName,
       work_email: emp.work_email || emp.email || "",
@@ -1330,8 +1430,8 @@ const ManageEmployees = () => {
   };
 
   const handleSave = async () => {
-    if (isManager || isEmployee) {
-      toast.error("Not allowed!");
+    if (!canManageEmployees) {
+      toast.error("Only HR and Management can modify employee profiles!");
       return;
     }
     const {
@@ -1350,13 +1450,14 @@ const ManageEmployees = () => {
       phone_no,
     } = empForm;
 
+    const resolvedDept = isCustomDept ? customDeptInput.trim() : (dept || "").trim();
     const primaryWorkEmail = (work_email || email || "").toLowerCase().trim();
     const primaryPersonalEmail = (personal_email || "").toLowerCase().trim();
 
     if (
       !employee_code ||
       !name ||
-      !dept ||
+      !resolvedDept ||
       !designation ||
       !primaryWorkEmail ||
       !current_salary ||
@@ -1364,7 +1465,7 @@ const ManageEmployees = () => {
       !reporting_manager ||
       !phone_no
     ) {
-      toast.error("Please fill all required fields (including Work Email)!");
+      toast.error("Please fill all required fields (including Work Email and Department)!");
       return;
     }
 
@@ -1392,8 +1493,12 @@ const ManageEmployees = () => {
       monthlySalary = Math.round(rawVal / 12);
     }
 
+    const resolvedJobRole = (empForm.job_role || "employee").toLowerCase().trim() === "employees" ? "employee" : (empForm.job_role || "employee");
+
     const payload = {
       ...empForm,
+      job_role: resolvedJobRole,
+      dept: resolvedDept,
       pan_no: empForm.pan_no ? empForm.pan_no.toUpperCase().trim() : "",
       aadhaar_no: empForm.aadhaar_no ? empForm.aadhaar_no.trim() : "",
       request_documents: empForm.request_documents,
@@ -1433,8 +1538,8 @@ const ManageEmployees = () => {
   };
 
   const handleDelete = async (emp) => {
-    if (!isAdmin) {
-      toast.error("Only Admin can delete!");
+    if (!canManageEmployees) {
+      toast.error("Only HR and Management can delete employees!");
       return;
     }
     if (!window.confirm("Delete employee?")) return;
@@ -1457,6 +1562,10 @@ const ManageEmployees = () => {
   };
 
   const openConfigureTabs = (emp) => {
+    if (!canManageEmployees) {
+      toast.error("Only HR can configure dashboard modules!");
+      return;
+    }
     let currentTabs = [1, 2, 3, 4, 8, 9, 10, 11, 12, 14, 16]; // default standard tabs
     if (emp.enabled_tabs) {
       let parsed = [];
@@ -1571,6 +1680,23 @@ const ManageEmployees = () => {
     return ["All", ...Array.from(set)];
   }, [employees]);
 
+  const allDepartments = useMemo(() => {
+    const set = new Set([
+      "Management / Executive",
+      "Human Resources (HR)",
+      "Accounts & Finance",
+      "Administration & Facilities",
+      "IT & Systems",
+      "Legal Cell",
+      "Operations",
+      "Sales & Marketing",
+    ]);
+    employees.forEach((emp) => {
+      if (emp.dept && emp.dept.trim()) set.add(emp.dept.trim());
+    });
+    return ["All", ...Array.from(set)];
+  }, [employees]);
+
   const filteredAndSortedEmployees = useMemo(() => {
     let list = employees.filter((emp) => {
       const term = searchTerm.toLowerCase().trim();
@@ -1587,11 +1713,15 @@ const ManageEmployees = () => {
         selectedDesignation === "All" ||
         empDesig === selectedDesignation.toLowerCase();
 
+      const matchesDept =
+        selectedDept === "All" ||
+        (emp.dept || "").toLowerCase() === selectedDept.toLowerCase();
+
       const matchesStatus =
         selectedStatus === "All" ||
         (emp.status || "").toLowerCase() === selectedStatus.toLowerCase();
 
-      return matchesSearch && matchesDesig && matchesStatus;
+      return matchesSearch && matchesDesig && matchesDept && matchesStatus;
     });
 
     list.sort((a, b) => {
@@ -1615,7 +1745,7 @@ const ManageEmployees = () => {
     });
 
     return list;
-  }, [employees, searchTerm, selectedDesignation, selectedStatus, sortBy]);
+  }, [employees, searchTerm, selectedDesignation, selectedDept, selectedStatus, sortBy]);
 
   return (
     <div className="emp-page-wrapper py-3 py-md-4">
@@ -1638,6 +1768,26 @@ const ManageEmployees = () => {
                   .map((d) => (
                     <option key={d} value={d}>
                       {d}
+                    </option>
+                  ))}
+              </Form.Select>
+            </div>
+
+            {/* Department Filter */}
+            <div className="filter-item flex-shrink-0" style={{ width: "165px" }}>
+              <Form.Select
+                size="sm"
+                value={selectedDept}
+                onChange={(e) => setSelectedDept(e.target.value)}
+                className="filter-select rounded-3 py-1.5 px-2 fw-semibold text-secondary"
+                style={{ fontSize: "13px", borderColor: "#cbd5e1" }}
+              >
+                <option value="All">Dept : All</option>
+                {allDepartments
+                  .filter((d) => d !== "All")
+                  .map((d) => (
+                    <option key={d} value={d}>
+                      Dept : {d}
                     </option>
                   ))}
               </Form.Select>
@@ -1713,12 +1863,13 @@ const ManageEmployees = () => {
                   value={role}
                   onChange={(e) => setRole(e.target.value)}
                   className="rounded-3 py-1.5 px-2 fw-semibold text-secondary"
-                  style={{ width: "135px", fontSize: "13px", borderColor: "#cbd5e1" }}
+                  style={{ width: "155px", fontSize: "13px", borderColor: "#cbd5e1" }}
                   title="Active Workspace Role"
                 >
+                  <option value="management">Management</option>
                   <option value="hr">HR Manager</option>
                   <option value="admin">Admin</option>
-                  <option value="manager">Reporting HOD</option>
+                  <option value="accounts">Accounts</option>
                 </Form.Select>
               </div>
 
@@ -1755,7 +1906,7 @@ const ManageEmployees = () => {
               </div>
 
               {/* Global ESI Slab Settings Button */}
-              {(isAdmin || isHR) && (
+              {canManageEmployees && (
                 <button
                   type="button"
                   className="btn btn-sm btn-outline-primary d-flex align-items-center gap-1.5 py-1.5 px-3 flex-shrink-0 rounded-3 shadow-xs"
@@ -1768,7 +1919,7 @@ const ManageEmployees = () => {
               )}
 
               {/* Add Employee Button */}
-              {(isAdmin || isHR) && (
+              {canManageEmployees && (
                 <button
                   type="button"
                   className="btn-add-emp py-1.5 px-3 flex-shrink-0"
@@ -1835,33 +1986,37 @@ const ManageEmployees = () => {
                           <BsThreeDots size={18} />
                         </Dropdown.Toggle>
                         <Dropdown.Menu className="shadow-lg border-0 rounded-3 py-2">
-                          <Dropdown.Item
-                            onClick={() => openEdit(emp)}
-                            className="d-flex align-items-center gap-2 py-2 fs-7"
-                          >
-                            <LuPencil size={15} className="text-primary" />
-                            <span>Edit Employee</span>
-                          </Dropdown.Item>
-                          <Dropdown.Item
-                            onClick={() =>
-                              setSalaryModal({
-                                show: true,
-                                code: emp.employee_code,
-                                name: emp.name,
-                              })
-                            }
-                            className="d-flex align-items-center gap-2 py-2 fs-7"
-                          >
-                            <LuFileText size={15} className="text-success" />
-                            <span>Salary Structure</span>
-                          </Dropdown.Item>
-                          <Dropdown.Item
-                            onClick={() => openConfigureTabs(emp)}
-                            className="d-flex align-items-center gap-2 py-2 fs-7"
-                          >
-                            <LuSettings size={15} className="text-info" />
-                            <span>Configure Tabs</span>
-                          </Dropdown.Item>
+                          {canManageEmployees && (
+                            <>
+                              <Dropdown.Item
+                                onClick={() => openEdit(emp)}
+                                className="d-flex align-items-center gap-2 py-2 fs-7"
+                              >
+                                <LuPencil size={15} className="text-primary" />
+                                <span>Edit Employee</span>
+                              </Dropdown.Item>
+                              <Dropdown.Item
+                                onClick={() =>
+                                  setSalaryModal({
+                                    show: true,
+                                    code: emp.employee_code,
+                                    name: emp.name,
+                                  })
+                                }
+                                className="d-flex align-items-center gap-2 py-2 fs-7"
+                              >
+                                <LuFileText size={15} className="text-success" />
+                                <span>Salary Structure</span>
+                              </Dropdown.Item>
+                              <Dropdown.Item
+                                onClick={() => openConfigureTabs(emp)}
+                                className="d-flex align-items-center gap-2 py-2 fs-7"
+                              >
+                                <LuSettings size={15} className="text-info" />
+                                <span>Configure Tabs</span>
+                              </Dropdown.Item>
+                            </>
+                          )}
                           <Dropdown.Item
                             onClick={() => setQuickViewModal({ show: true, employee: emp })}
                             className="d-flex align-items-center gap-2 py-2 fs-7"
@@ -1888,7 +2043,7 @@ const ManageEmployees = () => {
                               </Dropdown.Item>
                             </>
                           )}
-                          {isAdmin && (
+                          {canManageEmployees && (
                             <>
                               <Dropdown.Divider />
                               <Dropdown.Item
@@ -2174,25 +2329,27 @@ const ManageEmployees = () => {
                           >
                             <LuEye size={15} />
                           </Button>
-                          <Button
-                            variant="light"
-                            size="sm"
-                            className="p-1 text-primary border"
-                            title="Edit Employee"
-                            onClick={() => openEdit(emp)}
-                          >
-                            <LuPencil size={15} />
-                          </Button>
-                          {isAdmin && (
-                            <Button
-                              variant="light"
-                              size="sm"
-                              className="p-1 text-danger border"
-                              title="Delete Employee"
-                              onClick={() => handleDelete(emp)}
-                            >
-                              <LuTrash2 size={15} />
-                            </Button>
+                          {canManageEmployees && (
+                            <>
+                              <Button
+                                variant="light"
+                                size="sm"
+                                className="p-1 text-primary border"
+                                title="Edit Employee"
+                                onClick={() => openEdit(emp)}
+                              >
+                                <LuPencil size={15} />
+                              </Button>
+                              <Button
+                                variant="light"
+                                size="sm"
+                                className="p-1 text-danger border"
+                                title="Delete Employee"
+                                onClick={() => handleDelete(emp)}
+                              >
+                                <LuTrash2 size={15} />
+                              </Button>
+                            </>
                           )}
                         </div>
                       </td>
@@ -2276,8 +2433,12 @@ const ManageEmployees = () => {
                 </Form.Label>
                 <Form.Select size="sm" name="employment_type" value={empForm.employment_type || "Permanent"} onChange={handleChange}>
                   <option value="Permanent">Permanent (Full Facilities)</option>
+                  <option value="Full Time">Full Time</option>
                   <option value="Probation">Probation (Under Evaluation)</option>
                   <option value="Intern">Intern (Training)</option>
+                  <option value="Contractual">Contractual</option>
+                  <option value="Trainee">Trainee</option>
+                  <option value="Part Time">Part Time</option>
                 </Form.Select>
               </Col>
 
@@ -2322,15 +2483,18 @@ const ManageEmployees = () => {
                   System Role
                 </Form.Label>
                 <Form.Select size="sm" name="job_role" value={empForm.job_role} onChange={handleChange} >
+                  <option value="management">Management (CEO / CTO / COO / CFO / VP / Secretary)</option>
+                  <option value="hr">HR</option>
                   <option value="employee">Employee</option>
-                  <option value="hod">Reporting Manager (HOD)</option>
-                  <option value="hr">HR Manager</option>
                   <option value="accounts">Accounts</option>
-                  <option value="manager">Manager</option>
-                  <option value="teamlead">Team Lead</option>
-                  <option value="payroll">Payroll Specialist</option>
-                  <option value="admin">Administrator</option>
+                  <option value="admin">Admin</option>
+                  {!["management", "hr", "employee", "accounts", "admin"].includes((empForm.job_role || "").toLowerCase()) && empForm.job_role && (
+                    <option value={empForm.job_role}>{empForm.job_role} (Legacy)</option>
+                  )}
                 </Form.Select>
+                <div className="text-muted mt-1" style={{ fontSize: "11px" }}>
+                  Sets portal permissions & dashboard access.
+                </div>
               </Col>
               <Col xs={6} md={4}>
                 <Form.Label className="small fw-bold text-success">Tabs Access</Form.Label>
@@ -2342,21 +2506,101 @@ const ManageEmployees = () => {
                 </Form.Select>
               </Col>
               <Col xs={6} md={4}>
-                <Form.Label className="small fw-bold">Dept</Form.Label>
-                <Form.Select size="sm" name="dept" value={empForm.dept || ""} onChange={handleChange}>
+                <Form.Label className="small fw-bold">Department</Form.Label>
+                <Form.Select
+                  size="sm"
+                  name="dept"
+                  value={isCustomDept ? "Others" : (empForm.dept || "")}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === "Others") {
+                      setIsCustomDept(true);
+                      setEmpForm(prev => ({ ...prev, dept: customDeptInput }));
+                    } else {
+                      setIsCustomDept(false);
+                      setEmpForm(prev => ({ ...prev, dept: val }));
+                    }
+                  }}
+                >
                   <option value="">Select Department</option>
-                  <option value="HR">HR</option>
-                  <option value="Accounts">Accounts</option>
-                  <option value="Marketing">Marketing</option>
-                  <option value="Sales">Sales</option>
-                  <option value="HOD">HOD</option>
-                  <option value="IT">IT</option>
-                  <option value="Other">Other</option>
+                  <option value="Management / Executive">Management / Executive</option>
+                  <option value="Human Resources (HR)">Human Resources (HR)</option>
+                  <option value="Accounts & Finance">Accounts & Finance</option>
+                  <option value="Administration & Facilities">Administration & Facilities</option>
+                  <option value="IT & Systems">IT & Systems</option>
+                  <option value="Legal Cell">Legal Cell</option>
+                  <option value="Operations">Operations</option>
+                  <option value="Sales & Marketing">Sales & Marketing</option>
+                  <option value="Engineering / Tech">Engineering / Tech</option>
+                  <option value="Customer Support">Customer Support</option>
+                  {empForm.dept && !["Management / Executive", "Human Resources (HR)", "Accounts & Finance", "Administration & Facilities", "IT & Systems", "Legal Cell", "Operations", "Sales & Marketing", "Engineering / Tech", "Customer Support", "Others"].includes(empForm.dept) && !isCustomDept && (
+                    <option value={empForm.dept}>{empForm.dept}</option>
+                  )}
+                  <option value="Others">Others (Custom Field)</option>
                 </Form.Select>
+                {isCustomDept && (
+                  <div className="mt-1">
+                    <Form.Control
+                      size="sm"
+                      placeholder="Enter custom department name..."
+                      value={customDeptInput}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setCustomDeptInput(val);
+                        setEmpForm(prev => ({ ...prev, dept: val }));
+                      }}
+                      className="border-primary"
+                    />
+                    <div className="text-muted" style={{ fontSize: "10px" }}>
+                      Custom department will be saved for this employee
+                    </div>
+                  </div>
+                )}
               </Col>
               <Col xs={12} md={4}>
                 <Form.Label className="small fw-bold">Designation</Form.Label>
-                <Form.Control size="sm" name="designation" value={empForm.designation} onChange={handleChange} />
+                <Form.Control
+                  size="sm"
+                  name="designation"
+                  list="designations-list"
+                  placeholder="e.g. Employee, TL, Manager (HOD), GM, AGM..."
+                  value={empForm.designation || ""}
+                  onChange={handleChange}
+                />
+                <datalist id="designations-list">
+                  <option value="Employee" />
+                  <option value="TL" />
+                  <option value="HOD" />
+                  <option value="Manager" />
+                  <option value="Manager (HOD)" />
+                  <option value="AGM" />
+                  <option value="DGM" />
+                  <option value="GM" />
+                  <option value="CEO" />
+                  <option value="CTO" />
+                  <option value="COO" />
+                  <option value="CFO" />
+                  <option value="VP" />
+                  <option value="Secretary" />
+                  <option value="Legal Advisor" />
+                  <option value="Accountant" />
+                  <option value="IT Support Engineer" />
+                  <option value="HR Executive" />
+                </datalist>
+                <div className="d-flex flex-wrap gap-1 mt-1">
+                  {["TL", "HOD", "Manager", "AGM", "DGM", "GM"].map((d) => (
+                    <Badge
+                      key={d}
+                      bg="light"
+                      text="dark"
+                      className="border text-primary cursor-pointer"
+                      style={{ fontSize: "10px", cursor: "pointer", fontWeight: "normal" }}
+                      onClick={() => setEmpForm(prev => ({ ...prev, designation: d }))}
+                    >
+                      +{d}
+                    </Badge>
+                  ))}
+                </div>
               </Col>
               <Col xs={12} md={4}>
                 <Form.Label className="small fw-bold text-primary">Parent Group</Form.Label>
@@ -2404,7 +2648,7 @@ const ManageEmployees = () => {
                     name="salary_type"
                     value={empForm.salary_type || "Monthly (In Hand)"}
                     onChange={(e) => handleSalaryFrequencyChange(e.target.value)}
-                    style={{ maxWidth: "170px", fontWeight: "600" }}
+                    style={{ maxWidth: "175px", fontWeight: "600" }}
                   >
                     <option value="Monthly (In Hand)">Monthly (In Hand)</option>
                     <option value="LPA">LPA (Lakhs/yr)</option>
@@ -2662,10 +2906,10 @@ const ManageEmployees = () => {
                 prev.map((emp) =>
                   String(emp.employee_code || "").replace(/^#/, "").toLowerCase() === cleanModalCode
                     ? {
-                        ...emp,
-                        current_salary: parseFloat(newSalary),
-                        salary_structure: newStructure || emp.salary_structure,
-                      }
+                      ...emp,
+                      current_salary: parseFloat(newSalary),
+                      salary_structure: newStructure || emp.salary_structure,
+                    }
                     : emp
                 )
               );
@@ -2859,6 +3103,12 @@ const ManageEmployees = () => {
                         <Badge bg="secondary" className="fw-normal">{emp.employee_code}</Badge>
                         <Badge bg="info" className="text-dark fw-semibold">{emp.designation || emp.job_role}</Badge>
                         <Badge bg={emp.status === "Active" ? "success" : emp.status === "Resigned" ? "warning" : "danger"} text={emp.status === "Resigned" ? "dark" : "white"}>{emp.status}</Badge>
+                        <span
+                          className="px-2.5 py-1 rounded-pill d-inline-flex align-items-center gap-1 shadow-xs"
+                          style={getEmploymentTypeStyle(emp.employment_type)}
+                        >
+                          {emp.employment_type || "Permanent"}
+                        </span>
                       </div>
                     </div>
                     {(isAdmin || isHR) && (
@@ -2889,6 +3139,7 @@ const ManageEmployees = () => {
                         <InfoRow label="PAN Number" value={emp.pan_no} />
                         <InfoRow label="Aadhaar Number" value={emp.aadhaar_no} />
                         <InfoRow label="Department" value={emp.dept} />
+                        <InfoRow label="Employment Type" value={emp.employment_type || "Permanent"} />
                         <InfoRow label="Reporting Manager" value={emp.reporting_manager} />
                         <InfoRow label="Joining Date" value={emp.joining_date ? emp.joining_date.split("T")[0] : "—"} />
                       </div>
@@ -2936,7 +3187,14 @@ const ManageEmployees = () => {
                             )}
                           </div>
                         </div>
-                        <InfoRow label="System Role" value={emp.job_role || "employee"} />
+                        <InfoRow
+                          label="System Role"
+                          value={
+                            (emp.job_role || "employee").toLowerCase() === "employees"
+                              ? "Employee"
+                              : ((emp.job_role || "employee").charAt(0).toUpperCase() + (emp.job_role || "employee").slice(1))
+                          }
+                        />
                       </div>
                     </Col>
                   </Row>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Container, Row, Col, Button, Card, Table } from "react-bootstrap";
 import { Link } from "react-router-dom";
+import { isDepartmentHeadOrManager } from "../utils/auth";
 
 const Home = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(() => !!localStorage.getItem("token"));
@@ -47,7 +48,7 @@ const Home = () => {
     {
       title: "Leave Approvals",
       desc: "Admin section to review and approve/reject employee leave requests.",
-      path: "/admin/leaves",
+      path: "/hr/leaves",
       btnText: "Manage Requests"
     },
 
@@ -76,10 +77,12 @@ const Home = () => {
   const netSalary = grossSalary - totalDeductions;
 
   const getDashboardPath = () => {
-    const userRole = (localStorage.getItem("role") || "").toLowerCase();
-    if (userRole === "hr" || userRole === "admin" || userRole === "hrmanager") return "/admin/dashboard";
-    if (userRole === "hod" || userRole === "manager") return "/hod/dashboard";
-    if (userRole === "accounts" || userRole === "payroll") return "/accounts/dashboard";
+    const userRole = (localStorage.getItem("role") || "").toLowerCase().trim();
+    if (["management", "ceo", "coo", "cto", "cfo", "vp", "secretary"].includes(userRole)) return "/management/dashboard";
+    if (["admin"].includes(userRole)) return "/admin/dashboard";
+    if (["hr", "hrmanager"].includes(userRole)) return "/hr/dashboard";
+    if (["accounts", "payroll"].includes(userRole)) return "/accounts/dashboard";
+    if (["hod", "manager", "teamlead"].includes(userRole) || isDepartmentHeadOrManager()) return "/hod/dashboard";
     return "/employee/dashboard";
   };
 

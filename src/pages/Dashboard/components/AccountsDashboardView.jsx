@@ -127,7 +127,7 @@ export default function AccountsDashboardView() {
     {
       title: "Leave Management",
       desc: "Track unpaid leaves, LOP impacts, and staff paid leave approvals.",
-      route: "/admin/leaves",
+      route: "/hr/leaves",
       icon: <LuCalendar size={22} />,
       iconBg: "#f5f3ff",
       iconColor: "#7c3aed",

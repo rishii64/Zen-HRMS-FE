@@ -15,7 +15,18 @@ export const clearAuthSession = () => {
   if (typeof window === "undefined") return;
   clearAuthCookies();
   try {
+    // Preserve persistent notice acknowledgements across logout
+    const preserved = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith("hrms_notice_ack_")) {
+        preserved.push([k, localStorage.getItem(k)]);
+      }
+    }
     localStorage.clear();
+    preserved.forEach(([k, v]) => {
+      try { localStorage.setItem(k, v); } catch (_) {}
+    });
   } catch (_) {}
 };
 

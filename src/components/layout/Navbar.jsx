@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from "react";
+import logo from '../../assets/zentelex-logo.png';
 import { Link, NavLink, useNavigate, useLocation } from "react-router-dom";
+import toast from "react-hot-toast";
 import { CiCircleAlert } from "react-icons/ci";
 import { FiMenu, FiX, FiMail, FiLogOut, FiHash, FiGrid, FiChevronDown, FiSearch, FiClock } from "react-icons/fi";
 import {
@@ -25,17 +27,29 @@ import {
   LuSparkles,
   LuReceipt,
   LuUserCheck,
+  LuPartyPopper,
 } from "react-icons/lu";
 import { SiGoogledocs } from "react-icons/si";
 import { FaListCheck } from "react-icons/fa6";
-import logo from "../../assets/zentelex-logo.png";
-import { clearAuthSession, getCookie, setCookie, getAuthToken, getAuthRole, getAuthUser } from "../../utils/auth";
-import toast from 'react-hot-toast';
+import {
+  clearAuthSession,
+  getCookie,
+  setCookie,
+  getAuthToken,
+  getAuthRole,
+  getAuthUser,
+  getAuthDesignation,
+  isLeadershipDesignation,
+  isDepartmentHeadOrManager
+} from "../../utils/auth";
 import { TbPassword } from "react-icons/tb";
 import api, { getUploadUrl } from "../../api/axios";
 import ChangePasswordModal from "../common/ChangePasswordModal";
 import DailyAttendanceNoticeModal from "../common/DailyAttendanceNoticeModal";
 
+const ALL_STAFF_ROLES = [
+  "employee", "hr", "accounts", "payroll", "hod", "admin", "manager", "teamlead", "ceo", "coo", "cto", "cfo", "vp", "secretary", "management", "hrmanager"
+];
 
 const ALL_APPS = [
   {
@@ -44,7 +58,7 @@ const ALL_APPS = [
     tabId: null,
     icon: <LuTrendingUp className="text-blue-500" />,
     route: "/employee/dashboard",
-    roles: ["employee", "hr", "accounts", "payroll", "hod", "admin"],
+    roles: ALL_STAFF_ROLES,
     keywords: ["home", "dashboard", "overview", "analytics", "stats"],
   },
   {
@@ -53,7 +67,7 @@ const ALL_APPS = [
     tabId: 4,
     icon: <LuUser className="text-indigo-500" />,
     route: "/profile",
-    roles: ["employee", "hr", "accounts", "payroll", "hod", "admin"],
+    roles: ALL_STAFF_ROLES,
     keywords: ["profile", "user", "personal", "account", "details", "info"],
   },
   {
@@ -62,7 +76,7 @@ const ALL_APPS = [
     tabId: 1,
     icon: <LuCalendar className="text-emerald-500" />,
     route: "/attendance",
-    roles: ["employee", "hr", "accounts", "payroll", "hod", "admin"],
+    roles: ALL_STAFF_ROLES,
     keywords: ["attendance", "clock in", "check in", "roster", "logs", "timesheet", "checkin"],
   },
   {
@@ -71,16 +85,16 @@ const ALL_APPS = [
     tabId: 2,
     icon: <LuFileText className="text-teal-500" />,
     route: "/leave",
-    roles: ["employee", "hr", "accounts", "payroll", "hod", "admin"],
+    roles: ALL_STAFF_ROLES,
     keywords: ["leave", "apply leave", "vacation", "pto", "holiday leave", "time off", "absence"],
   },
   {
     id: "app_schedule",
-    title: "Work Schedule & Roster",
+    title: "Schedule & Roster",
     tabId: 16,
     icon: <LuClock className="text-orange-500" />,
     route: "/schedule",
-    roles: ["employee", "hr", "accounts", "payroll", "hod", "admin"],
+    roles: ALL_STAFF_ROLES,
     keywords: ["schedule", "duty", "roster", "shift", "shift timings", "timetable"],
   },
   {
@@ -89,7 +103,7 @@ const ALL_APPS = [
     tabId: 14,
     icon: <LuFileCheck className="text-purple-600" />,
     route: "/payslip",
-    roles: ["employee", "hr", "accounts", "payroll", "hod", "admin"],
+    roles: ALL_STAFF_ROLES,
     keywords: ["salary", "slip", "payslip", "earnings", "wage", "pay", "slips"],
   },
   {
@@ -98,7 +112,7 @@ const ALL_APPS = [
     tabId: 3,
     icon: <LuWallet className="text-emerald-600" />,
     route: "/payroll",
-    roles: ["employee", "hr", "accounts", "payroll", "hod", "admin"],
+    roles: ALL_STAFF_ROLES,
     keywords: ["payroll", "tax", "compensation", "salary structure", "ctc"],
   },
   {
@@ -107,7 +121,7 @@ const ALL_APPS = [
     tabId: 8,
     icon: <LuReceipt className="text-blue-600" />,
     route: "/it-declaration",
-    roles: ["employee", "hr", "accounts", "payroll", "hod", "admin"],
+    roles: ALL_STAFF_ROLES,
     keywords: ["it declaration", "income tax", "tds", "tax saving", "regime", "80c", "form 16", "investments", "tax"],
   },
   {
@@ -116,7 +130,7 @@ const ALL_APPS = [
     tabId: 9,
     icon: <LuBadgeCheck className="text-cyan-600" />,
     route: "/id-card",
-    roles: ["employee", "hr", "accounts", "payroll", "hod", "admin"],
+    roles: ALL_STAFF_ROLES,
     keywords: ["id", "id card", "documents", "identity", "aadhaar", "pan", "badge", "corporate id"],
   },
   {
@@ -125,7 +139,7 @@ const ALL_APPS = [
     tabId: 10,
     icon: <LuStethoscope className="text-rose-600" />,
     route: "/mediclaim",
-    roles: ["employee", "hr", "accounts", "payroll", "hod", "admin", "manager", "teamlead"],
+    roles: ALL_STAFF_ROLES,
     keywords: ["mediclaim", "medical", "insurance", "health", "hospital", "claims", "coverage", "card"],
   },
   {
@@ -134,7 +148,7 @@ const ALL_APPS = [
     tabId: 11,
     icon: <LuCalendar className="text-rose-500" />,
     route: "/holidays",
-    roles: ["employee", "hr", "accounts", "payroll", "hod", "admin"],
+    roles: ALL_STAFF_ROLES,
     keywords: ["holiday", "calendar", "festival", "off days", "events"],
   },
   {
@@ -143,17 +157,17 @@ const ALL_APPS = [
     tabId: 12,
     icon: <LuShieldCheck className="text-blue-600" />,
     route: "/policies",
-    roles: ["employee", "hr", "accounts", "payroll", "hod", "admin"],
+    roles: ALL_STAFF_ROLES,
     keywords: ["policy", "policies", "rules", "compliance", "handbook", "guidelines", "terms"],
   },
   {
     id: "app_training",
-    title: "Training Modules",
+    title: "Training & Development",
     tabId: 7,
     icon: <LuGraduationCap className="text-cyan-600" />,
-    route: "/policies",
-    roles: ["hr", "accounts", "payroll", "hod", "admin"],
-    keywords: ["training", "learning", "modules", "induction", "skills", "onboarding courses"],
+    route: "/training",
+    roles: ALL_STAFF_ROLES,
+    keywords: ["training", "learning", "modules", "induction", "skills", "onboarding courses", "assessments", "certifications"],
   },
   {
     id: "app_kpi_hub",
@@ -161,7 +175,7 @@ const ALL_APPS = [
     tabId: 15,
     icon: <LuAward className="text-amber-600" />,
     route: "/kpi",
-    roles: ["employee", "hr", "accounts", "payroll", "hod", "admin", "manager", "teamlead"],
+    roles: ALL_STAFF_ROLES,
     keywords: ["kpi", "goals", "appraisal", "performance", "pms", "progression", "review", "rating", "scorecard", "evaluation"],
   },
   {
@@ -170,16 +184,16 @@ const ALL_APPS = [
     tabId: 6,
     icon: <LuTrendingUp className="text-indigo-500" />,
     route: "/appraisal",
-    roles: ["employee", "hr", "accounts", "payroll", "hod", "admin", "manager"],
+    roles: ALL_STAFF_ROLES,
     keywords: ["appraisal", "performance", "review", "scorecard", "evaluation", "rating"],
   },
   {
     id: "app_resignation",
-    title: "Separation & Resignation",
+    title: "Resignation",
     tabId: 13,
     icon: <LuLogOut className="text-red-500" />,
     route: "/resignation",
-    roles: ["employee", "hr", "accounts", "payroll", "hod", "admin"],
+    roles: ALL_STAFF_ROLES,
     keywords: ["resignation", "separation", "exit", "quit", "clearance"],
   },
   {
@@ -188,16 +202,16 @@ const ALL_APPS = [
     tabId: 17,
     icon: <LuBriefcase className="text-cyan-600" />,
     route: "/requisition",
-    roles: ["hr", "admin", "hod", "manager", "teamlead", "ceo", "coo", "hrmanager"],
+    roles: ["hr", "hod", "manager", "teamlead", "ceo", "coo", "hrmanager"],
     keywords: ["requisition", "hiring", "cv", "resume", "candidates", "jobs", "desk", "shortlisting"],
   },
   {
     id: "app_onboarding",
-    title: "Employee Onboarding",
+    title: "Onboarding",
     tabId: 18,
     icon: <LuUserCheck className="text-violet-600" />,
     route: "/onboarding",
-    roles: ["hr", "admin", "hod", "manager", "teamlead"],
+    roles: ["hr", "admin", "hod", "manager", "teamlead", "ceo", "coo", "accounts", "payroll"],
     keywords: ["onboarding", "joining", "induction", "training", "probation", "assets", "documentation", "permanent"],
   },
   {
@@ -206,7 +220,7 @@ const ALL_APPS = [
     tabId: 5,
     icon: <SiGoogledocs className="text-indigo-600" />,
     route: "/interview",
-    roles: ["hr", "hod", "admin", "manager"],
+    roles: ["hr", "hod", "admin", "manager", "teamlead", "ceo", "coo", "hrmanager"],
     keywords: ["interview", "candidate", "evaluation", "assessment", "question bank"],
   },
   {
@@ -214,8 +228,8 @@ const ALL_APPS = [
     title: "Employee Directory",
     tabId: null,
     icon: <LuUsers className="text-blue-600" />,
-    route: "/admin/manage-employees",
-    roles: ["hr", "admin", "hod", "accounts"],
+    route: "/hr/manage-employees",
+    roles: ["hr", "admin", "hod", "manager", "accounts", "ceo", "coo", "management"],
     keywords: ["manage", "employees", "directory", "staff", "team", "people", "my teams"],
   },
   {
@@ -224,8 +238,26 @@ const ALL_APPS = [
     tabId: null,
     icon: <LuTrendingUp className="text-emerald-500" />,
     route: "/accounts/dashboard",
-    roles: ["accounts", "payroll", "admin"],
+    roles: ["accounts", "payroll", "ceo", "management"],
     keywords: ["accounts", "finance", "billing", "dashboard", "ledger"],
+  },
+  {
+    id: "app_admin_tasks",
+    title: "Admin Tasks & Facilities",
+    tabId: null,
+    icon: <FaListCheck className="text-slate-700" />,
+    route: "/admin/tasks",
+    roles: ["admin", "management", "hr", "ceo", "coo"],
+    keywords: ["admin", "unofficial", "tasks", "office", "maintenance", "facilities", "supplies", "logistics", "courier", "cleaning"],
+  },
+  {
+    id: "app_hr_events",
+    title: "HR Events",
+    tabId: null,
+    icon: <LuPartyPopper className="text-pink-600" />,
+    route: "/hr-events",
+    roles: ALL_STAFF_ROLES,
+    keywords: ["event", "events", "hr events", "townhall", "celebration", "meeting", "gathering", "presentation", "announcements"],
   },
 ];
 
@@ -271,39 +303,71 @@ const getTodayISTString = () => {
   }
 };
 
-const isNoticeAcknowledgedToday = (userKey, todayStr) => {
-  const ackKey = `hrms_daily_notice_ack_${userKey}_${todayStr}`;
-  if (getCookie(ackKey) === "true") return true;
+const isNoticeAcknowledged = (userKey) => {
+  // 1. Check user profile object in auth cookie/session
   try {
-    if (localStorage.getItem(ackKey) === "true") return true;
-  } catch (_) { }
+    const u = getAuthUser();
+    if (u && (u.notice_acknowledged === true || u.notice_acknowledged === "true")) {
+      return true;
+    }
+  } catch (_) {}
+
+  // 2. Check permanent cookie
+  const cookieVal = getCookie(`hrms_notice_ack_${userKey}`);
+  if (cookieVal === "true") return true;
+
+  // 3. Check localStorage
+  try {
+    if (localStorage.getItem(`hrms_notice_ack_${userKey}`) === "true") {
+      return true;
+    }
+  } catch (_) {}
+
   return false;
 };
 
-const saveDailyNoticeAcknowledged = (userKey, todayStr) => {
-  const ackKey = `hrms_daily_notice_ack_${userKey}_${todayStr}`;
+const saveDailyNoticeAcknowledged = (userKey) => {
+  // 1. Persist in permanent cookie (10-year expiry)
   try {
-    setCookie(ackKey, "true", { expires: 1 });
-  } catch (_) { }
+    setCookie(`hrms_notice_ack_${userKey}`, "true", { expires: 3650, path: "/" });
+  } catch (_) {}
+
+  // 2. Persist in localStorage
   try {
-    localStorage.setItem(ackKey, "true");
-  } catch (_) { }
+    localStorage.setItem(`hrms_notice_ack_${userKey}`, "true");
+  } catch (_) {}
+
+  // 3. Update current user cookie object
+  try {
+    const u = getAuthUser();
+    if (u) {
+      u.notice_acknowledged = true;
+      setCookie("user", u);
+    }
+  } catch (_) {}
+
+  // 4. Save to backend database for permanent cross-device persistence
+  try {
+    api.post("/acknowledge-notice").catch((err) => {
+      console.warn("Server notice acknowledge sync:", err?.message);
+    });
+  } catch (_) {}
 };
 
-const isNoticeSessionDismissed = (userKey, todayStr) => {
+const isNoticeSessionDismissed = (userKey) => {
   try {
-    const sessionKey = `hrms_daily_notice_session_dismissed_${userKey}_${todayStr}`;
+    const sessionKey = `hrms_notice_session_dismissed_${userKey}`;
     return sessionStorage.getItem(sessionKey) === "true";
   } catch (_) {
     return false;
   }
 };
 
-const saveDailyNoticeSessionDismissed = (userKey, todayStr) => {
+const saveDailyNoticeSessionDismissed = (userKey) => {
   try {
-    const sessionKey = `hrms_daily_notice_session_dismissed_${userKey}_${todayStr}`;
+    const sessionKey = `hrms_notice_session_dismissed_${userKey}`;
     sessionStorage.setItem(sessionKey, "true");
-  } catch (_) { }
+  } catch (_) {}
 };
 
 const AppNavbar = () => {
@@ -336,7 +400,7 @@ const AppNavbar = () => {
 
   const location = useLocation();
 
-  // Trigger daily attendance notice popup once per day after logging in (unless acknowledged)
+  // Trigger attendance notice popup on login until explicitly acknowledged with Understood
   useEffect(() => {
     if (!isLoggedIn) return;
     if (typeof window === "undefined") return;
@@ -347,12 +411,17 @@ const AppNavbar = () => {
 
     try {
       const userKey = getDailyNoticeUserKey();
-      const todayStr = getTodayISTString();
-      const acknowledged = isNoticeAcknowledgedToday(userKey, todayStr);
-      const sessionDismissed = isNoticeSessionDismissed(userKey, todayStr);
+      const acknowledged = isNoticeAcknowledged(userKey);
+      const sessionDismissed = isNoticeSessionDismissed(userKey);
 
-      // Unless acknowledged by clicking the understood button, the popup should come everyday after logging in
-      if (!acknowledged && !sessionDismissed) {
+      // Once acknowledged, NEVER display on any login!
+      if (acknowledged) {
+        setIsDailyNoticeOpen(false);
+        return;
+      }
+
+      // Appears on portal login until acknowledged by clicking the Understood button
+      if (!sessionDismissed) {
         // Small delay so page content smoothly renders first
         const timer = setTimeout(() => {
           setIsDailyNoticeOpen(true);
@@ -368,9 +437,8 @@ const AppNavbar = () => {
   const handleAcknowledgeDailyNotice = () => {
     try {
       const userKey = getDailyNoticeUserKey();
-      const todayStr = getTodayISTString();
-      saveDailyNoticeAcknowledged(userKey, todayStr);
-      toast.success("Daily attendance protocol acknowledged", {
+      saveDailyNoticeAcknowledged(userKey);
+      toast.success("Attendance protocol acknowledged", {
         id: "daily-notice-ack",
         duration: 2500,
       });
@@ -384,9 +452,8 @@ const AppNavbar = () => {
   const handleDismissDailyNotice = () => {
     try {
       const userKey = getDailyNoticeUserKey();
-      const todayStr = getTodayISTString();
-      // Only dismiss for the current browsing session; daily acknowledgement is NOT recorded!
-      saveDailyNoticeSessionDismissed(userKey, todayStr);
+      // Only dismiss for the current browsing session; permanent acknowledgement is NOT recorded!
+      saveDailyNoticeSessionDismissed(userKey);
     } catch (e) {
       // ignore
     }
@@ -397,7 +464,23 @@ const AppNavbar = () => {
   useEffect(() => {
     setImgError(false);
   }, [profilePhoto]);
-  const handleLogout = () => {
+  const handleLogout = async (e) => {
+    if (e) {
+      e.preventDefault?.();
+      e.stopPropagation?.();
+    }
+
+    // Auto-record check-out before clearing credentials
+    try {
+      await api.post("/attendance/check-out");
+    } catch (err) {
+      console.warn("Auto check-out on signout:", err?.response?.data || err?.message);
+    }
+
+    try {
+      await api.post("/logout");
+    } catch (_) {}
+
     clearAuthSession();
 
     setRole(null);
@@ -413,8 +496,17 @@ const AppNavbar = () => {
     setIsDailyNoticeOpen(false);
 
     window.dispatchEvent(new Event("authChanged"));
-    toast.success("Logged out!");
+    try {
+      toast.success("Logged out!");
+    } catch (_) {}
+
     navigate("/login", { replace: true });
+    // Guarantee authoritative navigation to login page
+    setTimeout(() => {
+      if (window.location.pathname !== "/login") {
+        window.location.href = "/login";
+      }
+    }, 100);
   };
 
   const handleChangePassword = () => {
@@ -488,29 +580,67 @@ const AppNavbar = () => {
   };
 
   const getRoleLabel = (r) => {
+    const desig = getAuthDesignation() || "";
     switch (r) {
+      case "management":
+      case "ceo":
+      case "coo":
+      case "cto":
+      case "cfo":
+      case "vp":
+      case "secretary":
+        return desig || "Management";
+      case "admin":
+        return "Admin (Operations)";
       case "hr":
-        return "HR Manager";
-      case "employee":
-        return "Employee";
+      case "hrmanager":
+        return desig || "HR Manager";
       case "accounts":
-        return "Finance & Accounts";
+        return desig || "Finance & Accounts";
+      case "payroll":
+        return desig || "Payroll Specialist";
       case "hod":
-        return "Department Head";
+        return desig || "Department Head";
+      case "manager":
+        return desig || "Manager";
+      case "teamlead":
+        return desig || "Team Lead";
+      case "employee":
+      case "employees":
+        return desig || "Employee";
       default:
-        return r ? r.toUpperCase() : "User";
+        return desig || (r ? r.toUpperCase() : "User");
     }
   };
 
   const getRoleColor = (r) => {
+    const desig = getAuthDesignation() || "";
+    if (isLeadershipDesignation(desig)) {
+      return "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/30 dark:text-purple-400 dark:border-purple-900/40";
+    }
     switch (r) {
+      case "management":
+      case "ceo":
+      case "coo":
+      case "cto":
+      case "cfo":
+      case "vp":
+      case "secretary":
+        return "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-400 dark:border-indigo-900/40";
+      case "admin":
+        return "bg-slate-100 text-slate-800 border-slate-300 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700";
       case "hr":
+      case "hrmanager":
         return "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900/40";
       case "employee":
+      case "employees":
         return "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-900/40";
       case "accounts":
+      case "payroll":
         return "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900/40";
       case "hod":
+      case "manager":
+      case "teamlead":
         return "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/30 dark:text-purple-400 dark:border-purple-900/40";
       default:
         return "bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700";
@@ -521,48 +651,98 @@ const AppNavbar = () => {
   const getNavLinks = () => {
     const profRoute = employeeCode ? `/profile/${employeeCode}` : "/profile/me";
     switch (role) {
-      case "employee":
+      case "management":
+      case "ceo":
+      case "coo":
+      case "cto":
+      case "cfo":
+      case "vp":
+      case "secretary":
         return [
-          { to: "/employee/dashboard", label: "Dashboard" },
+          { to: "/management/dashboard", label: "Executive Dashboard" },
+          { to: "/attendance", label: "Attendance" },
+          // { to: "/admin/manage-employees", label: "Staff Directory" },
+          { to: "/requisition", label: "Requisitions" },
+          { to: "/payroll", label: "Payroll Overview" },
+        ];
+      case "admin":
+        return [
+          { to: "/admin/tasks", label: "Unofficial Tasks" },
           { to: "/attendance", label: "My Attendance" },
           { to: "/leave", label: "Leaves" },
-          // { to: "/resignation", label: "Resignation" },
           { to: profRoute, label: "My Profile" },
         ];
       case "hr":
+      case "hrmanager":
         return [
-          { to: "/admin/dashboard", label: "Dashboard" },
+          { to: "/hr/dashboard", label: "Dashboard" },
+          // { to: "/hr-events", label: "HR Events" },
           { to: "/attendance", label: "Attendance" },
+          { to: "/hr/manage-employees", label: "Manage Staff" },
           { to: "/requisition", label: "Requisition" },
-          { to: "/onboarding", label: "Onboarding" },
-          { to: "/holidays", label: "Holidays" },
+          // { to: "/onboarding", label: "Onboarding" },
         ];
       case "accounts":
       case "payroll":
         return [
-          { to: "/accounts/dashboard", label: "Dashboard" },
-          { to: "/attendance", label: "Attendance" },
+          { to: "/accounts/dashboard", label: "Accounts Desk" },
           { to: "/payroll", label: "Payroll" },
-          { to: "/payslip", label: "Salary Slips" },
-          // { to: "/admin/leaves", label: "Leaves" },
+          // { to: "/payslip", label: "Salary Slips" },
+          { to: "/attendance", label: "Attendance" },
+          { to: "/it-declaration", label: "IT Declarations" },
+        ];
+      case "employee":
+      case "employees":
+        if (isDepartmentHeadOrManager()) {
+          return [
+            { to: "/hod/dashboard", label: "Dashboard" },
+            { to: "/attendance", label: "Attendance" },
+            { to: "/requisition", label: "Requisition" },
+            { to: "/schedule", label: "Department Shifts" },
+            { to: profRoute, label: "My Profile" },
+          ];
+        }
+        return [
+          { to: "/employee/dashboard", label: "Dashboard" },
+          { to: "/attendance", label: "My Attendance" },
+          { to: "/leave", label: "Leaves" },
+          // { to: "/payslip", label: "Salary Slips" },
+          { to: profRoute, label: "My Profile" },
         ];
       case "hod":
+      case "manager":
+      case "teamlead":
         return [
           { to: "/hod/dashboard", label: "Dashboard" },
           { to: "/attendance", label: "Attendance" },
           { to: "/requisition", label: "Requisition" },
-          { to: "/onboarding", label: "Onboarding" },
+          { to: "/schedule", label: "Department Shifts" },
           { to: profRoute, label: "My Profile" },
         ];
       default:
-        return [];
+        if (isDepartmentHeadOrManager()) {
+          return [
+            { to: "/hod/dashboard", label: "Dashboard" },
+            { to: "/attendance", label: "Attendance" },
+            { to: "/requisition", label: "Requisition" },
+            { to: "/schedule", label: "Department Shifts" },
+            { to: profRoute, label: "My Profile" },
+          ];
+        }
+        return [
+          { to: "/employee/dashboard", label: "Dashboard" },
+          { to: "/attendance", label: "Attendance" },
+          { to: "/leave", label: "Leaves" },
+          { to: profRoute, label: "My Profile" },
+        ];
     }
   };
 
   const navLinks = getNavLinks();
 
   // Filter All Apps strictly by active Role, Search Keyword & Employee's Configured Tabs
-  const userRole = (role || "").toLowerCase();
+  const rawRole = (role || "").toLowerCase();
+  const userRole = rawRole === "employees" ? "employee" : rawRole;
   const searchTrimmed = appSearch.trim().toLowerCase();
 
   // For employees, retrieve the tabs configured by HR (via enabled_tabs / tabs_enabled)
@@ -628,15 +808,16 @@ const AppNavbar = () => {
 
     // Role-based dynamic route resolution
     if (app.id === "app_dashboard") {
-      if (userRole === "hr" || userRole === "admin") route = "/admin/dashboard";
-      else if (userRole === "accounts" || userRole === "payroll") route = "/accounts/dashboard";
-      else if (userRole === "hod") route = "/hod/dashboard";
+      if (["management", "ceo", "coo", "cto", "cfo", "vp", "secretary"].includes(userRole)) route = "/management/dashboard";
+      else if (["admin"].includes(userRole)) route = "/admin/tasks";
+      else if (["hr", "hrmanager"].includes(userRole)) route = "/hr/dashboard";
+      else if (["accounts", "payroll"].includes(userRole)) route = "/accounts/dashboard";
+      else if (["hod", "manager", "teamlead"].includes(userRole)) route = "/hod/dashboard";
       else route = "/employee/dashboard";
     } else if (app.id === "app_profile") route = `/profile/${employeeCode || "me"}`;
     else if (app.id === "app_mediclaim") route = "/mediclaim";
     else if (app.id === "app_leave") {
-      // route = userRole === "employee" ? "/employee/leave" : (userRole === "hod" ? "/leave" : "/admin/leaves");
-      route = userRole === "admin" ? "/admin/leaves" : "/leave";
+      route = ["hr", "ceo", "coo", "management"].includes(userRole) ? "/hr/leaves" : "/leave";
     }
 
     navigate(route);
@@ -778,8 +959,10 @@ const AppNavbar = () => {
                   </div>
 
                   <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
-                    <button onClick={handleLogout}
-                      className="flex w-full items-center justify-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 hover:text-red-700 dark:bg-slate-800 dark:text-red-400 dark:hover:bg-red-950/30 dark:hover:text-red-300"
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className="flex w-full items-center justify-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 hover:text-red-700 dark:bg-slate-800 dark:text-red-400 dark:hover:bg-red-950/30 dark:hover:text-red-300 cursor-pointer"
                     >
                       <FiLogOut className="h-3.5 w-3.5" />
                       Sign Out
@@ -861,7 +1044,7 @@ const AppNavbar = () => {
             <div className="grid grid-cols-4 gap-y-2 gap-x-3 max-h-[380px] overflow-y-auto pr-1">
               {filteredApps.map((app) => (
                 <div
-                  key={app.id}
+                  key={app.id} title={app.title}
                   onClick={() => handleAppClick(app)}
                   className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl cursor-pointer transition-all duration-150 hover:bg-slate-50 dark:hover:bg-slate-800/70 border border-transparent hover:border-slate-200 dark:hover:border-slate-700 group shadow-xs hover:shadow-xs"
                 >
@@ -1026,8 +1209,10 @@ const AppNavbar = () => {
                       <TbPassword className="h-4 w-4" />
                       Change Password
                     </button>
-                    <button onClick={handleLogout}
-                      className="flex w-full items-center justify-center gap-2 rounded-lg bg-red-50 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-100 dark:bg-red-950/20 dark:text-red-400 dark:hover:bg-red-950/40"
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className="flex w-full items-center justify-center gap-2 rounded-lg bg-red-50 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-100 dark:bg-red-950/20 dark:text-red-400 dark:hover:bg-red-950/40 cursor-pointer"
                     >
                       <FiLogOut className="h-4 w-4" />
                       Sign Out

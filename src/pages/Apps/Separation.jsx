@@ -151,12 +151,28 @@ export default function Separation() {
   const userName = localStorage.getItem("userName") || "User";
 
   // RBAC checks
-  const isHR = storedRole === "hr" || storedRole === "admin" || storedRole === "hrmanager";
-  const isHOD = storedRole === "hod";
-  const isManager = storedRole === "manager";
-  const isTeamLead = storedRole === "teamlead";
+  const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+  const userDesig = (storedUser.designation || "").toLowerCase().trim();
+  const isLeadershipDesig =
+    /\b(hod|head|manager|mgr|lead|tl|agm|dgm|gm|director|supervisor)\b/i.test(userDesig) ||
+    userDesig.includes("team lead") ||
+    userDesig.includes("tech lead") ||
+    userDesig.includes("department head") ||
+    userDesig.includes("head of");
+  const isHodDesig =
+    /\b(hod|head|agm|dgm|gm|director)\b/i.test(userDesig) ||
+    userDesig.includes("department head") ||
+    userDesig.includes("head of");
+  const isManagerDesig = /\b(manager|mgr)\b/i.test(userDesig);
+  const isTlDesig = /\b(lead|tl|supervisor)\b/i.test(userDesig) || userDesig.includes("team lead");
+
+  const isAdmin = storedRole === "admin";
+  const isHR = storedRole === "hr" || storedRole === "hrmanager";
+  const isHOD = storedRole === "hod" || (!isHR && isHodDesig);
+  const isManager = storedRole === "manager" || (!isHR && !isHOD && isManagerDesig);
+  const isTeamLead = storedRole === "teamlead" || (!isHR && !isHOD && !isManager && isTlDesig);
   const isAccounts = storedRole === "accounts" || storedRole === "payroll";
-  const isEmployeeOnly = !isHR && !isHOD && !isManager && !isTeamLead && !isAccounts;
+  const isEmployeeOnly = !isHR && !isAdmin && !isHOD && !isManager && !isTeamLead && !isAccounts;
 
   // Data states
   const [loading, setLoading] = useState(true);
@@ -169,7 +185,7 @@ export default function Separation() {
   const [showApplyModal, setShowApplyModal] = useState(false);
   const [selectedRecordForDetail, setSelectedRecordForDetail] = useState(null);
   const [selectedRecordForAction, setSelectedRecordForAction] = useState(null);
-  const [actionType, setActionType] = useState(""); // "tl_action" | "manager_action" | "hod_action" | "hr_action"
+  const [actionType, setActionType] = useState(""); // "tl_action" | "manager_action" | "hod_action" | "admin_action" | "hr_action"
   const [activeTab, setActiveTab] = useState(isEmployeeOnly ? "my_resignation" : "team_queue");
 
   // History Tab Filters (for HR & Supervisors)
@@ -402,6 +418,12 @@ export default function Separation() {
             <FiShield className="w-3.5 h-3.5" /> Pending HR Approval
           </span>
         );
+      case "Pending Admin Approval":
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-900/40">
+            <FiShield className="w-3.5 h-3.5 text-blue-600" /> Pending Admin Approval
+          </span>
+        );
       case "Pending HOD Approval":
         return (
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-400 dark:border-indigo-900/40">
@@ -460,6 +482,7 @@ export default function Separation() {
     if (actionType === "tl_action") endpoint = `${API}/resignation/${selectedRecordForAction.id}/tl-action`;
     else if (actionType === "manager_action") endpoint = `${API}/resignation/${selectedRecordForAction.id}/manager-action`;
     else if (actionType === "hod_action") endpoint = `${API}/resignation/${selectedRecordForAction.id}/hod-action`;
+    else if (actionType === "admin_action") endpoint = `${API}/resignation/${selectedRecordForAction.id}/admin-action`;
     else if (actionType === "hr_action") endpoint = `${API}/resignation/${selectedRecordForAction.id}/hr-action`;
 
     try {
@@ -1094,6 +1117,7 @@ export default function Separation() {
   const pendingManagerCount = resignations.filter((r) => r.status === "Pending Manager Review").length;
   const pendingHodCount = resignations.filter((r) => r.status === "Pending HOD Approval").length;
   const pendingHandoverCount = resignations.filter((r) => r.status === "Pending Handover Completion" || r.status === "Awaiting Handover Confirmation" || r.approval_stage === "HANDOVER_IN_PROGRESS" || r.approval_stage === "HANDOVER_SUBMITTED").length;
+  const pendingAdminCount = resignations.filter((r) => r.status === "Pending Admin Approval").length;
   const pendingHrCount = resignations.filter((r) => r.status === "Pending HR Approval").length;
   const clearanceInProgressCount = resignations.filter((r) => r.clearance_raised && r.clearance_overall_status !== "Completed").length;
   const exitInterviewCount = resignations.filter((r) => r.clearance_overall_status === "Completed" && r.status !== "Separation Completed").length;
@@ -1174,13 +1198,13 @@ export default function Separation() {
                   : "text-slate-500 hover:text-slate-700 dark:text-slate-400"
               }`}
             >
-              {isHR ? "Organization Separation Hub (Active Queue & Clearances)" : "Department Review Queue"}
+              {isAdmin ? "Admin Approvals & Clearances" : isHR ? "Organization Separation Hub (Active Queue & Clearances)" : "Department Review Queue"}
               {activeTab === "team_queue" && (
                 <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400 rounded-full" />
               )}
             </button>
 
-            {(isHR || isHOD || isManager || isTeamLead) && (
+            {(isHR || isAdmin || isHOD || isManager || isTeamLead) && (
               <button
                 type="button"
                 onClick={() => setActiveTab("resignation_history")}
@@ -1428,7 +1452,7 @@ export default function Separation() {
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
                       {/* Step 1: Team Lead (TL) */}
                       <div className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col justify-between">
                         <div>
@@ -1545,11 +1569,40 @@ export default function Separation() {
                         )}
                       </div>
 
-                      {/* Step 5: HR Final Approval */}
+                      {/* Step 5: Admin Operations & Facilities Approval */}
                       <div className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col justify-between">
                         <div>
                           <div className="flex items-center justify-between mb-1.5">
-                            <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">5. HR Final Sign-off</span>
+                            <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">5. Admin Sign-off</span>
+                            <span className={`w-2 h-2 rounded-full ${myResignation.admin_decision === "Approved" ? "bg-emerald-500" : (myResignation.status === "Pending Admin Approval" ? "bg-blue-500 animate-ping" : "bg-slate-300")}`} />
+                          </div>
+                          <div className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
+                            {myResignation.admin_name || "Admin Operations"}
+                          </div>
+                          <div className="text-[10px] mt-1 font-semibold">
+                            {myResignation.admin_decision === "Approved" ? (
+                              <span className="text-emerald-600">✓ Admin Sign-off Granted</span>
+                            ) : myResignation.admin_decision === "Rejected" ? (
+                              <span className="text-rose-600">✕ Rejected by Admin</span>
+                            ) : myResignation.status === "Pending Admin Approval" ? (
+                              <span className="text-blue-600 font-bold">⏳ Awaiting Admin Sign-off</span>
+                            ) : (
+                              <span className="text-slate-400">Waiting for Handover</span>
+                            )}
+                          </div>
+                        </div>
+                        {myResignation.admin_comments && (
+                          <div className="mt-2 text-[10px] text-slate-500 italic bg-slate-50 dark:bg-slate-800 p-1.5 rounded">
+                            "{myResignation.admin_comments}"
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Step 6: HR Final Approval */}
+                      <div className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col justify-between">
+                        <div>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">6. HR Final Sign-off</span>
                             <span className={`w-2 h-2 rounded-full ${myResignation.status === "Approved" || myResignation.clearance_raised ? "bg-emerald-500" : (myResignation.status === "Pending HR Approval" ? "bg-purple-500 animate-ping" : "bg-slate-300")}`} />
                           </div>
                           <div className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
@@ -1965,7 +2018,7 @@ export default function Separation() {
           {!isEmployeeOnly && activeTab === "team_queue" && (
             <div className="space-y-6">
               {/* KPI Stat Cards */}
-              <div className="grid grid-cols-2 sm:grid-cols-7 gap-2.5">
+              <div className="grid grid-cols-2 sm:grid-cols-8 gap-2.5">
                 <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-3 shadow-xs">
                   <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                     Total Filed
@@ -2008,6 +2061,15 @@ export default function Separation() {
                   </div>
                   <div className="text-xl font-black text-amber-700 dark:text-amber-300 mt-1">
                     {pendingHandoverCount}
+                  </div>
+                </div>
+
+                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-blue-200/80 dark:border-blue-900/40 p-3 shadow-xs bg-blue-50/20">
+                  <div className="text-[10px] font-bold text-blue-700 dark:text-blue-400 uppercase tracking-wider">
+                    Admin Sign-off
+                  </div>
+                  <div className="text-xl font-black text-blue-600 dark:text-blue-400 mt-1">
+                    {pendingAdminCount}
                   </div>
                 </div>
 
@@ -2055,6 +2117,7 @@ export default function Separation() {
                     <option value="Pending HOD Approval">Pending HOD Approval</option>
                     <option value="Pending Handover Completion">Pending Handover Completion</option>
                     <option value="Awaiting Handover Confirmation">Awaiting Handover Confirmation</option>
+                    <option value="Pending Admin Approval">Pending Admin Approval</option>
                     <option value="Pending HR Approval">Pending HR Approval</option>
                     <option value="Approved">Approved (Awaiting Clearance)</option>
                     <option value="Clearance In Progress">Clearance In Progress</option>
@@ -2210,7 +2273,18 @@ export default function Separation() {
                                     </button>
                                   )}
 
-                                  {/* 4. HR Final Approval */}
+                                  {/* 4. Admin Operations & Facilities Approval */}
+                                  {(isAdmin || isHR) && item.status === "Pending Admin Approval" && (
+                                    <button
+                                      type="button"
+                                      onClick={() => openActionModal(item, "admin_action")}
+                                      className="px-2.5 py-1 text-xs font-bold rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition-colors whitespace-nowrap shrink-0"
+                                    >
+                                      Admin Approval
+                                    </button>
+                                  )}
+
+                                  {/* 5. HR Final Approval */}
                                   {isHR && item.status === "Pending HR Approval" && (
                                     <button
                                       type="button"
@@ -2539,6 +2613,7 @@ export default function Separation() {
                 {actionType === "tl_action" && "Team Lead (TL) Review"}
                 {actionType === "manager_action" && "Department Manager Review"}
                 {actionType === "hod_action" && "Department Head (HOD) Final Approval"}
+                {actionType === "admin_action" && "Admin Approval (Unofficial Tasks, Events & Joining Kit)"}
                 {actionType === "hr_action" && "HR Final Approval & LWD Confirmation"}
               </h3>
               <button
@@ -2590,7 +2665,7 @@ export default function Separation() {
                   }`}
                 >
                   <FiCheck className="w-4 h-4 text-emerald-600" />
-                  {actionType === "hr_action" ? "Grant Final Approval" : "Recommend & Endorse"}
+                  {actionType === "hr_action" ? "Grant Final Approval" : actionType === "admin_action" ? "Approve Admin Sign-off" : "Recommend & Endorse"}
                 </button>
                 <button
                   type="button"
@@ -3771,6 +3846,12 @@ export default function Separation() {
                   <div className="text-slate-600 dark:text-slate-300">
                     <span className="font-bold">Department Head (HOD):</span> {selectedRecordForDetail.hod_name} ({selectedRecordForDetail.hod_decision})
                     {selectedRecordForDetail.hod_comments && <p className="italic text-[11px]">"{selectedRecordForDetail.hod_comments}"</p>}
+                  </div>
+                )}
+                {selectedRecordForDetail.admin_name && (
+                  <div className="text-slate-600 dark:text-slate-300">
+                    <span className="font-bold">Admin (Operations):</span> {selectedRecordForDetail.admin_name} ({selectedRecordForDetail.admin_decision})
+                    {selectedRecordForDetail.admin_comments && <p className="italic text-[11px]">"{selectedRecordForDetail.admin_comments}"</p>}
                   </div>
                 )}
                 {selectedRecordForDetail.hr_name && (

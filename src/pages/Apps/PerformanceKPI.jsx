@@ -81,11 +81,19 @@ export default function PerformanceKPI() {
   const navigate = useNavigate();
 
   // Auth & Role
-  const rawRole = (localStorage.getItem("role") || "employee").toLowerCase();
+  const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+  const rawRole = (localStorage.getItem("role") || storedUser.role || "employee").toLowerCase();
+  const userDesig = (storedUser.designation || "").toLowerCase().trim();
+  const isLeadershipDesig =
+    /\b(hod|head|manager|mgr|lead|tl|agm|dgm|gm|director|supervisor)\b/i.test(userDesig) ||
+    userDesig.includes("team lead") ||
+    userDesig.includes("tech lead") ||
+    userDesig.includes("department head") ||
+    userDesig.includes("head of");
   const isHRorAdmin = ["hr", "admin"].includes(rawRole);
-  const isHOD = ["hod", "manager", "teamlead"].includes(rawRole);
-  const employeeId = localStorage.getItem("employee_id") || "";
-  const userName = localStorage.getItem("name") || "Employee";
+  const isHOD = ["hod", "manager", "teamlead"].includes(rawRole) || isLeadershipDesig;
+  const employeeId = storedUser.employee_id || localStorage.getItem("employeeCode") || localStorage.getItem("employee_id") || "";
+  const userName = storedUser.name || localStorage.getItem("userName") || localStorage.getItem("name") || "Employee";
 
   // Tab State: "my_kpi" | "team_reviews" | "calibration" | "templates"
   const defaultTab = isHRorAdmin ? "calibration" : isHOD ? "team_reviews" : "my_kpi";

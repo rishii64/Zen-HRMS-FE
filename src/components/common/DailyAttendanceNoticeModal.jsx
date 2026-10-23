@@ -364,7 +364,7 @@ export default function DailyAttendanceNoticeModal({ isOpen, onClose, onAcknowle
               {/* Micro Takeaway Note */}
               <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 mb-3 px-0.5">
                 <FiInfo className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-blue-500 flex-shrink-0" />
-                <span>Always click 'Clock Out' on your dashboard before leaving to finalize hours.</span>
+                <span>Attendance is automatically registered on login and finalized on sign out.</span>
               </div>
 
               {/* Actions for Step 2 */}
@@ -399,8 +399,8 @@ export default function DailyAttendanceNoticeModal({ isOpen, onClose, onAcknowle
 
         {/* Compact Sub-Footer */}
         <div className="px-3.5 sm:px-5 py-1.5 sm:py-2 bg-slate-50 dark:bg-slate-900/80 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[9.5px] sm:text-[10px] text-slate-400 flex-shrink-0">
-          <span>Step {step} of 2 • Daily Attendance Protocol</span>
-          <span>Resets daily on portal login</span>
+          <span>Step {step} of 2 • Attendance Protocol</span>
+          <span>Appears until acknowledged</span>
         </div>
       </div>
     </div>,

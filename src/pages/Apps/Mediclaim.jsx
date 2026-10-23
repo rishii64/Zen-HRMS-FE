@@ -504,7 +504,7 @@ export default function Mediclaim() {
   const percentCovered = summary?.sum_insured > 0 ? Math.min(100, Math.round((summary.total_approved / summary.sum_insured) * 100)) : 0;
 
   return (
-    <Container fluid className="px-4 py-4 max-w-6xl" style={{ backgroundColor: "#f8fafc", minHeight: "100vh" }}>
+    <Container fluid className="px-4 py-4 max-w-7xl" style={{ backgroundColor: "#f8fafc", minHeight: "100vh" }}>
       {/* HEADER SECTION */}
       <div className="mb-4">
         <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">

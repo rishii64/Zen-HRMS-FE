@@ -19,10 +19,13 @@ import {
   LuClock,
   LuBriefcase,
   LuUserCheck,
+  LuPartyPopper,
 } from "react-icons/lu";
 
 export default function EmployeeModulesView({ employee = {} }) {
   const navigate = useNavigate();
+
+  const employeeCode = employee?.employeeCode || localStorage.getItem("employeeCode") || "";
 
   const quickActions = [
     {
@@ -44,7 +47,7 @@ export default function EmployeeModulesView({ employee = {} }) {
       iconBg: "rgba(22, 163, 74, 0.08)",
       iconColor: "#16a34a",
       isLink: true,
-      linkTo: "/employee/leave",
+      linkTo: "/leave",
     },
     {
       id: 3,
@@ -65,7 +68,7 @@ export default function EmployeeModulesView({ employee = {} }) {
       iconBg: "rgba(109, 40, 217, 0.08)",
       iconColor: "#6d28d9",
       isLink: true,
-      linkTo: `/profile/${employee.empId || ""}`,
+      linkTo: `/profile/${employeeCode}`,
     },
     {
       id: 5,
@@ -89,13 +92,15 @@ export default function EmployeeModulesView({ employee = {} }) {
     },
     {
       id: 7,
-      title: "Training modules",
-      desc: "Access training modules and onboarding tasks.",
-      btnText: "Open Modules",
+      title: "Training & Development",
+      desc: "Attend programs, complete assessments, submit feedback, and manage certifications.",
+      btnText: "Open Training",
       icon: <LuGraduationCap size={24} />,
       iconBg: "rgba(8, 145, 178, 0.08)",
       iconColor: "#0891b2",
-      onClick: () => navigate("/policies"),
+      isLink: true,
+      linkTo: "/training",
+      onClick: () => navigate("/training"),
     },
     {
       id: 8,
@@ -218,6 +223,17 @@ export default function EmployeeModulesView({ employee = {} }) {
       isLink: true,
       linkTo: "/onboarding",
     },
+    {
+      id: 19,
+      title: "HR Events & Townhalls",
+      desc: "View corporate gatherings, celebrations, meetings, and official event announcements.",
+      btnText: "Open Events",
+      icon: <LuPartyPopper size={24} />,
+      iconBg: "rgba(236, 72, 153, 0.08)",
+      iconColor: "#ec4899",
+      isLink: true,
+      linkTo: "/hr-events",
+    },
   ];
 
   const enabledTabIds = (() => {
@@ -285,7 +301,15 @@ export default function EmployeeModulesView({ employee = {} }) {
         <Row className="g-3">
         {visibleActions.map((action, index) => (
           <Col xs={12} sm={6} lg={4} key={action.id}>
-            <Card className="h-100 shadow-sm border-0 rounded-4 hover-card bg-white">
+            <Card
+              className="h-100 shadow-sm border-0 rounded-4 hover-card bg-white"
+              style={{ cursor: "pointer" }}
+              onClick={(e) => {
+                if (e.target.closest("a, button")) return;
+                if (action.isLink && action.linkTo) navigate(action.linkTo);
+                else if (action.onClick) action.onClick(e);
+              }}
+            >
               <Card.Body className="d-flex flex-column p-4 justify-content-between">
                 <div>
                   <div className="d-flex justify-content-between align-items-center mb-3">

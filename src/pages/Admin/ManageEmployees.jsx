@@ -30,6 +30,7 @@ import {
   LuFileText,
   LuSearch,
   LuRefreshCw,
+  LuRotateCcw,
   LuDownload,
   LuCheck,
   LuX,
@@ -58,6 +59,8 @@ import {
 import { FaListCheck } from "react-icons/fa6";
 import { BsThreeDots } from "react-icons/bs";
 import { getApiBaseUrl, getBackendBaseUrl, getUploadUrl, UPLOADS_BASE } from "../../api/axios";
+import OrganizationStructureModal from "../../components/Admin/OrganizationStructureModal";
+import { LuNetwork } from "react-icons/lu";
 
 const API = getApiBaseUrl();
 
@@ -140,6 +143,7 @@ const ALL_TABS = [
   { id: 3, name: "Payroll & Salary", desc: "Review monthly salary slips, tax records, and allowances", badge: "Payroll", category: "Finance", icon: "wallet" },
   { id: 14, name: "Salary Slips (Payslips)", desc: "Download and view official monthly salary payslips and earnings", badge: "Payslip", category: "Finance", icon: "filecheck" },
   { id: 8, name: "IT Declaration", desc: "Declare tax investments, 80C/80D deductions, and tax regime", badge: "Taxation", category: "Finance", icon: "receipt" },
+  { id: 21, name: "Claims & Reimbursement", desc: "Submit travel & expense reimbursement claims with receipt uploads and track manager & finance approval", badge: "Claims", category: "Finance", icon: "claim" },
   { id: 10, name: "Mediclaim & Health Insurance", desc: "Digital health E-card, covered dependents, hospital list, and insurance claims", badge: "Mediclaim", category: "Finance", icon: "stethoscope" },
   { id: 15, name: "Performance KPI", desc: "Set performance goals, track KPI achievements, and review PMS scorecards", badge: "KPI", category: "Growth", icon: "award" },
   { id: 6, name: "Performance Appraisal", desc: "Review annual/probation appraisals, feedback loops, and rating scorecards", badge: "Appraisal", category: "Growth", icon: "trendingup" },
@@ -165,6 +169,7 @@ const renderTabIcon = (iconName) => {
     case "award": return <LuAward size={16} className="text-amber-600" />;
     case "graduationcap": return <LuGraduationCap size={16} className="text-cyan-600" />;
     case "receipt": return <LuReceipt size={16} className="text-blue-600" />;
+    case "claim": return <LuReceipt size={16} className="text-emerald-600" />;
     case "badgecheck": return <LuBadgeCheck size={16} className="text-teal-600" />;
     case "stethoscope": return <LuStethoscope size={16} className="text-rose-600" />;
     case "shieldcheck": return <LuShieldCheck size={16} className="text-blue-600" />;
@@ -184,6 +189,10 @@ const EMPTY_FORM = {
   name: "",
   dept: "",
   designation: "",
+  department_id: "",
+  designation_id: "",
+  grade_id: "",
+  reporting_manager_id: "",
   email: "",
   work_email: "",
   personal_email: "",
@@ -1213,6 +1222,10 @@ const ManageEmployees = () => {
   const [role, setRole] = useState(localStorage.getItem("role") || "admin");
   const [globalEsiThreshold, setGlobalEsiThreshold] = useState(21000);
   const [showEsiModal, setShowEsiModal] = useState(false);
+  const [showOrgModal, setShowOrgModal] = useState(false);
+  const [departmentsList, setDepartmentsList] = useState([]);
+  const [designationsList, setDesignationsList] = useState([]);
+  const [gradesList, setGradesList] = useState([]);
   const [esiForm, setEsiForm] = useState({ global_esi_threshold: 21000, apply_to_all: false });
   const [savingEsi, setSavingEsi] = useState(false);
 
@@ -1244,6 +1257,7 @@ const ManageEmployees = () => {
     }
     fetchEmployees();
     fetchGlobalEsi();
+    fetchOrgMasters();
 
     // Re-fetch latest employee records and updated photos whenever the window gains focus
     const handleFocus = () => {
@@ -1270,6 +1284,26 @@ const ManageEmployees = () => {
     }
     if (!silent) setLoading(false);
     else setRefreshing(false);
+  };
+
+  const fetchOrgMasters = async () => {
+    try {
+      const [resDepts, resDesigs, resGrades] = await Promise.all([
+        fetch(`${API}/departments`),
+        fetch(`${API}/designations`),
+        fetch(`${API}/job-grades`),
+      ]);
+      const [dataDepts, dataDesigs, dataGrades] = await Promise.all([
+        resDepts.json(),
+        resDesigs.json(),
+        resGrades.json(),
+      ]);
+      if (dataDepts.success) setDepartmentsList(dataDepts.data || []);
+      if (dataDesigs.success) setDesignationsList(dataDesigs.data || []);
+      if (dataGrades.success) setGradesList(dataGrades.data || []);
+    } catch (e) {
+      console.warn("Could not fetch org masters:", e.message);
+    }
   };
 
   const fetchGlobalEsi = async () => {
@@ -1467,6 +1501,10 @@ const ManageEmployees = () => {
       esi_threshold: hasCustomEsi ? emp.esi_threshold : "",
       esi_slab_type: hasCustomEsi ? "custom" : "global",
       group_name: emp.group_name || "TATA Company",
+      department_id: emp.department_id || "",
+      designation_id: emp.designation_id || "",
+      grade_id: emp.grade_id || "",
+      reporting_manager_id: emp.reporting_manager_id || "",
       company_name: emp.company_name || "TATA Steel",
       work_location: emp.work_location || "Kolkata",
     });
@@ -1610,7 +1648,7 @@ const ManageEmployees = () => {
       toast.error("Only HR can configure dashboard modules!");
       return;
     }
-    let currentTabs = [1, 2, 3, 4, 8, 9, 10, 11, 12, 14, 16]; // default standard tabs
+    let currentTabs = [1, 2, 3, 4, 8, 9, 10, 11, 12, 14, 16, 21]; // default standard tabs
     if (emp.enabled_tabs) {
       let parsed = [];
       if (typeof emp.enabled_tabs === "string") {
@@ -1802,189 +1840,289 @@ const ManageEmployees = () => {
     return list;
   }, [employees, searchTerm, selectedDesignation, selectedDept, selectedStatus, sortBy]);
 
+  const hasActiveFilters = useMemo(() => {
+    return Boolean(
+      (searchTerm && searchTerm.trim() !== "") ||
+      selectedDesignation !== "All" ||
+      selectedDept !== "All" ||
+      selectedStatus !== "All" ||
+      sortBy !== "newest"
+    );
+  }, [searchTerm, selectedDesignation, selectedDept, selectedStatus, sortBy]);
+
+  const handleResetFilters = () => {
+    setSearchTerm("");
+    setSelectedDesignation("All");
+    setSelectedDept("All");
+    setSelectedStatus("All");
+    setSortBy("newest");
+  };
+
   return (
-    <div className="emp-page-wrapper py-3 py-md-4">
+    <div className="emp-page-wrapper py-3 py-md-4 transition-colors duration-200">
       <Container fluid className="px-md-4 max-w-7xl">
-        {/* Top Control Bar Adaptive Single Line */}
-        <div className="emp-controls-card py-2.5 px-3 mb-4 bg-white border rounded-4 shadow-sm">
-          <div className="emp-controls-scroll-row d-flex flex-nowrap align-items-center gap-2 w-100">
-            {/* Designation Filter */}
-            <div className="filter-item flex-shrink-0" style={{ width: "160px" }}>
-              <Form.Select
-                size="sm"
-                value={selectedDesignation}
-                onChange={(e) => setSelectedDesignation(e.target.value)}
-                className="filter-select rounded-3 py-1.5 px-2 fw-semibold text-secondary"
-                style={{ fontSize: "13px", borderColor: "#cbd5e1" }}
-              >
-                <option value="All">Designation : All</option>
-                {allDesignations
-                  .filter((d) => d !== "All")
-                  .map((d) => (
-                    <option key={d} value={d}>
-                      {d}
-                    </option>
-                  ))}
-              </Form.Select>
-            </div>
+        {/* Top Control Bar Adaptive 2-Line Section (Left 3x2 & Right 2x2) */}
+        <div className="emp-controls-card py-2.5 px-3 mb-4 bg-white dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-4 shadow-sm">
+          <div className="row g-2 align-items-stretch">
+            {/* Left Controls: 3x2 Adaptive Grid (Search, Designation, Dept, Status, Sort, Reset) */}
+            <div className="col-12 col-xl-8 col-lg-7">
+              <div className="row g-2">
+                {/* Row 1, Col 1: Search Bar */}
+                <div className="col-12 col-sm-4">
+                  <InputGroup size="sm" className="w-100">
+                    <InputGroup.Text
+                      className="bg-white dark:bg-slate-800 border-end-0 text-muted px-2"
+                      style={{ borderColor: "#cbd5e1", height: "34px" }}
+                    >
+                      <LuSearch size={14} />
+                    </InputGroup.Text>
+                    <Form.Control
+                      placeholder="Search name, code, dept..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="border-start-0 py-1.5 ps-1"
+                      style={{ fontSize: "13px", borderColor: "#cbd5e1", height: "34px" }}
+                    />
+                    {searchTerm && (
+                      <Button
+                        variant="outline-secondary"
+                        size="sm"
+                        onClick={() => setSearchTerm("")}
+                        className="py-1 px-2 border-start-0"
+                        style={{ borderColor: "#cbd5e1", height: "34px" }}
+                      >
+                        <LuX size={13} />
+                      </Button>
+                    )}
+                  </InputGroup>
+                </div>
 
-            {/* Department Filter */}
-            <div className="filter-item flex-shrink-0" style={{ width: "165px" }}>
-              <Form.Select
-                size="sm"
-                value={selectedDept}
-                onChange={(e) => setSelectedDept(e.target.value)}
-                className="filter-select rounded-3 py-1.5 px-2 fw-semibold text-secondary"
-                style={{ fontSize: "13px", borderColor: "#cbd5e1" }}
-              >
-                <option value="All">Dept : All</option>
-                {allDepartments
-                  .filter((d) => d !== "All")
-                  .map((d) => (
-                    <option key={d} value={d}>
-                      Dept : {d}
-                    </option>
-                  ))}
-              </Form.Select>
-            </div>
-
-            {/* Status Filter */}
-            <div className="filter-item flex-shrink-0" style={{ width: "150px" }}>
-              <Form.Select
-                size="sm"
-                value={selectedStatus}
-                onChange={(e) => setSelectedStatus(e.target.value)}
-                className="filter-select rounded-3 py-1.5 px-2 fw-semibold text-secondary"
-                style={{ fontSize: "13px", borderColor: "#cbd5e1" }}
-              >
-                <option value="All">Status : All</option>
-                <option value="Active">Status : Active</option>
-                <option value="Inactive">Status : Inactive</option>
-                <option value="Resigned">Status : Resigned</option>
-              </Form.Select>
-            </div>
-
-            {/* Sort By Filter */}
-            <div className="filter-item flex-shrink-0" style={{ width: "150px" }}>
-              <Form.Select
-                size="sm"
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                className="filter-select rounded-3 py-1.5 px-2 fw-semibold text-secondary"
-                style={{ fontSize: "13px", borderColor: "#cbd5e1" }}
-              >
-                <option value="newest">Sort : Last 7 Days</option>
-                <option value="oldest">Sort : Oldest</option>
-                <option value="name-asc">Sort : Name (A - Z)</option>
-                <option value="name-desc">Sort : Name (Z - A)</option>
-                <option value="salary-high">Sort : Salary (High)</option>
-                <option value="salary-low">Sort : Salary (Low)</option>
-              </Form.Select>
-            </div>
-
-            {/* Search Bar */}
-            <div className="filter-item flex-grow-1" style={{ minWidth: "130px" }}>
-              <InputGroup size="sm">
-                <InputGroup.Text className="bg-white border-end-0 text-muted px-2" style={{ borderColor: "#cbd5e1" }}>
-                  <LuSearch size={14} />
-                </InputGroup.Text>
-                <Form.Control
-                  placeholder="Search name, code, dept..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="border-start-0 py-1.5 ps-1"
-                  style={{ fontSize: "13px", borderColor: "#cbd5e1" }}
-                />
-                {searchTerm && (
-                  <Button
-                    variant="outline-secondary"
+                {/* Row 1, Col 2: Designation Filter */}
+                <div className="col-12 col-sm-4">
+                  <Form.Select
                     size="sm"
-                    onClick={() => setSearchTerm("")}
-                    className="py-1 px-2 border-start-0"
-                    style={{ borderColor: "#cbd5e1" }}
+                    value={selectedDesignation}
+                    onChange={(e) => setSelectedDesignation(e.target.value)}
+                    className="filter-select rounded-3 py-1.5 px-2 fw-semibold text-secondary w-100"
+                    style={{ fontSize: "13px", borderColor: "#cbd5e1", height: "34px" }}
                   >
-                    <LuX size={13} />
-                  </Button>
-                )}
-              </InputGroup>
+                    <option value="All">Designation : All</option>
+                    {allDesignations
+                      .filter((d) => d !== "All")
+                      .map((d) => (
+                        <option key={d} value={d}>
+                          {d}
+                        </option>
+                      ))}
+                  </Form.Select>
+                </div>
+
+                {/* Row 1, Col 3: Department Filter */}
+                <div className="col-12 col-sm-4">
+                  <Form.Select
+                    size="sm"
+                    value={selectedDept}
+                    onChange={(e) => setSelectedDept(e.target.value)}
+                    className="filter-select rounded-3 py-1.5 px-2 fw-semibold text-secondary w-100"
+                    style={{ fontSize: "13px", borderColor: "#cbd5e1", height: "34px" }}
+                  >
+                    <option value="All">Dept : All</option>
+                    {allDepartments
+                      .filter((d) => d !== "All")
+                      .map((d) => (
+                        <option key={d} value={d}>
+                          Dept : {d}
+                        </option>
+                      ))}
+                  </Form.Select>
+                </div>
+
+                {/* Row 2, Col 1: Status Filter */}
+                <div className="col-12 col-sm-4">
+                  <Form.Select
+                    size="sm"
+                    value={selectedStatus}
+                    onChange={(e) => setSelectedStatus(e.target.value)}
+                    className="filter-select rounded-3 py-1.5 px-2 fw-semibold text-secondary w-100"
+                    style={{ fontSize: "13px", borderColor: "#cbd5e1", height: "34px" }}
+                  >
+                    <option value="All">Status : All</option>
+                    <option value="Active">Status : Active</option>
+                    <option value="Inactive">Status : Inactive</option>
+                    <option value="Resigned">Status : Resigned</option>
+                  </Form.Select>
+                </div>
+
+                {/* Row 2, Col 2: Sort By Filter */}
+                <div className="col-12 col-sm-4">
+                  <Form.Select
+                    size="sm"
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                    className="filter-select rounded-3 py-1.5 px-2 fw-semibold text-secondary w-100"
+                    style={{ fontSize: "13px", borderColor: "#cbd5e1", height: "34px" }}
+                  >
+                    <option value="newest">Sort : Last 7 Days</option>
+                    <option value="oldest">Sort : Oldest</option>
+                    <option value="name-asc">Sort : Name (A - Z)</option>
+                    <option value="name-desc">Sort : Name (Z - A)</option>
+                    <option value="salary-high">Sort : Salary (High)</option>
+                    <option value="salary-low">Sort : Salary (Low)</option>
+                  </Form.Select>
+                </div>
+
+                {/* Row 2, Col 3: Clear / Reset Filters */}
+                <div className="col-12 col-sm-4">
+                  <button
+                    type="button"
+                    onClick={handleResetFilters}
+                    disabled={!hasActiveFilters}
+                    className={`btn btn-sm w-auto px-4 d-flex align-items-center justify-content-center gap-1.5 py-1.5 px-2 rounded-3 text-truncate transition-all ${
+                      hasActiveFilters
+                        ? "btn-outline-danger shadow-xs fw-semibold"
+                        : "btn-outline-secondary text-muted opacity-80"
+                    }`}
+                    style={{ fontSize: "13px", height: "34px" }}
+                    title={hasActiveFilters ? "Reset all applied filters" : "All filters at default"}
+                  >
+                    <LuRotateCcw size={13} className={hasActiveFilters ? "text-danger" : "text-muted"} />
+                    <span className="text-truncate">
+                      {hasActiveFilters
+                        ? `Reset (${filteredAndSortedEmployees.length}/${employees.length})`
+                        : `All Staff (${employees.length})`}
+                    </span>
+                  </button>
+                </div>
+              </div>
             </div>
 
-            {/* Right Controls: Role Switcher, View Switcher & Add Employee */}
-            <div className="d-flex align-items-center gap-2 flex-shrink-0 ms-auto">
-              {/* Role selector for testing */}
-              <div className="d-none d-md-block flex-shrink-0">
-                <Form.Select
-                  size="sm"
-                  value={role}
-                  onChange={(e) => setRole(e.target.value)}
-                  className="rounded-3 py-1.5 px-2 fw-semibold text-secondary"
-                  style={{ width: "155px", fontSize: "13px", borderColor: "#cbd5e1" }}
-                  title="Active Workspace Role"
-                >
-                  <option value="management">Management</option>
-                  <option value="hr">HR Manager</option>
-                  <option value="admin">Admin</option>
-                  <option value="accounts">Accounts</option>
-                </Form.Select>
+            {/* Right Controls: 2-Rows Format */}
+            <div className="col-12 col-xl-4 col-lg-5">
+              <div className="row g-2">
+                {/* Row 1, Col 1: Role Switcher */}
+                <div className="col-6">
+                  <Form.Select
+                    size="sm"
+                    value={role}
+                    onChange={(e) => setRole(e.target.value)}
+                    className="rounded-3 py-1.5 px-2 fw-semibold text-secondary w-100"
+                    style={{ fontSize: "13px", borderColor: "#cbd5e1", height: "34px" }}
+                    title="Active Workspace Role"
+                  >
+                    <option value="management">Role : Management</option>
+                    <option value="hr">Role : HR Manager</option>
+                    <option value="admin">Role : Admin</option>
+                    <option value="accounts">Role : Accounts</option>
+                  </Form.Select>
+                </div>
+
+                {/* Row 1, Col 2: View Switcher & Refresh */}
+                <div className="col-6">
+                  <div className="d-flex align-items-center justify-content-end gap-1.5 w-100" style={{ height: "34px" }}>
+                    <button
+                      type="button"
+                      className="view-toggle-btn flex-shrink-0"
+                      onClick={() => fetchEmployees(true)}
+                      title="Refresh employee list & latest photos"
+                      style={{ width: "32px", height: "32px" }}
+                    >
+                      <LuRefreshCw size={14} className={refreshing ? "spin-animation" : ""} />
+                    </button>
+
+                    <div
+                      className="view-toggle-pill flex-shrink-0"
+                      style={{
+                        display: "inline-flex",
+                        background: "#f1f5f9",
+                        padding: "2px",
+                        borderRadius: "8px",
+                        border: "1px solid #e2e8f0",
+                        height: "32px",
+                        alignItems: "center"
+                      }}
+                    >
+                      <button
+                        type="button"
+                        className={`view-toggle-btn ${viewMode === "grid" ? "active" : ""}`}
+                        onClick={() => setViewMode("grid")}
+                        title="Grid View"
+                        style={{ width: "28px", height: "26px" }}
+                      >
+                        <LuLayoutGrid size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        className={`view-toggle-btn ${viewMode === "list" ? "active" : ""}`}
+                        onClick={() => setViewMode("list")}
+                        title="List View"
+                        style={{ width: "28px", height: "26px" }}
+                      >
+                        <LuList size={15} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Row 2, Col 1: Org Masters */}
+                <div className="col-4">
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-primary d-flex align-items-center justify-content-center gap-1 py-1.5 px-1.5 w-100 rounded-3 shadow-xs text-truncate"
+                    onClick={() => setShowOrgModal(true)}
+                    style={{ fontSize: "12px", fontWeight: 500, height: "34px" }}
+                    title="Manage Organization Hierarchy, Departments & Designations"
+                  >
+                    <LuNetwork size={14} className="flex-shrink-0" />
+                    <span className="text-truncate">Org Masters</span>
+                  </button>
+                </div>
+
+                {/* Row 2, Col 2: ESI Settings Button */}
+                <div className="col-4">
+                  {canManageEmployees ? (
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline-primary d-flex align-items-center justify-content-center gap-1 py-1.5 px-1.5 w-100 rounded-3 shadow-xs text-truncate"
+                      onClick={openEsiModal}
+                      style={{ fontSize: "12px", fontWeight: 500, height: "34px" }}
+                      title={`Configure Global ESI Slab & Threshold (₹${globalEsiThreshold.toLocaleString("en-IN")})`}
+                    >
+                      <span className="text-truncate">⚙️ ESI (₹${globalEsiThreshold >= 1000 ? `${Math.round(globalEsiThreshold / 1000)}k` : globalEsiThreshold})</span>
+                    </button>
+                  ) : (
+                    <div
+                      className="d-flex align-items-center justify-content-center text-muted small py-1.5 px-1.5 bg-light rounded-3 text-center border w-100 text-truncate"
+                      style={{ fontSize: "12px", height: "34px" }}
+                      title={`Global ESI Threshold: ₹${globalEsiThreshold.toLocaleString("en-IN")}`}
+                    >
+                      <span className="text-truncate">ESI: ₹${globalEsiThreshold >= 1000 ? `${Math.round(globalEsiThreshold / 1000)}k` : globalEsiThreshold}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Row 2, Col 3: Add Employee Button */}
+                <div className="col-4">
+                  {canManageEmployees ? (
+                    <button
+                      type="button"
+                      className="btn-add-emp py-1.5 px-2 w-100 d-flex align-items-center justify-content-center gap-1 rounded-3 text-truncate"
+                      onClick={openAdd}
+                      style={{ fontSize: "12.5px", height: "34px" }}
+                      title="Add New Employee"
+                    >
+                      <LuPlus size={15} className="flex-shrink-0" />
+                      <span className="text-truncate">Add Employee</span>
+                    </button>
+                  ) : (
+                    <div
+                      className="d-flex align-items-center justify-content-center text-muted small py-1.5 px-1.5 bg-light rounded-3 text-center border w-100 text-truncate"
+                      style={{ fontSize: "12px", height: "34px" }}
+                    >
+                      Read Only
+                    </div>
+                  )}
+                </div>
               </div>
-
-              {/* View Toggle Pill */}
-              <button
-                type="button"
-                className="view-toggle-btn flex-shrink-0"
-                onClick={() => fetchEmployees(true)}
-                title="Refresh employee list & latest photos"
-                style={{ width: "32px", height: "32px" }}
-              >
-                <LuRefreshCw size={14} className={refreshing ? "spin-animation" : ""} />
-              </button>
-
-              <div className="view-toggle-pill flex-shrink-0" style={{ display: "inline-flex", background: "#f1f5f9", padding: "2px", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
-                <button
-                  type="button"
-                  className={`view-toggle-btn ${viewMode === "grid" ? "active" : ""}`}
-                  onClick={() => setViewMode("grid")}
-                  title="Grid View"
-                  style={{ width: "28px", height: "28px" }}
-                >
-                  <LuLayoutGrid size={15} />
-                </button>
-                <button
-                  type="button"
-                  className={`view-toggle-btn ${viewMode === "list" ? "active" : ""}`}
-                  onClick={() => setViewMode("list")}
-                  title="List View"
-                  style={{ width: "28px", height: "28px" }}
-                >
-                  <LuList size={15} />
-                </button>
-              </div>
-
-              {/* Global ESI Slab Settings Button */}
-              {canManageEmployees && (
-                <button
-                  type="button"
-                  className="btn btn-sm btn-outline-primary d-flex align-items-center gap-1.5 py-1.5 px-3 flex-shrink-0 rounded-3 shadow-xs"
-                  onClick={openEsiModal}
-                  style={{ fontSize: "13px", whiteSpace: "nowrap", fontWeight: 500 }}
-                  title="Configure Global ESI Slab & Threshold"
-                >
-                  <span>⚙️ ESI Slab (₹{globalEsiThreshold.toLocaleString("en-IN")})</span>
-                </button>
-              )}
-
-              {/* Add Employee Button */}
-              {canManageEmployees && (
-                <button
-                  type="button"
-                  className="btn-add-emp py-1.5 px-3 flex-shrink-0"
-                  onClick={openAdd}
-                  style={{ fontSize: "13px", whiteSpace: "nowrap" }}
-                >
-                  <LuPlus size={15} />
-                  <span>Add Employee</span>
-                </button>
-              )}
             </div>
           </div>
         </div>
@@ -2033,7 +2171,7 @@ const ManageEmployees = () => {
 
               return (
                 <Col key={emp.employee_code || idx}>
-                  <div className="emp-card h-100 bg-white border rounded-4 p-4 text-center position-relative shadow-sm">
+                  <div className="emp-card h-100 bg-white dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-4 p-4 text-center position-relative shadow-sm">
                     {/* Top Right Three Dots Action Menu */}
                     <div className="position-absolute top-0 end-0 p-3">
                       <Dropdown align="end">
@@ -2561,34 +2699,63 @@ const ManageEmployees = () => {
                 </Form.Select>
               </Col>
               <Col xs={6} md={4}>
-                <Form.Label className="small fw-bold">Department</Form.Label>
+                <div className="d-flex align-items-center justify-content-between mb-1">
+                  <Form.Label className="small fw-bold mb-0">Department *</Form.Label>
+                  <span
+                    className="text-primary text-decoration-underline cursor-pointer"
+                    style={{ fontSize: "11px", cursor: "pointer" }}
+                    onClick={() => setShowOrgModal(true)}
+                  >
+                    + Manage
+                  </span>
+                </div>
                 <Form.Select
                   size="sm"
                   name="dept"
-                  value={isCustomDept ? "Others" : (empForm.dept || "")}
+                  value={empForm.department_id || (isCustomDept ? "Others" : (empForm.dept || ""))}
                   onChange={(e) => {
                     const val = e.target.value;
                     if (val === "Others") {
                       setIsCustomDept(true);
-                      setEmpForm(prev => ({ ...prev, dept: customDeptInput }));
+                      setEmpForm(prev => ({ ...prev, dept: customDeptInput, department_id: "" }));
                     } else {
                       setIsCustomDept(false);
-                      setEmpForm(prev => ({ ...prev, dept: val }));
+                      setCustomDeptInput("");
+                      const matchedDept = departmentsList.find(d => String(d.id) === String(val) || d.dept_name === val);
+                      if (matchedDept) {
+                        setEmpForm(prev => ({
+                          ...prev,
+                          dept: matchedDept.dept_name,
+                          department_id: matchedDept.id
+                        }));
+                      } else {
+                        setEmpForm(prev => ({ ...prev, dept: val, department_id: "" }));
+                      }
                     }
                   }}
+                  required
                 >
                   <option value="">Select Department</option>
-                  <option value="Management / Executive">Management / Executive</option>
-                  <option value="Human Resources (HR)">Human Resources (HR)</option>
-                  <option value="Accounts & Finance">Accounts & Finance</option>
-                  <option value="Administration & Facilities">Administration & Facilities</option>
-                  <option value="IT & Systems">IT & Systems</option>
-                  <option value="Legal Cell">Legal Cell</option>
-                  <option value="Operations">Operations</option>
-                  <option value="Sales & Marketing">Sales & Marketing</option>
-                  <option value="Engineering / Tech">Engineering / Tech</option>
-                  <option value="Customer Support">Customer Support</option>
-                  {empForm.dept && !["Management / Executive", "Human Resources (HR)", "Accounts & Finance", "Administration & Facilities", "IT & Systems", "Legal Cell", "Operations", "Sales & Marketing", "Engineering / Tech", "Customer Support", "Others"].includes(empForm.dept) && !isCustomDept && (
+                  {departmentsList.length > 0 ? (
+                    departmentsList.map(d => (
+                      <option key={d.id} value={d.id}>
+                        {d.dept_name} ({d.dept_code})
+                      </option>
+                    ))
+                  ) : (
+                    <>
+                      <option value="Engineering / Tech">Engineering / Tech</option>
+                      <option value="Sales & Marketing">Sales & Marketing</option>
+                      <option value="Accounts & Finance">Accounts & Finance</option>
+                      <option value="Human Resources (HR)">Human Resources (HR)</option>
+                      <option value="Operations">Operations</option>
+                      <option value="Administration & Facilities">Administration & Facilities</option>
+                      <option value="Customer Support">Customer Support</option>
+                      <option value="Legal Cell">Legal Cell</option>
+                      <option value="Management / Executive">Management / Executive</option>
+                    </>
+                  )}
+                  {empForm.dept && !departmentsList.some(d => d.dept_name === empForm.dept || String(d.id) === String(empForm.department_id)) && !isCustomDept && (
                     <option value={empForm.dept}>{empForm.dept}</option>
                   )}
                   <option value="Others">Others (Custom Field)</option>
@@ -2602,60 +2769,146 @@ const ManageEmployees = () => {
                       onChange={(e) => {
                         const val = e.target.value;
                         setCustomDeptInput(val);
-                        setEmpForm(prev => ({ ...prev, dept: val }));
+                        setEmpForm(prev => ({ ...prev, dept: val, department_id: "" }));
                       }}
                       className="border-primary"
                     />
-                    <div className="text-muted" style={{ fontSize: "10px" }}>
-                      Custom department will be saved for this employee
-                    </div>
                   </div>
                 )}
               </Col>
               <Col xs={12} md={4}>
-                <Form.Label className="small fw-bold">Designation</Form.Label>
-                <Form.Control
+                <div className="d-flex align-items-center justify-content-between mb-1">
+                  <Form.Label className="small fw-bold mb-0">Designation *</Form.Label>
+                  <span
+                    className="text-primary text-decoration-underline cursor-pointer"
+                    style={{ fontSize: "11px", cursor: "pointer" }}
+                    onClick={() => setShowOrgModal(true)}
+                  >
+                    + Add Role
+                  </span>
+                </div>
+                <Form.Select
                   size="sm"
                   name="designation"
-                  list="designations-list"
-                  placeholder="e.g. Employee, TL, Manager (HOD), GM, AGM..."
-                  value={empForm.designation || ""}
-                  onChange={handleChange}
-                />
-                <datalist id="designations-list">
-                  <option value="Employee" />
-                  <option value="TL" />
-                  <option value="HOD" />
-                  <option value="Manager" />
-                  <option value="Manager (HOD)" />
-                  <option value="AGM" />
-                  <option value="DGM" />
-                  <option value="GM" />
-                  <option value="CEO" />
-                  <option value="CTO" />
-                  <option value="COO" />
-                  <option value="CFO" />
-                  <option value="VP" />
-                  <option value="Secretary" />
-                  <option value="Legal Advisor" />
-                  <option value="Accountant" />
-                  <option value="IT Support Engineer" />
-                  <option value="HR Executive" />
-                </datalist>
-                <div className="d-flex flex-wrap gap-1 mt-1">
-                  {["TL", "HOD", "Manager", "AGM", "DGM", "GM"].map((d) => (
-                    <Badge
-                      key={d}
-                      bg="light"
-                      text="dark"
-                      className="border text-primary cursor-pointer"
-                      style={{ fontSize: "10px", cursor: "pointer", fontWeight: "normal" }}
-                      onClick={() => setEmpForm(prev => ({ ...prev, designation: d }))}
-                    >
-                      +{d}
-                    </Badge>
-                  ))}
-                </div>
+                  value={empForm.designation_id || empForm.designation || ""}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    const matchedDesig = designationsList.find(d => String(d.id) === String(val) || d.title === val);
+                    if (matchedDesig) {
+                      setEmpForm(prev => ({
+                        ...prev,
+                        designation: matchedDesig.title,
+                        designation_id: matchedDesig.id,
+                        grade_id: matchedDesig.grade_id,
+                        ...(matchedDesig.department_id && !prev.department_id ? {
+                          department_id: matchedDesig.department_id,
+                          dept: matchedDesig.department?.dept_name || prev.dept
+                        } : {})
+                      }));
+                    } else {
+                      setEmpForm(prev => ({ ...prev, designation: val }));
+                    }
+                  }}
+                  required
+                >
+                  <option value="">Select Designation / Role</option>
+                  {(() => {
+                    const currentDeptId = empForm.department_id ? parseInt(empForm.department_id, 10) : null;
+                    const deptSpecific = designationsList.filter(d => d.department_id && (!currentDeptId || d.department_id === currentDeptId));
+                    const globalRoles = designationsList.filter(d => !d.department_id);
+
+                    return (
+                      <>
+                        {deptSpecific.length > 0 && (
+                          <optgroup label="Department Positions">
+                            {deptSpecific.map(d => (
+                              <option key={d.id} value={d.id}>
+                                {d.title} ({d.grade?.grade_code || "L2"} - Rank {d.grade?.rank_level || 2})
+                              </option>
+                            ))}
+                          </optgroup>
+                        )}
+                        {globalRoles.length > 0 && (
+                          <optgroup label="Global / Management Positions">
+                            {globalRoles.map(d => (
+                              <option key={d.id} value={d.id}>
+                                {d.title} ({d.grade?.grade_code || "L5"} - Rank {d.grade?.rank_level || 5})
+                              </option>
+                            ))}
+                          </optgroup>
+                        )}
+                      </>
+                    );
+                  })()}
+                  {empForm.designation && !designationsList.some(d => d.title === empForm.designation || String(d.id) === String(empForm.designation_id)) && (
+                    <option value={empForm.designation}>{empForm.designation}</option>
+                  )}
+                </Form.Select>
+
+                {/* Dynamic Grade & Pay Band Info Pill */}
+                {(() => {
+                  const currentDesig = designationsList.find(d =>
+                    (empForm.designation_id && String(d.id) === String(empForm.designation_id)) ||
+                    (empForm.designation && d.title === empForm.designation)
+                  );
+                  const currentGrade = currentDesig?.grade || gradesList.find(g => String(g.id) === String(empForm.grade_id));
+
+                  if (currentGrade) {
+                    const minL = (parseFloat(currentGrade.min_salary || 0) / 100000).toFixed(1);
+                    const maxL = (parseFloat(currentGrade.max_salary || 0) / 100000).toFixed(1);
+                    const curSal = parseFloat(empForm.current_salary) || 0;
+                    const annualSal = (empForm.salary_type || "").includes("Monthly") ? curSal * 12 : curSal;
+                    const isWithinBand = annualSal >= parseFloat(currentGrade.min_salary || 0) && annualSal <= parseFloat(currentGrade.max_salary || 999999999);
+
+                    return (
+                      <div className="mt-1.5 p-1.5 rounded-2 bg-blue-50/60 border border-blue-200" style={{ fontSize: "10.5px" }}>
+                        <div className="d-flex align-items-center justify-content-between text-blue-900">
+                          <span className="fw-bold">
+                            Band: {currentGrade.grade_code} • {currentGrade.grade_name}
+                          </span>
+                          <span className="badge bg-primary px-1.5 py-0.5">Rank {currentGrade.rank_level}</span>
+                        </div>
+                        <div className="text-muted d-flex justify-content-between mt-0.5">
+                          <span>CTC Range: ₹{minL}L - ₹{maxL}L</span>
+                          <span>Notice: {currentGrade.notice_period_days}d</span>
+                        </div>
+                        {annualSal > 0 && (
+                          <div className={`mt-0.5 fw-semibold ${isWithinBand ? "text-emerald-700" : "text-amber-700"}`}>
+                            {isWithinBand ? "✓ Salary is within standard band" : "⚠️ Salary differs from standard grade band"}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+                  return (
+                    <div className="d-flex flex-wrap gap-1 mt-1">
+                      {["TL", "HOD", "Manager", "AGM", "DGM", "GM"].map((d) => (
+                        <Badge
+                          key={d}
+                          bg="light"
+                          text="dark"
+                          className="border text-primary cursor-pointer"
+                          style={{ fontSize: "10px", cursor: "pointer", fontWeight: "normal" }}
+                          onClick={() => {
+                            const matched = designationsList.find(item => item.title === d);
+                            if (matched) {
+                              setEmpForm(prev => ({
+                                ...prev,
+                                designation: matched.title,
+                                designation_id: matched.id,
+                                grade_id: matched.grade_id,
+                              }));
+                            } else {
+                              setEmpForm(prev => ({ ...prev, designation: d }));
+                            }
+                          }}
+                        >
+                          +{d}
+                        </Badge>
+                      ))}
+                    </div>
+                  );
+                })()}
               </Col>
               <Col xs={12} md={4}>
                 <Form.Label className="small fw-bold text-primary">Parent Group</Form.Label>
@@ -2930,7 +3183,7 @@ const ManageEmployees = () => {
           </Modal.Body>
           <Modal.Footer className="p-2">
             <Button
-            size="sm"
+              size="sm"
               variant="link"
               className="text-muted text-decoration-none !font-semibold !bg-gray-200 !rounded-lg px-3"
               onClick={() => setShowModal(false)}
@@ -3071,10 +3324,10 @@ const ManageEmployees = () => {
                 <Button
                   variant="outline-primary"
                   size="sm"
-                  onClick={() => setTabsModal(prev => ({ ...prev, selectedTabs: [1, 2, 3, 4, 8, 9, 10, 11, 12, 14, 16] }))}
+                  onClick={() => setTabsModal(prev => ({ ...prev, selectedTabs: [1, 2, 3, 4, 8, 9, 10, 11, 12, 14, 16, 21] }))}
                   className="py-1 px-2 !text-xs"
                 >
-                  Standard Default (11)
+                  Standard Default (12)
                 </Button>
               </div>
             </div>
@@ -3378,7 +3631,7 @@ const ManageEmployees = () => {
                           href={`${UPLOADS_BASE}/${emp.doc_resume || emp.cv_file}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="btn btn-outline-secondary btn-sm py-1 px-2 fw-semibold"
+                          className="btn btn-outline-secondary btn-sm py-1 px-2 fw-semibold d-flex items-center"
                           style={{ fontSize: "12px" }}
                         >
                           📄 CV / Resume <LuExternalLink size={12} className="ms-1" />
@@ -3389,7 +3642,7 @@ const ManageEmployees = () => {
                           href={`${UPLOADS_BASE}/${emp.doc_pan}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="btn btn-outline-secondary btn-sm py-1 px-2 fw-semibold"
+                          className="btn btn-outline-secondary btn-sm py-1 px-2 fw-semibold d-flex items-center"
                           style={{ fontSize: "12px" }}
                         >
                           💳 PAN Card <LuExternalLink size={12} className="ms-1" />
@@ -3400,7 +3653,7 @@ const ManageEmployees = () => {
                           href={`${UPLOADS_BASE}/${emp.doc_aadhaar}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="btn btn-outline-secondary btn-sm py-1 px-2 fw-semibold"
+                          className="btn btn-outline-secondary btn-sm py-1 px-2 fw-semibold d-flex items-center"
                           style={{ fontSize: "12px" }}
                         >
                           🪪 Aadhaar Card <LuExternalLink size={12} className="ms-1" />
@@ -3411,7 +3664,7 @@ const ManageEmployees = () => {
                           href={`${UPLOADS_BASE}/${emp.doc_id}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="btn btn-outline-secondary btn-sm py-1 px-2 fw-semibold"
+                          className="btn btn-outline-secondary btn-sm py-1 px-2 fw-semibold d-flex items-center"
                           style={{ fontSize: "12px" }}
                         >
                           🪪 ID Document <LuExternalLink size={12} className="ms-1" />
@@ -3422,7 +3675,7 @@ const ManageEmployees = () => {
                           href={`${UPLOADS_BASE}/${emp.doc_cert}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="btn btn-outline-secondary btn-sm py-1 px-2 fw-semibold"
+                          className="btn btn-outline-secondary btn-sm py-1 px-2 fw-semibold d-flex items-center"
                           style={{ fontSize: "12px" }}
                         >
                           🎓 Degree / Certificate <LuExternalLink size={12} className="ms-1" />
@@ -3438,7 +3691,7 @@ const ManageEmployees = () => {
                                 href={`${UPLOADS_BASE}/${s.filename || s}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="btn btn-outline-success btn-sm py-1 px-2 fw-semibold"
+                                className="btn btn-outline-success btn-sm py-1 px-2 fw-semibold d-flex items-center"
                                 style={{ fontSize: "12px" }}
                               >
                                 💵 Salary Slip #{idx + 1} <LuExternalLink size={12} className="ms-1" />
@@ -3458,7 +3711,7 @@ const ManageEmployees = () => {
                                 href={`${UPLOADS_BASE}/${c.filename || c}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="btn btn-outline-info btn-sm py-1 px-2 fw-semibold"
+                                className="btn btn-outline-info btn-sm py-1 px-2 fw-semibold d-flex items-center"
                                 style={{ fontSize: "12px" }}
                               >
                                 📜 Exp. Cert #{idx + 1} <LuExternalLink size={12} className="ms-1" />
@@ -3478,7 +3731,7 @@ const ManageEmployees = () => {
                                 href={`${UPLOADS_BASE}/${d.filename || d}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="btn btn-outline-warning btn-sm py-1 px-2 fw-semibold"
+                                className="btn btn-outline-warning btn-sm py-1 px-2 fw-semibold d-flex items-center"
                                 style={{ fontSize: "12px" }}
                               >
                                 🏢 Relieving/Company Doc #{idx + 1} <LuExternalLink size={12} className="ms-1" />
@@ -3526,10 +3779,12 @@ const ManageEmployees = () => {
           animation: spin 0.8s linear infinite;
         }
         .emp-page-wrapper {
-          background-color: #f8fafc;
+          background-color: var(--hrms-bg-main, #f8fafc);
           min-height: 100vh;
         }
         .emp-controls-card {
+          background-color: var(--hrms-card-bg, #ffffff);
+          border-color: var(--hrms-card-border, #e2e8f0);
           box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
         }
         .emp-controls-scroll-row {
@@ -3542,11 +3797,12 @@ const ManageEmployees = () => {
           display: none;
         }
         .emp-card {
-          background-color: #ffffff;
-          border: 1px solid #e2e8f0 !important;
+          background-color: var(--hrms-card-bg, #ffffff);
+          border: 1px solid var(--hrms-card-border, #e2e8f0) !important;
           border-radius: 18px !important;
           padding: 22px 18px 18px 18px !important;
           transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease;
+          color: var(--hrms-text-primary, #0f172a) !important;
         }
         .emp-card:hover {
           transform: translateY(-4px);
@@ -3568,8 +3824,8 @@ const ManageEmployees = () => {
           padding: 0;
         }
         .emp-dots-btn:hover {
-          background-color: #f1f5f9;
-          color: #1e293b;
+          background-color: var(--hrms-table-th-bg, #f1f5f9);
+          color: var(--hrms-text-primary, #1e293b);
         }
         .emp-dots-btn::after {
           display: none !important;
@@ -3585,7 +3841,7 @@ const ManageEmployees = () => {
           display: flex;
           align-items: center;
           justify-content: center;
-          background-color: #ffffff;
+          background-color: var(--hrms-card-bg, #ffffff);
           flex-shrink: 0;
         }
         .emp-avatar-inner {
@@ -3593,7 +3849,7 @@ const ManageEmployees = () => {
           height: 100%;
           border-radius: 50%;
           overflow: hidden;
-          background-color: #f1f5f9;
+          background-color: var(--hrms-table-th-bg, #f1f5f9);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -3612,19 +3868,19 @@ const ManageEmployees = () => {
           width: 13px;
           height: 13px;
           border-radius: 50%;
-          border: 2px solid #ffffff;
+          border: 2px solid var(--hrms-card-bg, #ffffff);
           box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
         }
         .emp-name {
           font-size: 15.5px;
           font-weight: 700;
-          color: #0f172a;
+          color: var(--hrms-text-primary, #0f172a);
           margin-bottom: 4px;
         }
         .emp-role-pill {
           display: inline-block;
-          background-color: #f1f5f9;
-          color: #475569;
+          background-color: var(--hrms-table-th-bg, #f1f5f9);
+          color: var(--hrms-text-secondary, #475569);
           font-size: 11.5px;
           font-weight: 500;
           padding: 3px 12px;
@@ -3646,9 +3902,9 @@ const ManageEmployees = () => {
           width: 34px;
           height: 34px;
           border-radius: 50%;
-          border: 1px solid #e2e8f0;
-          background-color: #ffffff;
-          color: #64748b;
+          border: 1px solid var(--hrms-card-border, #e2e8f0);
+          background-color: var(--hrms-card-bg, #ffffff);
+          color: var(--hrms-text-secondary, #64748b);
           display: inline-flex;
           align-items: center;
           justify-content: center;
@@ -3796,6 +4052,13 @@ const ManageEmployees = () => {
             </Button>
           </Modal.Footer>
         </Modal>
+
+      {/* Organization Hierarchy & Masters Modal */}
+      <OrganizationStructureModal
+        show={showOrgModal}
+        onHide={() => setShowOrgModal(false)}
+        onStructureUpdated={fetchOrgMasters}
+      />
 
       </Container>
     </div>

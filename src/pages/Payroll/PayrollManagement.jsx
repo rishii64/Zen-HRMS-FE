@@ -20,6 +20,7 @@ import { getApiBaseUrl, getUploadUrl } from "../../api/axios";
 import { exportToExcel } from "../../utils/excelExport";
 import FacilitiesWorksheetSection from "./components/FacilitiesWorksheetSection";
 import EsiSlabAuditModal from "./components/EsiSlabAuditModal";
+import FnfSettlementDesk from "../Apps/components/FnfSettlementDesk";
 
 const API = getApiBaseUrl();
 
@@ -3508,6 +3509,27 @@ const PayrollManagement = () => {
           </span>
         </button>
 
+        <button
+          className={`btn btn-sm px-3.5 py-2 fw-semibold rounded-pill d-flex align-items-center gap-2 transition-all ${activePayrollTab === "fnf"
+            ? "text-white shadow-xs"
+            : "text-secondary border-0 bg-transparent"
+            }`}
+          style={{ background: activePayrollTab === "fnf" ? "#4a2835" : "transparent" }}
+          onClick={() => setActivePayrollTab("fnf")}
+        >
+          <span>🧾</span>
+          <span>Full &amp; Final (F&amp;F) Settlement</span>
+          <span
+            className={`badge rounded-pill px-2 py-0.5 ${activePayrollTab === "fnf"
+              ? "bg-white text-dark"
+              : "bg-success-subtle text-success"
+              }`}
+            style={{ fontSize: "10px" }}
+          >
+            Exit Settlement
+          </span>
+        </button>
+
         {/* <button
           className={`btn btn-sm px-3.5 py-2 fw-semibold rounded-pill d-flex align-items-center gap-2 transition-all ${
             activePayrollTab === "esi"
@@ -3531,6 +3553,13 @@ const PayrollManagement = () => {
           </span>
         </button> */}
       </div>
+
+      
+      {activePayrollTab === "fnf" && (
+        <div className="mt-4">
+          <FnfSettlementDesk token={localStorage.getItem("token")} isEmployeeOnly={false} />
+        </div>
+      )}
 
       {activePayrollTab === "facilities" && (
         <FacilitiesWorksheetSection

@@ -40,8 +40,10 @@ import {
   LuShieldCheck,
   LuWallet,
   LuGripVertical,
-  LuArrowUpDown
+  LuArrowUpDown,
+  LuReceipt
 } from "react-icons/lu";
+import FnfSettlementDesk from "./components/FnfSettlementDesk";
 import toast from "react-hot-toast";
 import ResignationModal from "../../components/Resignation/ResignationModal";
 import { getApiBaseUrl } from "../../api/axios";
@@ -1241,6 +1243,21 @@ export default function Separation() {
                 <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400 rounded-full" />
               )}
             </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("fnf_settlement")}
+              className={`pb-3 px-3 text-xs font-bold relative transition-colors flex items-center gap-1.5 ${
+                activeTab === "fnf_settlement"
+                  ? "text-blue-600 dark:text-blue-400"
+                  : "text-slate-500 hover:text-slate-700 dark:text-slate-400"
+              }`}
+            >
+              <LuReceipt className="w-3.5 h-3.5" />
+              Exit Settlement &amp; Letters (F&amp;F)
+              {activeTab === "fnf_settlement" && (
+                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400 rounded-full" />
+              )}
+            </button>
           </div>
         )}
 
@@ -2010,6 +2027,11 @@ export default function Separation() {
                     </table>
                   </div>
                 )}
+
+                {/* Employee F&F Settlement & Letters */}
+                <div className="mt-6">
+                  <FnfSettlementDesk token={token} isEmployeeOnly={true} />
+                </div>
               </div>
             </div>
           )}
@@ -2596,6 +2618,13 @@ export default function Separation() {
                   </table>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* TAB 4: FULL & FINAL (F&F) EXIT SETTLEMENT & LETTERS */}
+          {activeTab === "fnf_settlement" && (
+            <div className="space-y-6">
+              <FnfSettlementDesk token={token} isEmployeeOnly={isEmployeeOnly} />
             </div>
           )}
         </div>

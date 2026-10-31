@@ -61,6 +61,8 @@ import UnifiedDashboard from "../pages/Dashboard/UnifiedDashboard";
 // Home Page
 import Home from "../pages/Home";
 import Appraisal from "../pages/Apps/Apprasial";
+import CandidateOfferAcceptance from "../pages/Apps/CandidateOfferAcceptance";
+import ClaimsReimbursement from "../pages/Apps/ClaimsReimbursement";
 
 // ✅ ProtectedRoute — checks token presence, expiry validity, role authorization & designation RBAC
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -117,6 +119,7 @@ export default function AppRoute() {
       <Route path="/login" element={<UnifiedLogin />} />
       <Route path="/register" element={<Navigate to="/login" replace />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/offer-acceptance/:token" element={<CandidateOfferAcceptance />} />
 
       {/* Unified Role-Based Dashboard Routes */}
       {/* <Route path="/dashboard" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "accounts", "payroll", "hod", "manager", "teamlead", "ceo", "coo", "cto", "cfo", "vp", "secretary", "management", "hrmanager"]}> <UnifiedDashboard /> </ProtectedRoute>} /> */}
@@ -135,7 +138,7 @@ export default function AppRoute() {
       <Route path="/hr/manage-employees" element={<ProtectedRoute allowedRoles={["hr", "accounts", "ceo", "coo", "management"]}> <ManageEmployees /> </ProtectedRoute>} />
       {/* <Route path="/admin/register-employee" element={<ProtectedRoute allowedRoles={["hr", "admin", "ceo", "management"]}> <Register /> </ProtectedRoute>} /> */}
 
-      <Route path="/requisition" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "ceo", "coo", "hrmanager", "management"]}> <Requisition /> </ProtectedRoute>} />
+      <Route path="/requisition" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "ceo", "coo", "hrmanager", "management", "accounts", "payroll", "sales", "operations", "chro", "vphr", "cfo", "cto", "vp"]}> <Requisition /> </ProtectedRoute>} />
       <Route path="/onboarding" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager", "ceo", "coo", "management"]}> <Onboarding /> </ProtectedRoute>} />
       <Route path="/onboarding/:id" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager", "ceo", "coo", "management"]}> <Onboarding /> </ProtectedRoute>} />
       <Route path="/interview" element={<ProtectedRoute allowedRoles={["employee", "hod", "hr", "admin", "manager", "teamlead", "hrmanager", "ceo", "coo", "management"]}> <InterviewForm /> </ProtectedRoute>} />
@@ -159,6 +162,9 @@ export default function AppRoute() {
       <Route path="/it-declaration" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager", "ceo", "coo", "management"]}> <IT_Declaration /> </ProtectedRoute>} />
       <Route path="/id-card" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager", "ceo", "coo", "management"]}> <ID_Card /> </ProtectedRoute>} />
       <Route path="/mediclaim" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager", "ceo", "coo", "management"]}> <Mediclaim /> </ProtectedRoute>} />
+      <Route path="/claims" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager", "ceo", "coo", "management"]}> <ClaimsReimbursement /> </ProtectedRoute>} />
+      <Route path="/reimbursement" element={<Navigate to="/claims" replace />} />
+      <Route path="/expenses" element={<Navigate to="/claims" replace />} />
 
       {/* Payroll Management & Salary Slips (Payslips) */}
       <Route path="/payroll" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager", "ceo", "coo", "management"]}> <PayrollManagement /> </ProtectedRoute>} />

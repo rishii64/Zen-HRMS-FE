@@ -142,11 +142,12 @@ export default function UnifiedDashboard() {
   return (
     <div
       style={{
-        backgroundColor: "#f8fafc",
+        backgroundColor: "var(--hrms-bg-main, #f8fafc)",
+        color: "var(--hrms-text-primary, #0f172a)",
         minHeight: "100vh",
         fontFamily: "'Plus Jakarta Sans', system-ui, -apple-system, sans-serif",
       }}
-      className="pb-12 pt-4"
+      className="pb-12 pt-4 transition-colors duration-200"
     >
       {/* Global Dashboard Styles */}
       <style>{`
@@ -207,6 +208,21 @@ export default function UnifiedDashboard() {
           border-bottom: 1px solid #f1f5f9;
           color: #1e293b;
         }
+        html.dark .table-custom thead th {
+          background: #0f172a !important;
+          color: #cbd5e1 !important;
+          border-bottom: 1px solid #334155 !important;
+        }
+        html.dark .table-custom tbody td {
+          border-bottom: 1px solid #334155 !important;
+          color: #f8fafc !important;
+          background-color: transparent !important;
+        }
+        html.dark .table-custom tbody tr:hover,
+        html.dark .table-custom tbody tr:hover > td {
+          background-color: #334155 !important;
+          color: #f8fafc !important;
+        }
         .role-switch-btn {
           font-size: 11px;
           font-weight: 700;
@@ -230,6 +246,15 @@ export default function UnifiedDashboard() {
           background-color: #f1f5f9;
           color: #1e293b;
         }
+        html.dark .role-switch-btn:not(.active) {
+          background-color: #1e293b !important;
+          color: #94a3b8 !important;
+          border-color: #334155 !important;
+        }
+        html.dark .role-switch-btn:not(.active):hover {
+          background-color: #334155 !important;
+          color: #f8fafc !important;
+        }
       `}</style>
 
       <Container fluid className="px-4 max-w-7xl mx-auto">
@@ -245,7 +270,7 @@ export default function UnifiedDashboard() {
 
         {/* View Switcher for privileged roles (HR, HOD, Manager, Accounts, Management) when not on explicit /admin/tasks route */}
         {!isEmployee && !isAdminTasksRoute && (
-          <div className="d-flex flex-wrap align-items-center justify-content-between mb-4 bg-white p-2.5 rounded-3 border shadow-sm">
+          <div className="d-flex flex-wrap align-items-center justify-content-between mb-4 bg-white dark:bg-slate-800/90 p-2.5 rounded-3 border border-slate-200 dark:border-slate-700/80 shadow-sm transition-colors">
             <div className="d-flex align-items-center gap-2">
               <span className="small text-muted fw-bold ps-2">Dashboard View:</span>
               <button
@@ -275,14 +300,14 @@ export default function UnifiedDashboard() {
             </div>
             <div className="small text-muted pe-2 py-1">
               <span>Portal Role: <strong className="text-primary text-uppercase">{currentRole}</strong></span>
-              {employee?.designation && <span className="ms-2 ps-2 border-start">&bull; Designation: <strong className="text-dark">{employee.designation}</strong></span>}
+              {employee?.designation && <span className="ms-2 ps-2 border-start">&bull; Designation: <strong className="text-dark dark:text-slate-100">{employee.designation}</strong></span>}
             </div>
           </div>
         )}
 
         {/* When Admin is on their dedicated /admin/tasks route, provide quick switch between Unofficial Tasks & Employee Workspace */}
         {isAdmin && isAdminTasksRoute && (
-          <div className="d-flex flex-wrap align-items-center justify-content-between mb-4 bg-white p-2.5 rounded-3 border shadow-sm">
+          <div className="d-flex flex-wrap align-items-center justify-content-between mb-4 bg-white dark:bg-slate-800/90 p-2.5 rounded-3 border border-slate-200 dark:border-slate-700/80 shadow-sm transition-colors">
             <div className="d-flex align-items-center gap-2">
               <span className="small text-muted fw-bold ps-2">Admin Workspace:</span>
               <button

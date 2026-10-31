@@ -879,13 +879,13 @@ export default function HRAdminDashboardView() {
       {/* EMPLOYEE DIRECTORY TABLE */}
       <div className="dash-card shadow-xs overflow-hidden">
         {/* Table Controls */}
-        <div className="p-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 bg-white">
+        <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-slate-900">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-purple-50 text-purple-600 border border-purple-100">
+            <div className="p-2.5 rounded-xl bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 border border-purple-100 dark:border-purple-900/40">
               <LuUsers className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-slate-900 m-0">Employee Directory</h3>
+              <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 m-0">Employee Directory</h3>
               <p className="text-xs text-slate-400 m-0">Directory of all staff in the organization.</p>
             </div>
           </div>
@@ -897,7 +897,7 @@ export default function HRAdminDashboardView() {
                 placeholder="Search staff..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="text-xs border border-slate-200 rounded-xl px-4.5 py-2 pl-8 bg-slate-50 text-slate-700 focus:outline-none w-48"
+                className="text-xs border border-slate-200 dark:border-slate-700 rounded-xl px-4.5 py-2 pl-8 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 focus:outline-none w-48"
               />
               <LuSearch className="absolute left-2.5 top-2.5 text-slate-400 h-3.5 w-3.5" />
             </div>
@@ -905,7 +905,7 @@ export default function HRAdminDashboardView() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="text-xs font-semibold border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 text-slate-700 focus:outline-none"
+              className="text-xs font-semibold border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 focus:outline-none"
             >
               <option value="All">All Status / Type ▾</option>
               <option value="Active">Active</option>
@@ -922,7 +922,7 @@ export default function HRAdminDashboardView() {
             <select
               value={deptFilter}
               onChange={(e) => setDeptFilter(e.target.value)}
-              className="text-xs font-semibold border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 text-slate-700 focus:outline-none"
+              className="text-xs font-semibold border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 focus:outline-none"
             >
               <option value="All">All Departments ▾</option>
               {actualDepartments.map((dept) => (
@@ -934,7 +934,7 @@ export default function HRAdminDashboardView() {
 
             <button
               onClick={() => navigate("/admin/manage-employees")}
-              className="px-3 py-2 text-xs font-bold text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-xl hover:bg-indigo-100 transition-colors"
+              className="px-3 py-2 text-xs font-bold text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-xl hover:bg-indigo-100 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-900/60 dark:hover:bg-indigo-900/40 transition-colors"
             >
               Manage Employees →
             </button>
@@ -947,7 +947,7 @@ export default function HRAdminDashboardView() {
             <thead>
               <tr>
                 <th style={{ width: "40px" }} className="text-center">
-                  <input type="checkbox" className="rounded border-slate-300" />
+                  <input type="checkbox" className="rounded border-slate-300 dark:border-slate-600 dark:bg-slate-800" />
                 </th>
                 <th>Employee ID</th>
                 <th>Name</th>
@@ -977,14 +977,14 @@ export default function HRAdminDashboardView() {
                   const badge = getDeptBadgeStyle(emp.department);
                   const statusBadge = getStatusBadgeStyle(emp.status);
                   return (
-                    <tr key={emp.id} className="hover:bg-slate-50/80 transition-colors">
+                    <tr key={emp.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/60 transition-colors">
                       <td className="text-center">
-                        <input type="checkbox" className="rounded border-slate-300" />
+                        <input type="checkbox" className="rounded border-slate-300 dark:border-slate-600 dark:bg-slate-800" />
                       </td>
-                      <td className="font-semibold text-slate-900">{emp.empId}</td>
-                      <td className="font-semibold text-slate-800">{emp.name}</td>
-                      <td className="text-slate-500">{emp.email}</td>
-                      <td className="text-slate-700 font-medium">{emp.role}</td>
+                      <td className="font-semibold text-slate-900 dark:text-slate-100">{emp.empId}</td>
+                      <td className="font-semibold text-slate-800 dark:text-slate-200">{emp.name}</td>
+                      <td className="text-slate-500 dark:text-slate-400">{emp.email}</td>
+                      <td className="text-slate-700 dark:text-slate-300 font-medium">{emp.role}</td>
                       <td>
                         <span
                           className="inline-block px-2.5 py-1 text-xs font-semibold rounded-md"
@@ -1019,7 +1019,7 @@ export default function HRAdminDashboardView() {
                           <button
                             type="button"
                             onClick={() => openViewModal(emp)}
-                            className="h-8 w-8 rounded-lg border border-slate-200 bg-white hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-600 text-slate-500 flex items-center justify-center transition-all shadow-2xs cursor-pointer group"
+                            className="h-8 w-8 rounded-lg border border-slate-200 bg-white hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-600 text-slate-500 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-700 flex items-center justify-center transition-all shadow-2xs cursor-pointer group"
                             title="Quick Overview"
                           >
                             <LuEye className="h-4 w-4 transition-transform group-hover:scale-110" />
@@ -1029,13 +1029,13 @@ export default function HRAdminDashboardView() {
                           <Dropdown align="end" className="inline-block">
                             <Dropdown.Toggle
                               as="button"
-                              className="h-8 w-8 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 hover:text-slate-800 text-slate-500 flex items-center justify-center transition-all shadow-2xs cursor-pointer"
+                              className="h-8 w-8 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 hover:text-slate-800 text-slate-500 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-700 flex items-center justify-center transition-all shadow-2xs cursor-pointer"
                               title="More Options"
                             >
                               {/* <BsThreeDotsVertical className="h-3.5 w-3.5" /> */}
                             </Dropdown.Toggle>
 
-                            <Dropdown.Menu className="shadow-2xl shadow-slate-900/15 border border-slate-100 rounded-2xl p-1.5 text-xs min-w-[195px] z-50 bg-white ring-1 ring-black/5 animate-in fade-in duration-150">
+                            <Dropdown.Menu className="shadow-2xl shadow-slate-900/15 border border-slate-100 dark:border-slate-800 rounded-2xl p-1.5 text-xs min-w-[195px] z-50 bg-white dark:bg-slate-900 ring-1 ring-black/5 animate-in fade-in duration-150">
                               <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
                                 Employee Actions
                               </div>
@@ -1201,33 +1201,33 @@ export default function HRAdminDashboardView() {
             </div>
 
             {/* Modal Body: Stats Grid & Detail Panels */}
-            <Modal.Body className="p-6 bg-slate-50/60 space-y-5 max-h-[62vh] overflow-y-auto">
+            <Modal.Body className="p-6 bg-slate-50/60 dark:!bg-slate-900 space-y-5 max-h-[62vh] overflow-y-auto">
               {/* 4 Stat Cards */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="bg-white rounded-2xl p-3.5 border border-slate-200/80 shadow-2xs hover:shadow-xs transition-shadow">
+                <div className="bg-white dark:bg-slate-800 rounded-2xl p-3.5 border border-slate-200/80 dark:border-slate-700/80 shadow-2xs hover:shadow-xs transition-shadow">
                   <div className="flex items-center gap-2 mb-2">
-                    <div className="p-1.5 rounded-lg bg-blue-50 text-blue-600 border border-blue-100/60">
+                    <div className="p-1.5 rounded-lg bg-blue-50 text-blue-600 border border-blue-100/60 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-900/40">
                       <LuBuilding2 className="h-4 w-4" />
                     </div>
                     <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                       Department
                     </span>
                   </div>
-                  <div className="text-sm font-bold text-slate-800 truncate" title={viewEmployee.department}>
+                  <div className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate" title={viewEmployee.department}>
                     {viewEmployee.department || "General"}
                   </div>
                 </div>
 
-                <div className="bg-white rounded-2xl p-3.5 border border-slate-200/80 shadow-2xs hover:shadow-xs transition-shadow">
+                <div className="bg-white dark:bg-slate-800 rounded-2xl p-3.5 border border-slate-200/80 dark:border-slate-700/80 shadow-2xs hover:shadow-xs transition-shadow">
                   <div className="flex items-center gap-2 mb-2">
-                    <div className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100/60">
+                    <div className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100/60 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/40">
                       <LuCalendar className="h-4 w-4" />
                     </div>
                     <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                       Joined On
                     </span>
                   </div>
-                  <div className="text-sm font-bold text-slate-800 truncate">
+                  <div className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">
                     {viewEmployee.joining_date
                       ? new Date(viewEmployee.joining_date).toLocaleDateString("en-GB", {
                         day: "numeric",
@@ -1238,30 +1238,30 @@ export default function HRAdminDashboardView() {
                   </div>
                 </div>
 
-                <div className="bg-white rounded-2xl p-3.5 border border-slate-200/80 shadow-2xs hover:shadow-xs transition-shadow">
+                <div className="bg-white dark:bg-slate-800 rounded-2xl p-3.5 border border-slate-200/80 dark:border-slate-700/80 shadow-2xs hover:shadow-xs transition-shadow">
                   <div className="flex items-center gap-2 mb-2">
-                    <div className="p-1.5 rounded-lg bg-purple-50 text-purple-600 border border-purple-100/60">
+                    <div className="p-1.5 rounded-lg bg-purple-50 text-purple-600 border border-purple-100/60 dark:bg-purple-950/40 dark:text-purple-400 dark:border-purple-900/40">
                       <LuUserCheck className="h-4 w-4" />
                     </div>
                     <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                       Reporting To
                     </span>
                   </div>
-                  <div className="text-sm font-bold text-slate-800 truncate" title={viewEmployee.reporting_manager}>
+                  <div className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate" title={viewEmployee.reporting_manager}>
                     {viewEmployee.reporting_manager || "Management"}
                   </div>
                 </div>
 
-                <div className="bg-white rounded-2xl p-3.5 border border-slate-200/80 shadow-2xs hover:shadow-xs transition-shadow">
+                <div className="bg-white dark:bg-slate-800 rounded-2xl p-3.5 border border-slate-200/80 dark:border-slate-700/80 shadow-2xs hover:shadow-xs transition-shadow">
                   <div className="flex items-center gap-2 mb-2">
-                    <div className="p-1.5 rounded-lg bg-amber-50 text-amber-600 border border-amber-100/60">
+                    <div className="p-1.5 rounded-lg bg-amber-50 text-amber-600 border border-amber-100/60 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-900/40">
                       <LuBriefcase className="h-4 w-4" />
                     </div>
                     <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                       Status
                     </span>
                   </div>
-                  <div className="text-sm font-bold text-slate-800 truncate">
+                  <div className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">
                     {viewEmployee.status || "Active"}
                   </div>
                 </div>
@@ -1270,12 +1270,12 @@ export default function HRAdminDashboardView() {
               {/* 2 Elevated Detail Cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Contact Information Card */}
-                <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs">
-                  <div className="flex items-center gap-2 pb-3 mb-3 border-b border-slate-100">
-                    <div className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600">
+                <div className="bg-white dark:bg-slate-800 rounded-2xl p-4 border border-slate-200/80 dark:border-slate-700/80 shadow-2xs">
+                  <div className="flex items-center gap-2 pb-3 mb-3 border-b border-slate-100 dark:border-slate-700">
+                    <div className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400">
                       <LuMail className="h-4 w-4" />
                     </div>
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 m-0">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 m-0">
                       Direct Contact Details
                     </h4>
                   </div>
@@ -1288,14 +1288,14 @@ export default function HRAdminDashboardView() {
                       <div className="flex items-center justify-between">
                         <a
                           href={`mailto:${viewEmployee.email}`}
-                          className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 hover:underline truncate"
+                          className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 hover:underline truncate"
                         >
                           {viewEmployee.email || "n/a"}
                         </a>
                         <button
                           type="button"
                           onClick={() => handleCopy(viewEmployee.email)}
-                          className="text-slate-400 hover:text-slate-700 p-1 rounded-md hover:bg-slate-100 transition-colors"
+                          className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                           title="Copy Email"
                         >
                           <LuCopy className="h-3 w-3" />
@@ -1310,14 +1310,14 @@ export default function HRAdminDashboardView() {
                       <div className="flex items-center justify-between">
                         <a
                           href={`tel:${viewEmployee.phone_no || viewEmployee.phone || "+91 9876543210"}`}
-                          className="text-xs font-semibold text-slate-800 font-mono hover:text-indigo-600 transition-colors"
+                          className="text-xs font-semibold text-slate-800 dark:text-slate-200 font-mono hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
                         >
                           {viewEmployee.phone_no || viewEmployee.phone || "+91 9876543210"}
                         </a>
                         <button
                           type="button"
                           onClick={() => handleCopy(viewEmployee.phone_no || viewEmployee.phone || "+91 9876543210")}
-                          className="text-slate-400 hover:text-slate-700 p-1 rounded-md hover:bg-slate-100 transition-colors"
+                          className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                           title="Copy Phone"
                         >
                           <LuCopy className="h-3 w-3" />
@@ -1329,7 +1329,7 @@ export default function HRAdminDashboardView() {
                       <span className="text-[11px] font-semibold text-slate-400 block mb-0.5">
                         Office Location
                       </span>
-                      <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700">
+                      <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700 dark:text-slate-300">
                         <LuMapPin className="h-3.5 w-3.5 text-slate-400" />
                         <span>Corporate Office (HQ)</span>
                       </div>
@@ -1338,12 +1338,12 @@ export default function HRAdminDashboardView() {
                 </div>
 
                 {/* Role & Compensation Card */}
-                <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs">
-                  <div className="flex items-center gap-2 pb-3 mb-3 border-b border-slate-100">
-                    <div className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600">
+                <div className="bg-white dark:bg-slate-800 rounded-2xl p-4 border border-slate-200/80 dark:border-slate-700/80 shadow-2xs">
+                  <div className="flex items-center gap-2 pb-3 mb-3 border-b border-slate-100 dark:border-slate-700">
+                    <div className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400">
                       <LuShieldCheck className="h-4 w-4" />
                     </div>
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 m-0">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 m-0">
                       Role & Compensation
                     </h4>
                   </div>
@@ -1353,7 +1353,7 @@ export default function HRAdminDashboardView() {
                       <span className="text-[11px] font-semibold text-slate-400 block mb-0.5">
                         Designation / Job Role
                       </span>
-                      <div className="text-xs font-semibold text-slate-800">
+                      <div className="text-xs font-semibold text-slate-800 dark:text-slate-100">
                         {viewEmployee.role || viewEmployee.designation || "Staff Member"}
                       </div>
                     </div>
@@ -1362,8 +1362,8 @@ export default function HRAdminDashboardView() {
                       <span className="text-[11px] font-semibold text-slate-400 block mb-0.5">
                         Monthly Salary Structure
                       </span>
-                      <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900">
-                        <LuIndianRupee className="h-3.5 w-3.5 text-emerald-600" />
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900 dark:text-slate-100">
+                        <LuIndianRupee className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
                         <span>
                           {viewEmployee.current_salary
                             ? `₹${Number(viewEmployee.current_salary).toLocaleString("en-IN")} / month`
@@ -1376,8 +1376,8 @@ export default function HRAdminDashboardView() {
                       <span className="text-[11px] font-semibold text-slate-400 block mb-0.5">
                         System Access Level
                       </span>
-                      <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-xs font-medium">
-                        <LuBadgeCheck className="h-3.5 w-3.5 text-indigo-600" />
+                      <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-medium">
+                        <LuBadgeCheck className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
                         <span>Standard Staff Portal Access</span>
                       </div>
                     </div>
@@ -1387,14 +1387,14 @@ export default function HRAdminDashboardView() {
             </Modal.Body>
 
             {/* Modal Footer */}
-            <div className="px-7 py-4 bg-white border-t border-slate-100 flex items-center justify-between">
+            <div className="px-7 py-4 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
               <button
                 type="button"
                 onClick={() => {
                   setShowViewModal(false);
-                  navigate(`/employee/profile/${viewEmployee.empId}`);
+                  navigate(`/profile/${viewEmployee.empId}`);
                 }}
-                className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-800 transition-colors group cursor-pointer"
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 transition-colors group cursor-pointer"
               >
                 <span>Open Full Profile Page</span>
                 <LuExternalLink className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
@@ -1404,7 +1404,7 @@ export default function HRAdminDashboardView() {
                 <button
                   type="button"
                   onClick={() => setShowViewModal(false)}
-                  className="px-4 py-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer"
+                  className="px-4 py-2.5 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition-colors cursor-pointer"
                 >
                   Close
                 </button>
@@ -1434,11 +1434,11 @@ export default function HRAdminDashboardView() {
         centered
         size="lg"
         backdropClassName="bg-slate-950/60 backdrop-blur-md"
-        contentClassName="border-0 shadow-2xl rounded-3xl overflow-hidden bg-white ring-1 ring-black/5"
+        contentClassName="border-0 shadow-2xl rounded-3xl overflow-hidden bg-white dark:bg-slate-900 ring-1 ring-black/5"
       >
         <form onSubmit={handleSaveEdit}>
           {/* Executive Modal Header */}
-          <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white p-6 pb-2.5    relative overflow-hidden flex items-center justify-between">
+          <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white p-6 pb-2.5 relative overflow-hidden flex items-center justify-between">
             {/* Ambient decorative blur */}
             <div className="absolute -right-8 -top-8 w-40 h-40 bg-indigo-500/20 rounded-full blur-2xl pointer-events-none" />
 
@@ -1466,21 +1466,21 @@ export default function HRAdminDashboardView() {
             </button>
           </div>
 
-          <Modal.Body className="p-6 bg-slate-50/60 max-h-[60vh] overflow-y-auto space-y-5">
+          <Modal.Body className="p-6 bg-slate-50/60 dark:!bg-slate-900 max-h-[60vh] overflow-y-auto space-y-5">
             {/* Section 1: Personal Credentials Card */}
-            <div className="bg-white rounded-2xl p-3 pb-2 border border-slate-200/80 shadow-2xs">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl p-3 pb-2 border border-slate-200/80 dark:border-slate-700/80 shadow-2xs">
               <div className="flex items-center gap-2 pb-3">
-                <div className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600">
+                <div className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400">
                   <LuUser className="h-4 w-4" />
                 </div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 m-0">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 m-0">
                   Personal Information
                 </h4>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                     Full Name <span className="text-rose-500">*</span>
                   </label>
                   <input
@@ -1488,13 +1488,13 @@ export default function HRAdminDashboardView() {
                     required
                     value={editForm.name}
                     onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                    className="w-full text-xs font-medium text-slate-800 bg-slate-50/50 hover:bg-white focus:bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-indigo-600 focus:ring-4 focus:ring-indigo-600/10 transition-all shadow-2xs"
+                    className="w-full text-xs font-medium text-slate-800 dark:text-slate-100 bg-slate-50/50 dark:bg-slate-900 hover:bg-white dark:hover:bg-slate-900 focus:bg-white dark:focus:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-indigo-600 focus:ring-4 focus:ring-indigo-600/10 transition-all shadow-2xs"
                     placeholder="Full Name"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                     Work Email <span className="text-rose-500">*</span>
                   </label>
                   <input
@@ -1502,59 +1502,59 @@ export default function HRAdminDashboardView() {
                     required
                     value={editForm.email}
                     onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                    className="w-full text-xs font-medium text-slate-800 bg-slate-50/50 hover:bg-white focus:bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-indigo-600 focus:ring-4 focus:ring-indigo-600/10 transition-all shadow-2xs"
+                    className="w-full text-xs font-medium text-slate-800 dark:text-slate-100 bg-slate-50/50 dark:bg-slate-900 hover:bg-white dark:hover:bg-slate-900 focus:bg-white dark:focus:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-indigo-600 focus:ring-4 focus:ring-indigo-600/10 transition-all shadow-2xs"
                     placeholder="name@zentelex.com"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                     Phone Number
                   </label>
                   <input
                     type="tel"
                     value={editForm.phone_no}
                     onChange={(e) => setEditForm({ ...editForm, phone_no: e.target.value })}
-                    className="w-full text-xs font-medium text-slate-800 bg-slate-50/50 hover:bg-white focus:bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-indigo-600 focus:ring-4 focus:ring-indigo-600/10 transition-all shadow-2xs font-mono"
+                    className="w-full text-xs font-medium text-slate-800 dark:text-slate-100 bg-slate-50/50 dark:bg-slate-900 hover:bg-white dark:hover:bg-slate-900 focus:bg-white dark:focus:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-indigo-600 focus:ring-4 focus:ring-indigo-600/10 transition-all shadow-2xs font-mono"
                     placeholder="+91 9876543210"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                     Employee Code (Read-Only)
                   </label>
                   <input
                     type="text"
                     disabled
                     value={editForm.employee_code}
-                    className="w-full text-xs font-mono font-semibold text-slate-500 bg-slate-100 border border-slate-200 rounded-xl px-3.5 py-2.5 cursor-not-allowed"
+                    className="w-full text-xs font-mono font-semibold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 cursor-not-allowed"
                   />
                 </div>
               </div>
             </div>
 
             {/* Section 2: Role & Department Card */}
-            <div className="bg-white rounded-2xl p-3 pb-2 border border-slate-200/80 shadow-2xs">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl p-3 pb-2 border border-slate-200/80 dark:border-slate-700/80 shadow-2xs">
               <div className="flex items-center gap-2 pb-3">
-                <div className="p-1.5 rounded-lg bg-blue-50 text-blue-600">
+                <div className="p-1.5 rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400">
                   <LuBuilding2 className="h-4 w-4" />
                 </div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 m-0">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 m-0">
                   Employment & Role
                 </h4>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                     Department <span className="text-rose-500">*</span>
                   </label>
                   <select
                     required
                     value={editForm.dept}
                     onChange={(e) => setEditForm({ ...editForm, dept: e.target.value })}
-                    className="w-full text-xs font-semibold text-slate-800 bg-slate-50/50 hover:bg-white focus:bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-indigo-600 focus:ring-4 focus:ring-indigo-600/10 transition-all shadow-2xs"
+                    className="w-full text-xs font-semibold text-slate-800 dark:text-slate-100 bg-slate-50/50 dark:bg-slate-900 hover:bg-white dark:hover:bg-slate-900 focus:bg-white dark:focus:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-indigo-600 focus:ring-4 focus:ring-indigo-600/10 transition-all shadow-2xs"
                   >
                     <option value="IT">IT</option>
                     <option value="HR">HR</option>
@@ -1574,7 +1574,7 @@ export default function HRAdminDashboardView() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                     Designation / Role <span className="text-rose-500">*</span>
                   </label>
                   <input
@@ -1582,19 +1582,19 @@ export default function HRAdminDashboardView() {
                     required
                     value={editForm.designation}
                     onChange={(e) => setEditForm({ ...editForm, designation: e.target.value })}
-                    className="w-full text-xs font-medium text-slate-800 bg-slate-50/50 hover:bg-white focus:bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-indigo-600 focus:ring-4 focus:ring-indigo-600/10 transition-all shadow-2xs"
+                    className="w-full text-xs font-medium text-slate-800 dark:text-slate-100 bg-slate-50/50 dark:bg-slate-900 hover:bg-white dark:hover:bg-slate-900 focus:bg-white dark:focus:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-indigo-600 focus:ring-4 focus:ring-indigo-600/10 transition-all shadow-2xs"
                     placeholder="e.g. Associate Engineer"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                     Employment Status
                   </label>
                   <select
                     value={editForm.status}
                     onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
-                    className="w-full text-xs font-semibold text-slate-800 bg-slate-50/50 hover:bg-white focus:bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-indigo-600 focus:ring-4 focus:ring-indigo-600/10 transition-all shadow-2xs"
+                    className="w-full text-xs font-semibold text-slate-800 dark:text-slate-100 bg-slate-50/50 dark:bg-slate-900 hover:bg-white dark:hover:bg-slate-900 focus:bg-white dark:focus:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-indigo-600 focus:ring-4 focus:ring-indigo-600/10 transition-all shadow-2xs"
                   >
                     <option value="Active">Active</option>
                     <option value="Inactive">Inactive</option>
@@ -1605,13 +1605,13 @@ export default function HRAdminDashboardView() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                     Employment Type
                   </label>
                   <select
                     value={editForm.employment_type || "Permanent"}
                     onChange={(e) => setEditForm({ ...editForm, employment_type: e.target.value })}
-                    className="w-full text-xs font-semibold text-slate-800 bg-slate-50/50 hover:bg-white focus:bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-indigo-600 focus:ring-4 focus:ring-indigo-600/10 transition-all shadow-2xs"
+                    className="w-full text-xs font-semibold text-slate-800 dark:text-slate-100 bg-slate-50/50 dark:bg-slate-900 hover:bg-white dark:hover:bg-slate-900 focus:bg-white dark:focus:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-indigo-600 focus:ring-4 focus:ring-indigo-600/10 transition-all shadow-2xs"
                   >
                     <option value="Permanent">Permanent</option>
                     <option value="Full Time">Full Time</option>
@@ -1624,33 +1624,33 @@ export default function HRAdminDashboardView() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                     Date of Joining
                   </label>
                   <input
                     type="date"
                     value={editForm.joining_date}
                     onChange={(e) => setEditForm({ ...editForm, joining_date: e.target.value })}
-                    className="w-full text-xs font-medium text-slate-800 bg-slate-50/50 hover:bg-white focus:bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-indigo-600 focus:ring-4 focus:ring-indigo-600/10 transition-all shadow-2xs"
+                    className="w-full text-xs font-medium text-slate-800 dark:text-slate-100 bg-slate-50/50 dark:bg-slate-900 hover:bg-white dark:hover:bg-slate-900 focus:bg-white dark:focus:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-indigo-600 focus:ring-4 focus:ring-indigo-600/10 transition-all shadow-2xs"
                   />
                 </div>
               </div>
             </div>
 
             {/* Section 3: Compensation & Appraisal Card */}
-            <div className="bg-white rounded-2xl p-3 pb-2 border border-slate-200/80 shadow-2xs">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl p-3 pb-2 border border-slate-200/80 dark:border-slate-700/80 shadow-2xs">
               <div className="flex items-center gap-2 pb-3">
-                <div className="p-1.5 rounded-lg bg-amber-50 text-amber-600">
+                <div className="p-1.5 rounded-lg bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400">
                   <LuIndianRupee className="h-4 w-4" />
                 </div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 m-0">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 m-0">
                   Compensation & Appraisal
                 </h4>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                     Monthly Salary (₹)
                   </label>
                   <div className="relative">
@@ -1661,14 +1661,14 @@ export default function HRAdminDashboardView() {
                       onChange={(e) =>
                         setEditForm({ ...editForm, current_salary: e.target.value })
                       }
-                      className="w-full text-xs font-semibold text-slate-800 bg-slate-50/50 hover:bg-white focus:bg-white border border-slate-200 rounded-xl pl-7 pr-3.5 py-2.5 focus:outline-none focus:border-indigo-600 focus:ring-4 focus:ring-indigo-600/10 transition-all shadow-2xs font-mono"
+                      className="w-full text-xs font-semibold text-slate-800 dark:text-slate-100 bg-slate-50/50 dark:bg-slate-900 hover:bg-white dark:hover:bg-slate-900 focus:bg-white dark:focus:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl pl-7 pr-3.5 py-2.5 focus:outline-none focus:border-indigo-600 focus:ring-4 focus:ring-indigo-600/10 transition-all shadow-2xs font-mono"
                       placeholder="50000"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                     Reporting Manager
                   </label>
                   <input
@@ -1677,13 +1677,13 @@ export default function HRAdminDashboardView() {
                     onChange={(e) =>
                       setEditForm({ ...editForm, reporting_manager: e.target.value })
                     }
-                    className="w-full text-xs font-medium text-slate-800 bg-slate-50/50 hover:bg-white focus:bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-indigo-600 focus:ring-4 focus:ring-indigo-600/10 transition-all shadow-2xs"
+                    className="w-full text-xs font-medium text-slate-800 dark:text-slate-100 bg-slate-50/50 dark:bg-slate-900 hover:bg-white dark:hover:bg-slate-900 focus:bg-white dark:focus:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-indigo-600 focus:ring-4 focus:ring-indigo-600/10 transition-all shadow-2xs"
                     placeholder="e.g. Biswajit Bag"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                     Performance KPI (1-5)
                   </label>
                   <input
@@ -1693,7 +1693,7 @@ export default function HRAdminDashboardView() {
                     max="5"
                     value={editForm.kpi}
                     onChange={(e) => setEditForm({ ...editForm, kpi: e.target.value })}
-                    className="w-full text-xs font-semibold text-slate-800 bg-slate-50/50 hover:bg-white focus:bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-indigo-600 focus:ring-4 focus:ring-indigo-600/10 transition-all shadow-2xs font-mono"
+                    className="w-full text-xs font-semibold text-slate-800 dark:text-slate-100 bg-slate-50/50 dark:bg-slate-900 hover:bg-white dark:hover:bg-slate-900 focus:bg-white dark:focus:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-indigo-600 focus:ring-4 focus:ring-indigo-600/10 transition-all shadow-2xs font-mono"
                     placeholder="4.8"
                   />
                 </div>
@@ -1702,11 +1702,11 @@ export default function HRAdminDashboardView() {
           </Modal.Body>
 
           {/* Modal Footer */}
-          <div className="px-6 py-3 border-t border-slate-200 bg-white flex items-center justify-end gap-3">
+          <div className="px-6 py-3 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-end gap-3">
             <button
               type="button"
               onClick={() => setShowEditModal(false)}
-              className="px-5 py-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer"
+              className="px-5 py-2.5 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition-colors cursor-pointer"
             >
               Cancel
             </button>

@@ -22,12 +22,15 @@ import {
   LuUserMinus,
   LuEllipsis,
   LuTrash2,
-  LuEye
+  LuEye,
+  LuHistory,
+  LuShieldCheck
 } from "react-icons/lu";
 import { MdMoreVert } from "react-icons/md";
 import { FaRegCircleCheck } from "react-icons/fa6";
 import { getApiBaseUrl } from "../../api/axios";
 import { exportToExcel } from "../../utils/excelExport";
+import LeaveAllocationDesk from "./components/LeaveAllocationDesk";
 
 const API = getApiBaseUrl();
 
@@ -35,6 +38,8 @@ const LEAVE_TYPE_COLORS = {
   "Casual Leave": { bg: "#ecfdf5", color: "#10b981", border: "#a7f3d0", badge: "CL" },
   "Sick Leave": { bg: "#eff6ff", color: "#3b82f6", border: "#bfdbfe", badge: "SL" },
   "Earned Leave": { bg: "#f5f3ff", color: "#8b5cf6", border: "#ddd6fe", badge: "EL" },
+  "Privilege Leave": { bg: "#eef2ff", color: "#4f46e5", border: "#c7d2fe", badge: "PL" },
+  "Priviledge Leave": { bg: "#eef2ff", color: "#4f46e5", border: "#c7d2fe", badge: "PL" },
   "Holidays": { bg: "#fef3c7", color: "#d97706", border: "#fde68a", badge: "HL" },
   "Holiday": { bg: "#fef3c7", color: "#d97706", border: "#fde68a", badge: "HL" },
   "Maternity Leave": { bg: "#fdf2f8", color: "#db2777", border: "#fbcfe8", badge: "ML" },
@@ -101,7 +106,8 @@ const Leave = () => {
   const [leaveBalances, setLeaveBalances] = useState({
     casual: { total: 5, used: 0, remaining: 5 },
     sick: { total: 5, used: 0, remaining: 5 },
-    earned: { total: 12, used: 0, remaining: 12 },
+    earned: { total: 12, allocated: 12, carried_forward: 0, used: 0, remaining: 12, lapsed_days: 0 },
+    privilege: { total: 15, allocated: 15, carried_forward: 0, used: 0, remaining: 15, lapsed_days: 0 },
     holidays: { total: 10, used: 0, remaining: 10 },
     maternity: { total: 90, used: 0, remaining: 90 },
     paternity: { total: 5, used: 0, remaining: 5 },
@@ -109,6 +115,32 @@ const Leave = () => {
     unpaid: { used: 0 },
     summary: { totalTaken: 0, upcomingLeaves: 0, absentDays: 0, leavesRemaining: 0 }
   });
+
+  // Employee Personal 3-Year Carry-Forward Ledger State
+  const [showMyCfModal, setShowMyCfModal] = useState(false);
+  const [myCfLogs, setMyCfLogs] = useState([]);
+  const [myCfLoading, setMyCfLoading] = useState(false);
+
+  const fetchMyCfHistory = async () => {
+    setShowMyCfModal(true);
+    setMyCfLoading(true);
+    try {
+      const res = await fetch(`${API}/leave/carry-forward-history/${userEmpId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data)) {
+        setMyCfLogs(data.data);
+      } else {
+        setMyCfLogs([]);
+      }
+    } catch (err) {
+      console.error("Fetch personal CF history error:", err);
+      toast.error("Failed to load your carry-forward history");
+    } finally {
+      setMyCfLoading(false);
+    }
+  };
 
   // Derived Gender Status
   const userGender = leaveBalances.gender || storedUser.gender || (employees.find(e => e.employee_id === userEmpId || e.employee_code === userEmpId)?.gender) || "Male";
@@ -496,14 +528,22 @@ const Leave = () => {
 
       {/* TOP HEADER & PILL NAVIGATION */}
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6 px-2">
-        {/* Top Pills: [ My Data ] [ Team ] [ Holidays ] */}
-        <div className="flex items-center gap-2">
+        {/* Top Pills: [ My Data ] [ Team ] [ Allocation ] [ Holidays ] */}
+        <div className="flex items-center gap-2 flex-wrap">
           <button onClick={() => setActivePill("my_data")} className={`pill-nav-btn ${activePill === "my_data" ? "active" : "inactive"}`}>
             My Data
           </button>
           {canManageLeaves && (
             <button onClick={() => setActivePill("team")} className={`pill-nav-btn ${activePill === "team" ? "active" : "inactive"}`}>
-              Team
+              Team Leaves
+            </button>
+          )}
+          {(isAdmin || isHR || role === "ceo" || role === "coo") && (
+            <button
+              onClick={() => setActivePill("allocation")}
+              className={`pill-nav-btn ${activePill === "allocation" ? "active" : "inactive"}`}
+            >
+              Leave Allocations &amp; Carry-Forward
             </button>
           )}
           <button onClick={() => navigate("/holidays")} className="pill-nav-btn inactive">
@@ -524,7 +564,15 @@ const Leave = () => {
         </div>
       </div>
 
-      {/* SUB-TABS & ACTION BAR */}
+      {activePill === "allocation" ? (
+        <LeaveAllocationDesk
+          token={token}
+          employees={employees}
+          onAllocationChanged={fetchLeaveData}
+        />
+      ) : (
+        <>
+          {/* SUB-TABS & ACTION BAR */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-3 mb-6 px-2">
         {/* Sub-Tabs: Leave Summary | Leave Balance | Leave Requests */}
         <div className="flex items-center gap-6">
@@ -675,21 +723,60 @@ const Leave = () => {
             </div>
           </Col>
 
-          {/* Earned Leave */}
+          {/* Earned Leave (EL) */}
           <Col xs={6} sm={4} lg={3}>
-            <div className={`leave-bal-card ${leaveBalances.isPermanent === false ? "border-slate-200 bg-slate-50/50 opacity-80" : "border-purple-100 bg-purple-50/30"}`}>
+            <div className={`leave-bal-card ${leaveBalances.isPermanent === false ? "border-slate-200 bg-slate-50/50 opacity-80" : "border-purple-200 bg-purple-50/40"}`}>
               <div className="flex items-center justify-between mb-1">
-                <span className={`text-[11px] font-bold ${leaveBalances.isPermanent === false ? "text-slate-500" : "text-purple-800"}`}>Earned Leave</span>
+                <span className={`text-[11px] font-bold ${leaveBalances.isPermanent === false ? "text-slate-500" : "text-purple-900"}`}>Earned Leave</span>
                 <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded ${leaveBalances.isPermanent === false ? "bg-slate-200 text-slate-600" : "bg-purple-100 text-purple-800"}`}>EL</span>
               </div>
-              <div className={`text-lg font-extrabold ${leaveBalances.isPermanent === false ? "text-slate-400" : "text-slate-900"}`}>
-                {leaveBalances.isPermanent === false ? "0 / 0" : `${leaveBalances.earned?.remaining ?? 12} / ${leaveBalances.earned?.total ?? 12}`}
-              </div>
-              <div className="text-[10px] text-slate-400 mt-1 font-semibold flex items-center justify-between">
-                <span>Accrued Service Leave</span>
-                {leaveBalances.isPermanent === false && (
-                  <span className="text-[9px] font-bold text-amber-700 bg-amber-100/80 px-1 py-0.2 rounded">Permanent Only</span>
+              <div className="flex items-baseline gap-1.5">
+                <span className={`text-lg font-extrabold ${leaveBalances.isPermanent === false ? "text-slate-400" : "text-slate-900"}`}>
+                  {leaveBalances.isPermanent === false ? "0 / 0" : `${leaveBalances.earned?.remaining ?? 12} / ${leaveBalances.earned?.total ?? 12}`}
+                </span>
+                {leaveBalances.earned?.carried_forward > 0 && (
+                  <span className="text-[10px] font-extrabold text-emerald-700 bg-emerald-100/90 px-1.5 py-0.2 rounded" title="Carried forward from previous years">
+                    +{leaveBalances.earned.carried_forward} CF
+                  </span>
                 )}
+              </div>
+              <div className="text-[10px] text-slate-500 mt-1 flex items-center justify-between">
+                <span>Stacked: <strong>{leaveBalances.earned?.carried_forward || 0}/45</strong> (Max 3 Yrs)</span>
+                <button
+                  onClick={fetchMyCfHistory}
+                  className="text-[9px] font-bold text-purple-700 hover:text-purple-900 underline cursor-pointer bg-transparent border-0 p-0"
+                >
+                  3-Yr Ledger
+                </button>
+              </div>
+            </div>
+          </Col>
+
+          {/* Privilege Leave (PL) */}
+          <Col xs={6} sm={4} lg={3}>
+            <div className={`leave-bal-card ${leaveBalances.isPermanent === false ? "border-slate-200 bg-slate-50/50 opacity-80" : "border-indigo-200 bg-indigo-50/40"}`}>
+              <div className="flex items-center justify-between mb-1">
+                <span className={`text-[11px] font-bold ${leaveBalances.isPermanent === false ? "text-slate-500" : "text-indigo-900"}`}>Privilege Leave</span>
+                <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded ${leaveBalances.isPermanent === false ? "bg-slate-200 text-slate-600" : "bg-indigo-100 text-indigo-800"}`}>PL</span>
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className={`text-lg font-extrabold ${leaveBalances.isPermanent === false ? "text-slate-400" : "text-slate-900"}`}>
+                  {leaveBalances.isPermanent === false ? "0 / 0" : `${leaveBalances.privilege?.remaining ?? 15} / ${leaveBalances.privilege?.total ?? 15}`}
+                </span>
+                {leaveBalances.privilege?.carried_forward > 0 && (
+                  <span className="text-[10px] font-extrabold text-emerald-700 bg-emerald-100/90 px-1.5 py-0.2 rounded" title="Carried forward from previous years">
+                    +{leaveBalances.privilege.carried_forward} CF
+                  </span>
+                )}
+              </div>
+              <div className="text-[10px] text-slate-500 mt-1 flex items-center justify-between">
+                <span>Stacked: <strong>{leaveBalances.privilege?.carried_forward || 0}/45</strong> (Max 3 Yrs)</span>
+                <button
+                  onClick={fetchMyCfHistory}
+                  className="text-[9px] font-bold text-indigo-700 hover:text-indigo-900 underline cursor-pointer bg-transparent border-0 p-0"
+                >
+                  3-Yr Ledger
+                </button>
               </div>
             </div>
           </Col>
@@ -954,6 +1041,8 @@ const Leave = () => {
 
       </>
       )}
+      </>
+      )}
 
       {/* APPLY LEAVE MODAL */}
       <Modal show={showApplyModal} onHide={() => setShowApplyModal(false)} centered className="rounded-4">
@@ -972,23 +1061,29 @@ const Leave = () => {
                 className="text-xs py-2.5 rounded-xl"
               >
                 <option value="Casual Leave">
-                  Casual Leave (CL) — {leaveBalances.casual?.total ?? 5} Days Allocation (Paid • All Staff)
+                  Casual Leave (CL) — {leaveBalances.casual?.remaining ?? 5} Days Available (Paid • All Staff)
                 </option>
                 {leaveBalances.isPermanent !== false ? (
                   <>
-                    <option value="Sick Leave">Sick Leave (SL) — 5 Days Yearly Allocation (Paid)</option>
-                    <option value="Earned Leave">Earned Leave (EL) — 12 Days Yearly Allocation (Paid)</option>
-                    <option value="Holidays">Public Holiday (HL) — 10 Days Yearly Allocation (Paid)</option>
+                    <option value="Sick Leave">Sick Leave (SL) — {leaveBalances.sick?.remaining ?? 5} Days Available (Paid)</option>
+                    <option value="Earned Leave">
+                      Earned Leave (EL) — {leaveBalances.earned?.remaining ?? 12} Days Available {leaveBalances.earned?.carried_forward > 0 ? `(+${leaveBalances.earned.carried_forward} CF)` : ""} (Paid)
+                    </option>
+                    <option value="Privilege Leave">
+                      Privilege Leave (PL) — {leaveBalances.privilege?.remaining ?? 15} Days Available {leaveBalances.privilege?.carried_forward > 0 ? `(+${leaveBalances.privilege.carried_forward} CF)` : ""} (Paid)
+                    </option>
+                    <option value="Holidays">Public Holiday (HL) — {leaveBalances.holidays?.remaining ?? 10} Days Available (Paid)</option>
                     {isFemale ? (
-                      <option value="Maternity Leave">Maternity Leave (ML) — 90 Days Allocation (Paid)</option>
+                      <option value="Maternity Leave">Maternity Leave (ML) — {leaveBalances.maternity?.remaining ?? 90} Days Allocation (Paid)</option>
                     ) : (
-                      <option value="Paternity Leave">Paternity Leave (PL) — 5 Days Allocation (Paid)</option>
+                      <option value="Paternity Leave">Paternity Leave (PL) — {leaveBalances.paternity?.remaining ?? 5} Days Allocation (Paid)</option>
                     )}
                   </>
                 ) : (
                   <>
                     <option value="Sick Leave" disabled>Sick Leave (SL) — Permanent Staff Only (0 Days)</option>
                     <option value="Earned Leave" disabled>Earned Leave (EL) — Permanent Staff Only (0 Days)</option>
+                    <option value="Privilege Leave" disabled>Privilege Leave (PL) — Permanent Staff Only (0 Days)</option>
                     <option value="Holidays" disabled>Public Holiday (HL) — Permanent Staff Only (0 Days)</option>
                     {isFemale ? (
                       <option value="Maternity Leave" disabled>Maternity Leave (ML) — Permanent Staff Only (0 Days)</option>
@@ -1124,6 +1219,85 @@ const Leave = () => {
                   Approve Request
                 </Button>
               </div>
+            </div>
+          )}
+        </Modal.Body>
+      </Modal>
+
+      {/* EMPLOYEE PERSONAL CARRY-FORWARD AUDIT MODAL */}
+      <Modal show={showMyCfModal} onHide={() => setShowMyCfModal(false)} centered size="lg">
+        <Modal.Header closeButton className="border-0 pb-0">
+          <Modal.Title className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+            <LuHistory className="text-indigo-600" /> My 3-Year Carry-Forward &amp; Stacking Ledger
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="pt-3">
+          <div className="mb-3 p-3 bg-indigo-50/70 rounded-2xl border border-indigo-200 text-xs text-indigo-950">
+            <div className="font-extrabold flex items-center gap-1.5 mb-1">
+              <LuShieldCheck className="w-4 h-4 text-indigo-600" /> Carry-Forward Policy Specification
+            </div>
+            <p className="text-[11px] text-indigo-900 mb-0">
+              Only <strong>Earned Leaves (EL) &amp; Privilege Leaves (PL)</strong> can be carry-forwarded up to <strong>3 years</strong> (stacking up to <strong>45 leaves</strong>). Any balance beyond 45 or older than 3 years is lapsed. Casual &amp; Sick leaves reset annually.
+            </p>
+          </div>
+
+          {myCfLoading ? (
+            <div className="py-12 text-center text-slate-400">
+              <Spinner animation="border" size="sm" className="mb-2" />
+              <div className="text-xs font-semibold">Loading your carry-forward ledger...</div>
+            </div>
+          ) : myCfLogs.length === 0 ? (
+            <div className="py-12 text-center text-slate-400">
+              <LuHistory className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+              <div className="text-xs font-bold text-slate-700">No Carry-Forward Logs Recorded Yet</div>
+              <p className="text-[11px] text-slate-400 mt-0.5">Logs appear when annual year-end roll-overs are executed by HR.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table hover className="text-xs mb-0 align-middle">
+                <thead className="bg-slate-100/80 text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">
+                  <tr>
+                    <th className="py-2.5 px-3">Roll-Over Cycle</th>
+                    <th className="py-2.5 px-3">Leave Category</th>
+                    <th className="py-2.5 px-3 text-center">Unutilized Balance</th>
+                    <th className="py-2.5 px-3 text-center">Carried Forward</th>
+                    <th className="py-2.5 px-3 text-center">Lapsed (Cap/Age)</th>
+                    <th className="py-2.5 px-3 text-center">Expiry Year</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {myCfLogs.map(log => (
+                    <tr key={log.id}>
+                      <td className="py-2.5 px-3 font-bold text-slate-900">
+                        {log.from_year} ➔ {log.to_year}
+                      </td>
+                      <td className="py-2.5 px-3 font-semibold text-slate-800">
+                        {log.leave_type} ({log.leave_code})
+                      </td>
+                      <td className="py-2.5 px-3 text-center font-mono">
+                        {log.unutilized_balance} d
+                      </td>
+                      <td className="py-2.5 px-3 text-center">
+                        <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
+                          +{log.actual_carried_forward} d
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 text-center">
+                        {parseFloat(log.excess_lapsed) > 0 ? (
+                          <span className="font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full">
+                            ⚠️ {log.excess_lapsed} d
+                          </span>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-3 text-center font-mono text-slate-600">
+                        {log.expiry_year} (Yr 3)
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
             </div>
           )}
         </Modal.Body>

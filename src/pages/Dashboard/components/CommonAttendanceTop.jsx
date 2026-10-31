@@ -243,25 +243,23 @@ export default function CommonAttendanceTop({
             <Col xs={6}>
               <Card className="top-widget-card p-3 h-100 d-flex flex-column justify-content-between">
                 <div
-                  className="p-2.5 rounded-circle d-inline-flex align-items-center justify-content-center"
+                  className="p-2.5 rounded-circle d-inline-flex align-items-center justify-content-center bg-blue-50 dark:bg-blue-950/40 border border-dashed border-blue-200 dark:border-blue-900/60"
                   style={{
                     width: "38px",
-                    height: "38px",
-                    background: "#eff6ff",
-                    border: "1px dashed #bfdbfe"
+                    height: "38px"
                   }}
                 >
                   <LuClock size={20} style={{ color: "#2563eb" }} />
                 </div>
                 <div className="mt-3">
                   <div
-                    className="text-slate-700 fw-semibold"
+                    className="text-slate-600 dark:text-slate-400 fw-semibold"
                     style={{ fontSize: "12px" }}
                   >
                     Average hours
                   </div>
                   <h4
-                    className="fw-bold text-dark m-0 mt-1"
+                    className="fw-bold text-slate-900 dark:text-slate-100 m-0 mt-1"
                     style={{ fontSize: "22px" }}
                   >
                     {calculateAverageHours()}
@@ -274,25 +272,23 @@ export default function CommonAttendanceTop({
             <Col xs={6}>
               <Card className="top-widget-card p-3 h-100 d-flex flex-column justify-content-between">
                 <div
-                  className="p-2.5 rounded-circle d-inline-flex align-items-center justify-content-center"
+                  className="p-2.5 rounded-circle d-inline-flex align-items-center justify-content-center bg-blue-50 dark:bg-blue-950/40 border border-dashed border-blue-200 dark:border-blue-900/60"
                   style={{
                     width: "38px",
-                    height: "38px",
-                    background: "#eff6ff",
-                    border: "1px dashed #bfdbfe"
+                    height: "38px"
                   }}
                 >
                   <LuArrowUpRight size={20} style={{ color: "#2563eb" }} />
                 </div>
                 <div className="mt-3">
                   <div
-                    className="text-slate-700 fw-semibold"
+                    className="text-slate-600 dark:text-slate-400 fw-semibold"
                     style={{ fontSize: "12px" }}
                   >
                     Average log-in
                   </div>
                   <h4
-                    className="fw-bold text-dark m-0 mt-1"
+                    className="fw-bold text-slate-900 dark:text-slate-100 m-0 mt-1"
                     style={{ fontSize: "22px" }}
                   >
                     {calculateAverageCheckIn()}
@@ -305,19 +301,17 @@ export default function CommonAttendanceTop({
             <Col xs={6}>
               <Card className="top-widget-card p-3 h-100 d-flex flex-column justify-content-between">
                 <div
-                  className="p-2.5 rounded-circle d-inline-flex align-items-center justify-content-center"
+                  className="p-2.5 rounded-circle d-inline-flex align-items-center justify-content-center bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/60"
                   style={{
                     width: "38px",
-                    height: "38px",
-                    background: "#f0fdf4",
-                    border: "1px solid #bbf7d0"
+                    height: "38px"
                   }}
                 >
                   <LuUserCheck size={20} style={{ color: "#16a34a" }} />
                 </div>
                 <div className="mt-3">
                   <div
-                    className="text-slate-700 fw-semibold"
+                    className="text-slate-600 dark:text-slate-400 fw-semibold"
                     style={{ fontSize: "12px" }}
                   >
                     On-time arrival
@@ -336,25 +330,23 @@ export default function CommonAttendanceTop({
             <Col xs={6}>
               <Card className="top-widget-card p-3 h-100 d-flex flex-column justify-content-between">
                 <div
-                  className="p-2.5 rounded-circle d-inline-flex align-items-center justify-content-center"
+                  className="p-2.5 rounded-circle d-inline-flex align-items-center justify-content-center bg-orange-50 dark:bg-orange-950/40 border border-orange-200 dark:border-orange-900/60"
                   style={{
                     width: "38px",
-                    height: "38px",
-                    background: "#fff7ed",
-                    border: "1px solid #fed7aa"
+                    height: "38px"
                   }}
                 >
                   <LuLogOut size={20} style={{ color: "#ea580c" }} />
                 </div>
                 <div className="mt-3">
                   <div
-                    className="text-slate-700 fw-semibold"
+                    className="text-slate-600 dark:text-slate-400 fw-semibold"
                     style={{ fontSize: "12px" }}
                   >
                     Average log-out
                   </div>
                   <h4
-                    className="fw-bold text-dark m-0 mt-1"
+                    className="fw-bold text-slate-900 dark:text-slate-100 m-0 mt-1"
                     style={{ fontSize: "22px" }}
                   >
                     {calculateAverageCheckOut()}
@@ -371,8 +363,8 @@ export default function CommonAttendanceTop({
             <div>
               <div className="d-flex justify-content-between align-items-center mb-3">
                 <h5
-                  className="fw-bold text-dark m-0"
-                  style={{ fontSize: "18px", color: "#0f172a" }}
+                  className="fw-bold m-0 text-slate-900 dark:text-slate-100"
+                  style={{ fontSize: "18px" }}
                 >
                   My Attendance
                 </h5>
@@ -384,13 +376,7 @@ export default function CommonAttendanceTop({
                   View Stats
                 </Link>
               </div>
-              <hr
-                style={{
-                  borderColor: "#e2e8f0",
-                  opacity: 0.8,
-                  margin: "12px 0 20px 0"
-                }}
-              />
+              <hr className="my-3 border-slate-200 dark:border-slate-800 opacity-60" />
 
               <div className="d-flex align-items-center justify-content-between">
                 {/* Metrics legend */}
@@ -404,8 +390,8 @@ export default function CommonAttendanceTop({
                         backgroundColor: "#22c55e"
                       }}
                     ></span>
-                    <span className="text-slate-800 font-semibold">
-                      <strong className="text-dark">
+                    <span className="text-slate-700 dark:text-slate-300 font-semibold">
+                      <strong className="text-slate-900 dark:text-slate-100">
                         {onTimeCount.toLocaleString()}
                       </strong>{" "}
                       on time
@@ -420,8 +406,8 @@ export default function CommonAttendanceTop({
                         backgroundColor: "#eab308"
                       }}
                     ></span>
-                    <span className="text-slate-800 font-semibold">
-                      <strong className="text-dark">
+                    <span className="text-slate-700 dark:text-slate-300 font-semibold">
+                      <strong className="text-slate-900 dark:text-slate-100">
                         {wfhCount.toLocaleString()}
                       </strong>{" "}
                       Work from Home
@@ -436,8 +422,8 @@ export default function CommonAttendanceTop({
                         backgroundColor: "#ef4444"
                       }}
                     ></span>
-                    <span className="text-slate-800 font-semibold">
-                      <strong className="text-dark">
+                    <span className="text-slate-700 dark:text-slate-300 font-semibold">
+                      <strong className="text-slate-900 dark:text-slate-100">
                         {lateCount.toLocaleString()}
                       </strong>{" "}
                       Late check-in
@@ -452,8 +438,8 @@ export default function CommonAttendanceTop({
                         backgroundColor: "#94a3b8"
                       }}
                     ></span>
-                    <span className="text-slate-800 font-semibold">
-                      <strong className="text-dark">
+                    <span className="text-slate-700 dark:text-slate-300 font-semibold">
+                      <strong className="text-slate-900 dark:text-slate-100">
                         {absentCount.toLocaleString()}
                       </strong>{" "}
                       Absent
@@ -472,7 +458,8 @@ export default function CommonAttendanceTop({
                       cy="67.5"
                       r="52"
                       fill="transparent"
-                      stroke="#f1f5f9"
+                      stroke="currentColor"
+                      className="text-slate-100 dark:text-slate-800"
                       strokeWidth="11"
                     />
                     {/* On time green arc */}
@@ -523,17 +510,16 @@ export default function CommonAttendanceTop({
                   </svg>
                   <div className="position-absolute text-center">
                     <span
-                      className="fw-bold text-dark d-block"
+                      className="fw-bold text-slate-900 dark:text-slate-100 d-block"
                       style={{
                         fontSize: "19px",
-                        lineHeight: "1.1",
-                        color: "#0f172a"
+                        lineHeight: "1.1"
                       }}
                     >
                       {totalPresentCount.toLocaleString()}
                     </span>
                     <span
-                      className="text-muted"
+                      className="text-slate-400 dark:text-slate-500"
                       style={{ fontSize: "12px", fontWeight: "500" }}
                     >
                       /{totalRosterDays}
@@ -544,24 +530,21 @@ export default function CommonAttendanceTop({
             </div>
 
             <div
-              className="pt-3 border-top mt-3 d-flex align-items-center gap-2"
-              style={{ borderColor: "#f1f5f9" }}
+              className="pt-3 border-t border-slate-100 dark:border-slate-800 mt-3 d-flex align-items-center gap-2"
             >
               <div
-                className="d-inline-flex align-items-center justify-content-center rounded-2"
+                className="d-inline-flex align-items-center justify-content-center rounded-2 bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400"
                 style={{
                   width: "20px",
                   height: "20px",
-                  backgroundColor: "#dcfce7",
-                  color: "#16a34a",
                   fontSize: "12px"
                 }}
               >
                 ✓
               </div>
-              <span className="text-muted" style={{ fontSize: "12px" }}>
+              <span className="text-slate-500 dark:text-slate-400" style={{ fontSize: "12px" }}>
                 Better than{" "}
-                <strong className="text-dark" style={{ color: "#0f172a" }}>
+                <strong className="text-slate-900 dark:text-slate-100 font-bold">
                   91.3%
                 </strong>{" "}
                 employees!

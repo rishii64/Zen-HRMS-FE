@@ -43,18 +43,19 @@ import {
     LuFileCheck,
 } from "react-icons/lu";
 import api, { getUploadUrl } from "../../api";
+import OfferManagementDesk from "./components/OfferManagementDesk";
 
-// Department presets
+// Standard 8 Corporate Departments
 const DEPARTMENTS = [
     "All",
-    "IT",
-    "Engineering",
-    "HR",
-    "Accounts",
-    "Sales",
-    "Marketing",
+    "Engineering / Tech",
+    "Sales & Marketing",
+    "Accounts & Finance",
+    "Human Resources (HR)",
     "Operations",
-    "Quality Assurance",
+    "Administration & Facilities",
+    "Customer Support",
+    "Legal Cell",
 ];
 
 // Experience brackets
@@ -83,24 +84,52 @@ const Requisition = () => {
     const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
     const rawRole = (localStorage.getItem("role") || storedUser.role || "").toLowerCase();
     const designation = (storedUser.designation || "").toLowerCase();
+    const userDept = storedUser.dept || localStorage.getItem("dept") || "Engineering";
+
+    // Leadership & HOD detection across all 8 departments
     const isLeadershipDesig =
-        /\b(hod|head|manager|mgr|lead|tl|agm|dgm|gm|director|supervisor)\b/i.test(designation) ||
+        /\b(hod|head|manager|mgr|lead|tl|agm|dgm|gm|director|supervisor|chro|vp|cfo|coo|cto)\b/i.test(designation) ||
         designation.includes("team lead") ||
         designation.includes("tech lead") ||
         designation.includes("department head") ||
-        designation.includes("head of");
-    const isHodRole =
-        !["hr", "admin", "hrmanager"].includes(rawRole) && (
-            ["hod", "manager", "teamlead", "department head"].includes(rawRole) || isLeadershipDesig
-        );
-    const activeRole = ["hr", "admin", "hrmanager"].includes(rawRole) ? "hr" : (isHodRole ? "hod" : "employee");
+        designation.includes("head of") ||
+        designation.includes("general manager") ||
+        designation.includes("assistant general manager") ||
+        designation.includes("deputy general manager");
+
+    // Check if user is CHRO / VP HR (authorized to finalize requisitions or delegate to GM-HR)
+    const isCHRO =
+        /\b(chro|vp hr|vp-hr|vp - hr)\b/i.test(designation) ||
+        designation.includes("chief human resources officer") ||
+        designation.includes("head of hr") ||
+        designation.includes("hr head") ||
+        designation.includes("vice president hr") ||
+        designation.includes("vice president - hr") ||
+        designation.includes("vice president human resources") ||
+        ["chro", "vphr", "admin", "management", "ceo", "coo"].includes(rawRole) ||
+        ((userDept.toLowerCase().includes("human resource") || userDept.toLowerCase() === "hr") &&
+            (storedUser.grade?.rank_level >= 11 || storedUser.rank_level >= 11));
+
+    // Check if user is General Manager - HR (can finalize when delegated by CHRO)
+    const isGMHR =
+        (userDept.toLowerCase().includes("human resource") || userDept.toLowerCase() === "hr") &&
+        (/\b(general manager|gm|gm-hr|gm - hr)\b/i.test(designation) ||
+         designation.includes("general manager - hr") ||
+         storedUser.grade?.rank_level === 10 ||
+         storedUser.rank_level === 10);
+
+    // Any HOD across ALL departments can raise requisitions
+    const isHOD =
+        storedUser.is_hod ||
+        ["hod", "manager", "teamlead", "department head", "sales", "operations", "accounts"].includes(rawRole) ||
+        isLeadershipDesig ||
+        (storedUser.grade?.rank_level >= 6 || storedUser.rank_level >= 6);
+
+    const isHR = isCHRO || isGMHR || ["hr", "admin", "hrmanager"].includes(rawRole) || userDept.toLowerCase().includes("human resource") || userDept.toLowerCase() === "hr";
+
+    const activeRole = isCHRO ? "chro" : (isGMHR ? "gm_hr" : (isHR ? "hr" : (isHOD ? "hod" : "employee")));
     const employeeId = storedUser.employee_id || localStorage.getItem("employeeCode") || "EMP-001";
     const userName = storedUser.name || localStorage.getItem("userName") || "User";
-    const userDept = storedUser.dept || localStorage.getItem("dept") || "IT";
-
-    // Role permissions: Only HOD can raise requisition, only HR can list resume
-    const isHOD = activeRole === "hod";
-    const isHR = activeRole === "hr";
 
     // Active Tab
     const [activeTab, setActiveTab] = useState("requisitions");
@@ -130,6 +159,18 @@ const Requisition = () => {
     // Modals
     const [showRaiseReqModal, setShowRaiseReqModal] = useState(false);
     const [showCeoApprovalModal, setShowCeoApprovalModal] = useState(false);
+    const [showFinalizeModal, setShowFinalizeModal] = useState(false);
+    const [finalizeAction, setFinalizeAction] = useState("APPROVE_AND_FINALIZE");
+    const [finalizeComments, setFinalizeComments] = useState("");
+    const [submittingFinalize, setSubmittingFinalize] = useState(false);
+
+    // CHRO Delegation to General Manager - HR State
+    const [showDelegateModal, setShowDelegateModal] = useState(false);
+    const [eligibleFinalizers, setEligibleFinalizers] = useState([]);
+    const [selectedFinalizerId, setSelectedFinalizerId] = useState("");
+    const [selectedFinalizerName, setSelectedFinalizerName] = useState("");
+    const [delegateNotes, setDelegateNotes] = useState("");
+    const [submittingDelegate, setSubmittingDelegate] = useState(false);
     const [showAddCandidateModal, setShowAddCandidateModal] = useState(false);
     const [showHodDecisionModal, setShowHodDecisionModal] = useState(false);
     const [showScheduleModal, setShowScheduleModal] = useState(false);
@@ -143,7 +184,7 @@ const Requisition = () => {
     // Form State: Raise Requisition (HOD)
     const initialReqForm = {
         position: "",
-        department: isHOD && userDept ? userDept : "IT",
+        department: userDept || "Engineering",
         experience_required: "3 - 5 Years (Mid-Level)",
         job_description: "",
         max_salary: "",
@@ -274,11 +315,18 @@ const Requisition = () => {
 
     const renderStatusBadge = (status) => {
         switch (status) {
+            case "PENDING_CHRO_APPROVAL":
+                return (
+                    <span className="md-chip md-chip-amber">
+                        <span className="md-dot md-dot-amber" />
+                        Awaiting CHRO Finalization
+                    </span>
+                );
             case "PENDING_CEO_COO_APPROVAL":
                 return (
                     <span className="md-chip md-chip-amber">
                         <span className="md-dot md-dot-amber" />
-                        Pending CEO/COO
+                        Pending CEO/COO Budget
                     </span>
                 );
             case "SOURCING_CANDIDATES":
@@ -367,7 +415,7 @@ const Requisition = () => {
     const handleOpenRaiseModal = () => {
         setReqForm({
             ...initialReqForm,
-            department: userDept || "IT",
+            department: userDept || "Engineering / Tech",
         });
         setApprovalFile(null);
         setShowRaiseReqModal(true);
@@ -444,6 +492,86 @@ const Requisition = () => {
             toast.error(err.response?.data?.error || "Failed to submit requisition");
         } finally {
             setSubmittingReq(false);
+        }
+    };
+
+    // =========================================================================
+    // HANDLERS: CHRO / VP HR REQUISITION FINALIZATION
+    // =========================================================================
+
+    const handleOpenFinalizeModal = (requisition) => {
+        setSelectedRequisition(requisition);
+        setFinalizeAction("APPROVE_AND_FINALIZE");
+        const roleTitle = isCHRO ? "CHRO / VP HR" : "General Manager - HR (Delegated Authority)";
+        setFinalizeComments(`Approved and finalized for workforce candidate sourcing by ${roleTitle}.`);
+        setShowFinalizeModal(true);
+    };
+
+    const handleOpenDelegateModal = async (requisition) => {
+        setSelectedRequisition(requisition);
+        setDelegateNotes("Assigned by CHRO to General Manager - HR to review and finalize this requisition.");
+        try {
+            const res = await api.get("/recruitment/eligible-finalizers");
+            if (res.data?.success && res.data.data?.length > 0) {
+                setEligibleFinalizers(res.data.data);
+                setSelectedFinalizerId(res.data.data[0].id);
+                setSelectedFinalizerName(`${res.data.data[0].name} (${res.data.data[0].designation})`);
+            } else {
+                const def = [{ id: "HR-GM-01", name: "Mr. Rajesh Sharma", designation: "General Manager - HR", dept: "Human Resources (HR)" }];
+                setEligibleFinalizers(def);
+                setSelectedFinalizerId("HR-GM-01");
+                setSelectedFinalizerName("Mr. Rajesh Sharma (General Manager - HR)");
+            }
+        } catch {
+            const def = [{ id: "HR-GM-01", name: "Mr. Rajesh Sharma", designation: "General Manager - HR", dept: "Human Resources (HR)" }];
+            setEligibleFinalizers(def);
+            setSelectedFinalizerId("HR-GM-01");
+            setSelectedFinalizerName("Mr. Rajesh Sharma (General Manager - HR)");
+        }
+        setShowDelegateModal(true);
+    };
+
+    const handleProcessDelegate = async () => {
+        if (!selectedRequisition) return;
+        try {
+            setSubmittingDelegate(true);
+            const res = await api.post(`/recruitment/requisitions/${selectedRequisition.id}/delegate`, {
+                delegated_finalizer_id: selectedFinalizerId,
+                delegated_finalizer_name: selectedFinalizerName,
+                notes: delegateNotes,
+            });
+            if (res.data?.success) {
+                toast.success(res.data.message || "Requisition assigned to General Manager - HR!");
+                setShowDelegateModal(false);
+                fetchAllData();
+            }
+        } catch (err) {
+            console.error("Delegate requisition error:", err);
+            toast.error(err.response?.data?.error || "Failed to delegate requisition");
+        } finally {
+            setSubmittingDelegate(false);
+        }
+    };
+
+    const handleProcessFinalize = async () => {
+        if (!selectedRequisition) return;
+        try {
+            setSubmittingFinalize(true);
+            const res = await api.post(`/recruitment/requisitions/${selectedRequisition.id}/finalize`, {
+                action: finalizeAction,
+                comments: finalizeComments,
+            });
+
+            if (res.data?.success) {
+                toast.success(res.data.message || "Requisition finalized successfully by CHRO / VP HR!");
+                setShowFinalizeModal(false);
+                fetchAllData();
+            }
+        } catch (err) {
+            console.error("Finalize requisition error:", err);
+            toast.error(err.response?.data?.error || "Failed to finalize requisition");
+        } finally {
+            setSubmittingFinalize(false);
         }
     };
 
@@ -627,14 +755,32 @@ const Requisition = () => {
 
     const approvedRequisitions = useMemo(() => {
         return requisitions.filter(
-            (r) => r.is_budgeted || r.budget_approval_status === "APPROVED_BY_CEO"
+            (r) =>
+                r.status !== "PENDING_CHRO_APPROVAL" &&
+                r.status !== "PENDING_CEO_COO_APPROVAL" &&
+                r.status !== "REJECTED" &&
+                (r.finalization_status === "FINALIZED_BY_CHRO" ||
+                 r.status === "SOURCING_CANDIDATES" ||
+                 r.status === "HOD_REVIEW" ||
+                 r.status === "INTERVIEWS_IN_PROGRESS")
         );
     }, [requisitions]);
 
     const filteredRequisitions = useMemo(() => {
         return requisitions.filter((r) => {
-            if (deptFilter !== "All" && r.department.toLowerCase() !== deptFilter.toLowerCase()) {
-                return false;
+            if (deptFilter !== "All") {
+                const df = deptFilter.toLowerCase();
+                const rd = (r.department || "").toLowerCase();
+                const match = rd === df || rd.includes(df) || df.includes(rd) ||
+                    (df.includes("eng") && rd.includes("eng")) ||
+                    (df.includes("hr") && rd.includes("hr")) ||
+                    (df.includes("sales") && rd.includes("sales")) ||
+                    (df.includes("fin") && rd.includes("fin")) ||
+                    (df.includes("ops") && rd.includes("ops")) ||
+                    (df.includes("admin") && rd.includes("admin")) ||
+                    (df.includes("support") && rd.includes("support")) ||
+                    (df.includes("legal") && rd.includes("legal"));
+                if (!match) return false;
             }
             if (statusFilter !== "ALL" && r.status !== statusFilter) {
                 return false;
@@ -645,7 +791,8 @@ const Requisition = () => {
                 const matchPos = r.position?.toLowerCase().includes(q);
                 const matchDept = r.department?.toLowerCase().includes(q);
                 const matchHod = r.hod_name?.toLowerCase().includes(q);
-                if (!matchCode && !matchPos && !matchDept && !matchHod) return false;
+                const matchDel = r.delegated_finalizer_name?.toLowerCase().includes(q);
+                if (!matchCode && !matchPos && !matchDept && !matchHod && !matchDel) return false;
             }
             return true;
         });
@@ -675,28 +822,29 @@ const Requisition = () => {
     }, [filteredCandidates]);
 
     return (
-        <Container fluid className="px-3 px-md-4 py-3 max-w-7xl recruitment-portal bg-slate-50 min-vh-100 font-sans">
+        <Container fluid className="px-3 px-md-4 py-3 max-w-7xl recruitment-portal bg-slate-50 dark:bg-slate-950 min-vh-100 font-sans transition-colors duration-200">
             <style>{`
         /* Surface Card */
         .md-card {
-          background: #ffffff;
+          background: var(--hrms-card-bg, #ffffff);
           border-radius: 16px;
-          border: 1px solid #e2e8f0;
+          border: 1px solid var(--hrms-card-border, #e2e8f0);
           box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 6px 16px -2px rgba(15, 23, 42, 0.04);
+          color: var(--hrms-text-primary, #0f172a);
         }
 
         /* Material Search & Filter Toolbar */
         .md-toolbar {
-          background: #f8fafc;
-          border: 1px solid #e2e8f0;
+          background: var(--hrms-table-th-bg, #f8fafc);
+          border: 1px solid var(--hrms-card-border, #e2e8f0);
           border-radius: 12px;
           padding: 10px 14px;
           margin-bottom: 16px;
         }
 
         .md-search-group {
-          background: #ffffff;
-          border: 1px solid #cbd5e1;
+          background: var(--hrms-table-th-bg, #ffffff);
+          border: 1px solid var(--hrms-card-border, #cbd5e1);
           border-radius: 10px;
           display: flex;
           align-items: center;
@@ -744,8 +892,8 @@ const Requisition = () => {
           overflow-x: auto !important;
           -webkit-overflow-scrolling: touch;
           border-radius: 12px;
-          border: 1px solid #e2e8f0;
-          background: #ffffff;
+          border: 1px solid var(--hrms-card-border, #e2e8f0);
+          background: var(--hrms-card-bg, #ffffff);
           position: relative;
         }
 
@@ -771,14 +919,14 @@ const Requisition = () => {
         }
 
         .md-table th {
-          background: #f8fafc !important;
-          color: #334155 !important;
+          background: var(--hrms-table-th-bg, #f8fafc) !important;
+          color: var(--hrms-text-secondary, #334155) !important;
           font-size: 0.72rem !important;
           font-weight: 700 !important;
           text-transform: uppercase !important;
           letter-spacing: 0.05em !important;
           padding: 13px 16px !important;
-          border-bottom: 2px solid #e2e8f0 !important;
+          border-bottom: 2px solid var(--hrms-card-border, #e2e8f0) !important;
           border-top: none !important;
           white-space: nowrap !important;
           line-height: 1.2;
@@ -787,12 +935,12 @@ const Requisition = () => {
         .md-table td {
           padding: 13px 16px !important;
           vertical-align: middle !important;
-          border-bottom: 1px solid #f1f5f9 !important;
+          border-bottom: 1px solid var(--hrms-table-border, #f1f5f9) !important;
           border-top: none !important;
           font-size: 0.8125rem !important;
           white-space: nowrap !important;
-          color: #0f172a;
-          background: #ffffff;
+          color: var(--hrms-text-primary, #0f172a);
+          background: var(--hrms-card-bg, #ffffff);
         }
 
         .md-table tbody tr {
@@ -800,7 +948,7 @@ const Requisition = () => {
         }
 
         .md-table tbody tr:hover td {
-          background-color: #f8fafc !important;
+          background-color: var(--hrms-table-th-bg, #f8fafc) !important;
         }
 
         /* Actions Column (Unpinned, Clean Material Dropdown) */
@@ -1029,19 +1177,19 @@ const Requisition = () => {
                             <LuBriefcase />
                         </div>
                         <div>
-                            <h5 className="fw-bold mb-0 text-slate-900 tracking-tight fs-6">Recruitment & Hiring Portal</h5>
-                            <p className="text-slate-500 mb-0 text-xs">
+                            <h5 className="fw-bold mb-0 text-slate-900 dark:text-slate-100 tracking-tight fs-6">Recruitment & Hiring Portal</h5>
+                            <p className="text-slate-500 dark:text-slate-400 mb-0 text-xs">
                                 HOD Requisition, Executive Budget Clearance, HR Resume Sourcing, and HOD Candidate Selection
                             </p>
                         </div>
                     </div>
 
                     <div className="d-flex align-items-center gap-2 flex-wrap justify-content-md-end">
-                        <div className="d-flex align-items-center gap-2 bg-slate-50 border border-slate-200 rounded-3 px-3 py-1.5 shadow-sm">
-                            <span className="text-slate-500 text-xs whitespace-nowrap font-medium">Profile Role:</span>
-                            <span className={`badge rounded-pill text-xs fw-bold px-2.5 py-1 d-flex align-items-center gap-1.5 ${isHOD ? "bg-blue-100 text-black border border-blue-200" : "bg-emerald-100 text-black border border-emerald-200"}`}>
-                                <span className={`md-dot ${isHOD ? "md-dot-blue" : "md-dot-emerald"}`} />
-                                {isHOD ? "HOD (Department Head)" : "HR / Recruiter"}
+                        <div className="d-flex align-items-center gap-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3 px-3 py-1.5 shadow-sm">
+                            <span className="text-slate-500 dark:text-slate-400 text-xs whitespace-nowrap font-medium">Profile Role:</span>
+                            <span className={`badge rounded-pill text-xs fw-bold px-2.5 py-1 d-flex align-items-center gap-1.5 ${isCHRO ? "bg-purple-100 text-purple-900 border border-purple-200" : isHOD ? "bg-blue-100 text-blue-900 border border-blue-200" : "bg-emerald-100 text-emerald-900 border border-emerald-200"}`}>
+                                <span className={`md-dot ${isCHRO ? "md-dot-purple" : isHOD ? "md-dot-blue" : "md-dot-emerald"}`} />
+                                {isCHRO ? "CHRO / VP HR (Finalizing Authority)" : isHOD ? `HOD (${userDept || "Department Head"})` : "HR / Recruiter"}
                             </span>
                         </div>
 
@@ -1050,7 +1198,7 @@ const Requisition = () => {
                             size="sm"
                             onClick={handleRefresh}
                             disabled={refreshing}
-                            className="p-1.5 text-slate-600 border-slate-200 bg-white rounded-2"
+                            className="p-1.5 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-2"
                             title="Refresh Portal Data"
                         >
                             <LuRefreshCw size={14} className={refreshing ? "spin" : ""} />
@@ -1093,11 +1241,11 @@ const Requisition = () => {
 
                     <div className="pe-3 border-end border-slate-200 flex-fill flex items-center justify-around">
                         <span className="text-slate-500 text-xs text-uppercase tracking-wider fw-bold d-block">
-                            Pending CEO/COO
+                            Pending CHRO Finalization
                         </span>
                         <div className="fs-5 fw-bold text-amber-600 d-flex align-items-center gap-1.5">
                             <span className="md-dot md-dot-amber" />
-                            {stats.pendingApproval || 0}
+                            {stats.pendingChroFinalization || 0}
                         </div>
                     </div>
 
@@ -1186,6 +1334,14 @@ const Requisition = () => {
                             {shortlistedCandidates.length}
                         </span>
                     </button>
+
+                    <button
+                        type="button"
+                        onClick={() => setActiveTab("offers")}
+                        className={`md-tab-btn ${activeTab === "offers" ? "active" : ""}`}
+                    >
+                        <LuFileCheck size={14} /> Offer Letters &amp; Approvals
+                    </button>
                 </div>
 
                 {/* ───────────────────────────────────────────────────────────────── */}
@@ -1242,7 +1398,8 @@ const Requisition = () => {
                                         className="md-filter-select"
                                     >
                                         <option value="ALL">All Statuses</option>
-                                        <option value="PENDING_CEO_COO_APPROVAL">Pending CEO/COO</option>
+                                        <option value="PENDING_CHRO_APPROVAL">Awaiting CHRO Finalization</option>
+                                        <option value="PENDING_CEO_COO_APPROVAL">Pending CEO/COO Budget</option>
                                         <option value="SOURCING_CANDIDATES">Sourcing Resumes</option>
                                         <option value="HOD_REVIEW">HOD Reviewing</option>
                                         <option value="INTERVIEWS_IN_PROGRESS">Interviews Active</option>
@@ -1417,7 +1574,66 @@ const Requisition = () => {
                                                     </td>
 
                                                     {/* Workflow Status */}
-                                                    <td>{renderStatusBadge(req.status)}</td>
+                                                    <td>
+                                                        {renderStatusBadge(req.status)}
+                                                        {req.finalization_status === "FINALIZED_BY_GM_HR" && (
+                                                            <div className="mt-1">
+                                                                <span className="badge bg-teal-50 text-teal-800 border border-teal-200 text-3xs">
+                                                                    Finalized by GM-HR ({req.finalized_by_name || "Delegated"})
+                                                                </span>
+                                                            </div>
+                                                        )}
+                                                        {req.finalization_status === "FINALIZED_BY_CHRO" && (
+                                                            <div className="mt-1">
+                                                                <span className="badge bg-purple-50 text-purple-700 border border-purple-200 text-3xs">
+                                                                    CHRO Finalized ({req.finalized_by_name || "CHRO / VP HR"})
+                                                                </span>
+                                                            </div>
+                                                        )}
+                                                        {req.delegated_finalizer_name && (req.status === "PENDING_CHRO_APPROVAL" || req.finalization_status === "PENDING_CHRO") && (
+                                                            <div className="mt-1">
+                                                                <span className="badge bg-purple-100 text-purple-900 border border-purple-300 text-3xs fw-semibold d-inline-flex align-items-center gap-1">
+                                                                    <LuUserCheck size={10} className="text-purple-700" />
+                                                                    Delegated: {req.delegated_finalizer_name}
+                                                                </span>
+                                                            </div>
+                                                        )}
+                                                        {(req.status === "PENDING_CHRO_APPROVAL" || req.finalization_status === "PENDING_CHRO") && (
+                                                            <div className="mt-1 d-flex flex-wrap gap-1">
+                                                                {isCHRO && (
+                                                                    <>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => handleOpenFinalizeModal(req)}
+                                                                            className="btn btn-sm btn-outline-purple py-0.5 px-2 text-3xs fw-bold d-inline-flex align-items-center gap-1 rounded-pill"
+                                                                            style={{ borderColor: "#a855f7", color: "#6b21a8" }}
+                                                                            title="Finalize Requisition as CHRO / VP HR"
+                                                                        >
+                                                                            <LuFileCheck size={11} /> Finalize
+                                                                        </button>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => handleOpenDelegateModal(req)}
+                                                                            className="btn btn-sm btn-light border py-0.5 px-2 text-3xs fw-semibold d-inline-flex align-items-center gap-1 rounded-pill text-slate-700 hover:bg-slate-100"
+                                                                            title="Assign General Manager - HR to finalize"
+                                                                        >
+                                                                            <LuUserCheck size={11} className="text-purple-600" /> Assign GM-HR
+                                                                        </button>
+                                                                    </>
+                                                                )}
+                                                                {!isCHRO && (isGMHR || req.delegated_finalizer_id === employeeId) && (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => handleOpenFinalizeModal(req)}
+                                                                        className="btn btn-sm btn-outline-success py-0.5 px-2 text-3xs fw-bold d-inline-flex align-items-center gap-1 rounded-pill"
+                                                                        title="Finalize as Delegated General Manager - HR"
+                                                                    >
+                                                                        <LuFileCheck size={11} /> Finalize (GM-HR)
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </td>
 
                                                     {/* Candidates */}
                                                     <td>
@@ -1458,7 +1674,37 @@ const Requisition = () => {
                                                                 <LuEllipsisVertical size={13} className="text-slate-500" />
                                                             </Dropdown.Toggle>
 
-                                                            <Dropdown.Menu className="shadow-lg border-slate-200 py-1 rounded-2 text-xs" style={{ minWidth: "195px", zIndex: 1050 }}>
+                                                            <Dropdown.Menu className="shadow-lg border-slate-200 py-1 rounded-2 text-xs" style={{ minWidth: "215px", zIndex: 1050 }}>
+                                                                {/* CHRO Actions */}
+                                                                {isCHRO && (req.status === "PENDING_CHRO_APPROVAL" || req.finalization_status === "PENDING_CHRO") && (
+                                                                    <>
+                                                                        <Dropdown.Item
+                                                                            as="button"
+                                                                            className="d-flex align-items-center gap-2 py-1.5 text-xs text-purple-900 bg-purple-50 fw-bold border-bottom border-purple-100"
+                                                                            onClick={() => handleOpenFinalizeModal(req)}
+                                                                        >
+                                                                            <LuFileCheck size={14} className="text-purple-700" /> Finalize Requisition (CHRO)
+                                                                        </Dropdown.Item>
+                                                                        <Dropdown.Item
+                                                                            as="button"
+                                                                            className="d-flex align-items-center gap-2 py-1.5 text-xs text-purple-800 fw-semibold"
+                                                                            onClick={() => handleOpenDelegateModal(req)}
+                                                                        >
+                                                                            <LuUserCheck size={14} className="text-purple-600" /> Assign General Manager - HR
+                                                                        </Dropdown.Item>
+                                                                    </>
+                                                                )}
+                                                                {/* Delegated GM-HR Action */}
+                                                                {!isCHRO && (isGMHR || req.delegated_finalizer_id === employeeId) && (req.status === "PENDING_CHRO_APPROVAL" || req.finalization_status === "PENDING_CHRO") && (
+                                                                    <Dropdown.Item
+                                                                        as="button"
+                                                                        className="d-flex align-items-center gap-2 py-1.5 text-xs text-emerald-900 bg-emerald-50 fw-bold border-bottom border-emerald-100"
+                                                                        onClick={() => handleOpenFinalizeModal(req)}
+                                                                    >
+                                                                        <LuFileCheck size={14} className="text-emerald-700" /> Finalize (General Manager - HR)
+                                                                    </Dropdown.Item>
+                                                                )}
+
                                                                 <Dropdown.Item
                                                                     as="button"
                                                                     className="d-flex align-items-center gap-2 py-1.5 text-xs text-slate-700"
@@ -2157,6 +2403,18 @@ const Requisition = () => {
                         )}
                     </div>
                 )}
+                            {/* ───────────────────────────────────────────────────────────────── */}
+                {/* TAB 5: OFFER LETTERS & APPROVALS                                 */}
+                {/* ───────────────────────────────────────────────────────────────── */}
+                {activeTab === "offers" && (
+                    <div className="mt-2">
+                        <OfferManagementDesk
+                            token={localStorage.getItem("token")}
+                            activeRole={activeRole}
+                            currentUser={storedUser}
+                        />
+                    </div>
+                )}
             </div>
 
             {/* ───────────────────────────────────────────────────────────────── */}
@@ -2170,6 +2428,12 @@ const Requisition = () => {
                 </Modal.Header>
                 <Form onSubmit={handleSubmitRequisition}>
                     <Modal.Body className="p-3 p-md-4">
+                        <div className="p-2.5 rounded-2 bg-blue-50 border border-blue-200 mb-3 text-xs text-blue-900 d-flex align-items-center gap-2">
+                            <LuBriefcase size={16} className="text-blue-600 flex-shrink-0" />
+                            <span>
+                                All department HODs can raise workforce requisitions. Requisitions are posted to the <strong>Requisitions Hub</strong> and require finalization and sign-off by the <strong>CHRO / VP HR</strong> (or assigned <strong>General Manager - HR</strong>) before candidate sourcing begins.
+                            </span>
+                        </div>
                         <Row className="g-3">
                             <Col md={8}>
                                 <Form.Group>
@@ -2485,7 +2749,7 @@ const Requisition = () => {
                             size="sm"
                             type="submit"
                             disabled={submittingReq || (reqForm.is_budgeted === "No" && !approvalFile)}
-                            className="text-xs px-3 bg-blue-600 border-blue-600"
+                            className="text-xs px-3 bg-blue-600 border-blue-600 d-flex items-center"
                             title={reqForm.is_budgeted === "No" && !approvalFile ? "CEO/COO approval PDF is required to submit" : ""}
                         >
                             {submittingReq ? <Spinner size="sm" animation="border" /> : <LuSend size={12} className="me-1" />}
@@ -2496,6 +2760,189 @@ const Requisition = () => {
             </Modal>
 
             {/* ───────────────────────────────────────────────────────────────── */}
+            {/* ───────────────────────────────────────────────────────────────── */}
+            {/* MODAL: CHRO / VP HR (OR DELEGATED GM-HR) REQUISITION FINALIZATION */}
+            {/* ───────────────────────────────────────────────────────────────── */}
+            <Modal show={showFinalizeModal} onHide={() => setShowFinalizeModal(false)} size="lg" centered backdrop="static">
+                <Modal.Header closeButton className="bg-purple-50 border-bottom border-purple-200 py-3">
+                    <Modal.Title className="fs-6 fw-bold d-flex align-items-center gap-2 text-purple-950">
+                        <LuFileCheck className="text-purple-700" size={18} />
+                        {isCHRO ? "Finalize Workforce Requisition (CHRO / VP HR)" : "Finalize Workforce Requisition (General Manager - HR)"}
+                    </Modal.Title>
+                </Modal.Header>
+                <Modal.Body className="p-3.5">
+                    {selectedRequisition && (
+                        <div>
+                            <div className="bg-slate-50 border rounded-3 p-3 mb-3">
+                                <Row className="g-2.5 text-xs">
+                                    <Col sm={6}>
+                                        <div className="text-muted text-uppercase tracking-wider fw-bold text-3xs">Requisition Code</div>
+                                        <div className="fw-bold text-slate-900 fs-7">{selectedRequisition.requisition_code}</div>
+                                    </Col>
+                                    <Col sm={6}>
+                                        <div className="text-muted text-uppercase tracking-wider fw-bold text-3xs">Hiring Department</div>
+                                        <div className="fw-bold text-slate-900">{selectedRequisition.department}</div>
+                                    </Col>
+                                    <Col sm={6}>
+                                        <div className="text-muted text-uppercase tracking-wider fw-bold text-3xs">Designation / Role</div>
+                                        <div className="fw-bold text-blue-700">{selectedRequisition.position} ({selectedRequisition.vacancies_count} Vacanc{selectedRequisition.vacancies_count > 1 ? "ies" : "y"})</div>
+                                    </Col>
+                                    <Col sm={6}>
+                                        <div className="text-muted text-uppercase tracking-wider fw-bold text-3xs">Approved CTC Cap</div>
+                                        <div className="fw-bold text-emerald-700 font-monospace">{formatCurrency(selectedRequisition.max_salary, selectedRequisition.salary_frequency)}</div>
+                                    </Col>
+                                    <Col sm={6}>
+                                        <div className="text-muted text-uppercase tracking-wider fw-bold text-3xs">Raised By Department Head</div>
+                                        <div className="fw-semibold text-slate-800">{selectedRequisition.hod_name || "Department Head"}</div>
+                                    </Col>
+                                    <Col sm={6}>
+                                        <div className="text-muted text-uppercase tracking-wider fw-bold text-3xs">Experience Bracket</div>
+                                        <div className="text-slate-800">{selectedRequisition.experience_required}</div>
+                                    </Col>
+                                    <Col sm={12}>
+                                        <div className="text-muted text-uppercase tracking-wider fw-bold text-3xs">Hiring Reason & Details</div>
+                                        <div className="text-slate-700">{selectedRequisition.reason_for_hiring} {selectedRequisition.replacement_for_employee ? `• Replacement for: ${selectedRequisition.replacement_for_employee}` : ""}</div>
+                                    </Col>
+                                </Row>
+                            </div>
+
+                            <Form.Group className="mb-3">
+                                <Form.Label className="fw-bold text-xs text-slate-800 mb-2">Finalization Decision *</Form.Label>
+                                <div className="d-flex flex-column gap-2 bg-white border rounded-2 p-2.5">
+                                    <Form.Check
+                                        type="radio"
+                                        id="fin-approve"
+                                        name="finalizeAction"
+                                        label={<span className="fw-bold text-emerald-800">Approve & Finalize for Hiring (Opens workforce candidate sourcing for HR recruiters)</span>}
+                                        checked={finalizeAction === "APPROVE_AND_FINALIZE"}
+                                        onChange={() => setFinalizeAction("APPROVE_AND_FINALIZE")}
+                                    />
+                                    <Form.Check
+                                        type="radio"
+                                        id="fin-reject"
+                                        name="finalizeAction"
+                                        label={<span className="fw-bold text-rose-800">Reject Requisition (Cancels requisition & halts sourcing)</span>}
+                                        checked={finalizeAction === "REJECT"}
+                                        onChange={() => setFinalizeAction("REJECT")}
+                                    />
+                                </div>
+                            </Form.Group>
+
+                            <Form.Group>
+                                <Form.Label className="fw-bold text-xs text-slate-800">
+                                    CHRO / VP HR Directives & Strategic Remarks
+                                </Form.Label>
+                                <Form.Control
+                                    as="textarea"
+                                    rows={3}
+                                    placeholder="Enter strategic directives, talent guidelines, or approved hiring timeline..."
+                                    value={finalizeComments}
+                                    onChange={(e) => setFinalizeComments(e.target.value)}
+                                    className="text-xs"
+                                />
+                            </Form.Group>
+                        </div>
+                    )}
+                </Modal.Body>
+                <Modal.Footer className="bg-slate-50 border-top py-2.5">
+                    <Button variant="outline-secondary" size="sm" onClick={() => setShowFinalizeModal(false)} className="text-xs">
+                        Cancel
+                    </Button>
+                    <Button
+                        variant={finalizeAction === "REJECT" ? "danger" : "success"}
+                        size="sm"
+                        onClick={handleProcessFinalize}
+                        disabled={submittingFinalize}
+                        className="text-xs px-3"
+                    >
+                        {submittingFinalize ? <Spinner size="sm" animation="border" /> : <LuCircleCheck size={13} className="me-1" />}
+                        {finalizeAction === "REJECT" ? "Reject Requisition" : (isCHRO ? "Confirm CHRO Finalization" : "Confirm Finalization (GM-HR)")}
+                    </Button>
+                </Modal.Footer>
+            </Modal>
+
+            {/* ───────────────────────────────────────────────────────────────── */}
+            {/* MODAL: CHRO ASSIGN / DELEGATE TO GENERAL MANAGER - HR             */}
+            {/* ───────────────────────────────────────────────────────────────── */}
+            <Modal show={showDelegateModal} onHide={() => setShowDelegateModal(false)} size="md" centered backdrop="static">
+                <Modal.Header closeButton className="bg-purple-50 border-bottom border-purple-200 py-3">
+                    <Modal.Title className="fs-6 fw-bold d-flex align-items-center gap-2 text-purple-950">
+                        <LuUserCheck className="text-purple-700" size={18} /> Assign General Manager - HR for Finalization
+                    </Modal.Title>
+                </Modal.Header>
+                <Modal.Body className="p-3.5">
+                    {selectedRequisition && (
+                        <div>
+                            <div className="bg-slate-50 border rounded-3 p-3 mb-3">
+                                <div className="fw-bold text-slate-900 fs-7">{selectedRequisition.position}</div>
+                                <div className="text-xs text-slate-500 mt-1">
+                                    <span className="font-monospace fw-bold text-slate-800">{selectedRequisition.requisition_code}</span> • {selectedRequisition.department} • HOD: {selectedRequisition.hod_name}
+                                </div>
+                            </div>
+
+                            <div className="p-2.5 rounded-2 bg-blue-50 border border-blue-200 mb-3 text-xs text-blue-900">
+                                As <strong>CHRO / VP HR</strong>, you can assign the <strong>General Manager - HR</strong> of your department to review, assess compensation bands, and finalize this candidate requisition.
+                            </div>
+
+                            <Form.Group className="mb-3">
+                                <Form.Label className="fw-bold text-xs text-slate-800">
+                                    Select General Manager - HR <span className="text-rose-500">*</span>
+                                </Form.Label>
+                                <Form.Select
+                                    size="sm"
+                                    value={selectedFinalizerId}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        setSelectedFinalizerId(val);
+                                        const fin = eligibleFinalizers.find(f => f.id === val);
+                                        if (fin) {
+                                            setSelectedFinalizerName(`${fin.name} (${fin.designation})`);
+                                        }
+                                    }}
+                                    className="text-xs"
+                                >
+                                    {eligibleFinalizers.map(f => (
+                                        <option key={f.id} value={f.id}>
+                                            {f.name} — {f.designation} ({f.dept})
+                                        </option>
+                                    ))}
+                                </Form.Select>
+                            </Form.Group>
+
+                            <Form.Group>
+                                <Form.Label className="fw-bold text-xs text-slate-800">
+                                    Delegation Directives / Notes
+                                </Form.Label>
+                                <Form.Control
+                                    as="textarea"
+                                    rows={3}
+                                    value={delegateNotes}
+                                    onChange={(e) => setDelegateNotes(e.target.value)}
+                                    placeholder="Enter instructions for GM-HR..."
+                                    className="text-xs"
+                                />
+                            </Form.Group>
+                        </div>
+                    )}
+                </Modal.Body>
+                <Modal.Footer className="bg-slate-50 border-top py-2.5">
+                    <Button variant="outline-secondary" size="sm" onClick={() => setShowDelegateModal(false)} className="text-xs">
+                        Cancel
+                    </Button>
+                    <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={handleProcessDelegate}
+                        disabled={submittingDelegate}
+                        className="text-xs d-inline-flex align-items-center gap-1.5"
+                        style={{ backgroundColor: "#7c3aed", borderColor: "#7c3aed" }}
+                    >
+                        {submittingDelegate ? <Spinner animation="border" size="sm" /> : <LuCheck size={14} />}
+                        Confirm Assignment
+                    </Button>
+                </Modal.Footer>
+            </Modal>
+
             {/* MODAL 2: CEO / COO BUDGET APPROVAL                               */}
             {/* ───────────────────────────────────────────────────────────────── */}
             <Modal show={showCeoApprovalModal} onHide={() => setShowCeoApprovalModal(false)} size="md" centered>
@@ -2572,7 +3019,7 @@ const Requisition = () => {
             {/* ───────────────────────────────────────────────────────────────── */}
             {/* MODAL 3: HR ADD / LIST CANDIDATE RESUME                          */}
             {/* ───────────────────────────────────────────────────────────────── */}
-            <Modal show={showAddCandidateModal} onHide={() => setShowAddCandidateModal(false)} size="lg" centered backdrop="static">
+            <Modal show={showAddCandidateModal} onHide={() => setShowAddCandidateModal(false)} size="md" centered backdrop="static">
                 <Modal.Header closeButton className="bg-slate-50 border-bottom border-slate-200 py-3">
                     <Modal.Title className="fs-6 fw-bold d-flex align-items-center gap-2 text-slate-900">
                         <LuUpload className="text-blue-600" /> List Candidate Resume for HOD Review
@@ -2851,7 +3298,7 @@ const Requisition = () => {
                         size="sm"
                         onClick={handleSubmitHodDecision}
                         disabled={submittingHodDecision}
-                        className="text-xs px-3"
+                        className="text-xs px-3 d-flex items-center"
                     >
                         {submittingHodDecision ? <Spinner size="sm" animation="border" /> : <LuSend size={12} className="me-1" />}
                         Confirm Selection

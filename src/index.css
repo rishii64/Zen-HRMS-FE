@@ -2,6 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --hrms-bg-main: #f8fafc;
+  --hrms-card-bg: #ffffff;
+  --hrms-card-border: #e2e8f0;
+  --hrms-text-primary: #0f172a;
+  --hrms-text-secondary: #64748b;
+  --hrms-table-th-bg: #f8fafc;
+  --hrms-table-border: #f1f5f9;
+}
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
@@ -9,6 +19,9 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background-color: var(--hrms-bg-main);
+  color: var(--hrms-text-primary);
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 code {
@@ -40,3 +53,613 @@ code {
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
+
+html.dark {
+  --hrms-bg-main: #0f172a;
+  --hrms-card-bg: #1e293b;
+  --hrms-card-border: #334155;
+  --hrms-text-primary: #f8fafc;
+  --hrms-text-secondary: #94a3b8;
+  --hrms-table-th-bg: #0f172a;
+  --hrms-table-border: #334155;
+  color-scheme: dark;
+}
+
+html.light {
+  color-scheme: light;
+}
+
+html.dark body {
+  background-color: #0f172a !important;
+  color: #f8fafc !important;
+}
+
+/* ========================================================================= */
+/* UNIVERSAL DARK THEME ENFORCEMENT ACROSS ALL HRMS MODULES                  */
+/* Neutralizes Bootstrap !important conflicts and provides rich aesthetics  */
+/* ========================================================================= */
+
+html.dark .bg-white {
+  background-color: #1e293b !important;
+  color: #f8fafc;
+}
+
+html.dark .bg-light,
+html.dark .bg-slate-50 {
+  background-color: #0f172a !important;
+}
+
+html.dark .border,
+html.dark .border-slate-200 {
+  border-color: #334155 !important;
+}
+
+html.dark .text-dark,
+html.dark .text-slate-900,
+html.dark .text-slate-800 {
+  color: #f8fafc !important;
+}
+
+html.dark .text-secondary,
+html.dark .text-muted,
+html.dark .text-slate-600,
+html.dark .text-slate-500 {
+  color: #94a3b8 !important;
+}
+
+/* Universal Form Controls, Selects & Inputs */
+html.dark .form-control,
+html.dark .form-select,
+html.dark .filter-select,
+html.dark input[type="text"],
+html.dark input[type="password"],
+html.dark input[type="email"],
+html.dark input[type="number"],
+html.dark input[type="tel"],
+html.dark input[type="date"],
+html.dark input[type="time"],
+html.dark input[type="search"],
+html.dark select,
+html.dark textarea {
+  background-color: #0f172a !important;
+  color: #f8fafc !important;
+  border-color: #334155 !important;
+}
+
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: #64748b !important;
+  opacity: 1;
+}
+
+/* Auth Pages (Login / Forgot Password / Register) Honeycomb & Inputs */
+.auth-honeycomb {
+  background-color: #ffffff;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='49' viewBox='0 0 28 49'%3E%3Cpath fill='none' stroke='%23f1f5f9' stroke-width='1.5' d='M13.9 0L0 8v16l13.9 8L27.8 24V8L13.9 0z M0 33L13.9 41L27.8 33 M13.9 41v8'/%3E%3C/svg%3E");
+  background-size: 28px 49px;
+}
+
+html.dark .auth-honeycomb {
+  background-color: #0f172a !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='49' viewBox='0 0 28 49'%3E%3Cpath fill='none' stroke='%231e293b' stroke-width='1.5' d='M13.9 0L0 8v16l13.9 8L27.8 24V8L13.9 0z M0 33L13.9 41L27.8 33 M13.9 41v8'/%3E%3C/svg%3E") !important;
+  background-size: 28px 49px;
+}
+
+html.dark .auth-input {
+  background-color: #0f172a !important;
+  border-color: #334155 !important;
+  color: #f8fafc !important;
+}
+
+html.dark .auth-input:focus {
+  border-color: #f59e0b !important;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.25) !important;
+}
+
+html.dark .form-control:focus,
+html.dark .form-select:focus,
+html.dark input:focus,
+html.dark select:focus {
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25) !important;
+  background-color: #0f172a !important;
+  color: #f8fafc !important;
+}
+
+html.dark .input-group-text {
+  background-color: #0f172a !important;
+  color: #94a3b8 !important;
+  border-color: #334155 !important;
+}
+
+/* Dropdowns & Modals */
+html.dark .dropdown-menu {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+  color: #f8fafc !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5) !important;
+}
+
+html.dark .dropdown-item {
+  color: #cbd5e1 !important;
+}
+
+html.dark .dropdown-item:hover,
+html.dark .dropdown-item:focus {
+  background-color: #334155 !important;
+  color: #f8fafc !important;
+}
+
+html.dark .dropdown-divider {
+  border-top-color: #334155 !important;
+}
+
+html.dark .modal-content {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+  color: #f8fafc !important;
+}
+
+html.dark .modal-header,
+html.dark .modal-footer {
+  border-color: #334155 !important;
+  background-color: #1e293b !important;
+}
+
+html.dark .btn-close {
+  filter: invert(1) grayscale(100%) brightness(200%);
+}
+
+/* ── Manage Employees Module ─────────────────────────────────────────── */
+html.dark .emp-page-wrapper {
+  background-color: #0f172a !important;
+}
+
+html.dark .emp-controls-card {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+}
+
+html.dark .emp-card {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+  color: #f8fafc !important;
+}
+
+html.dark .emp-card:hover {
+  border-color: #64748b !important;
+  box-shadow: 0 14px 28px -6px rgba(0, 0, 0, 0.4) !important;
+}
+
+html.dark .emp-name {
+  color: #f8fafc !important;
+}
+
+html.dark .emp-avatar-ring {
+  background-color: #1e293b !important;
+}
+
+html.dark .emp-avatar-inner {
+  background-color: #0f172a !important;
+}
+
+html.dark .emp-role-pill {
+  background-color: #334155 !important;
+  color: #cbd5e1 !important;
+}
+
+html.dark .emp-action-btn {
+  background-color: #334155 !important;
+  border-color: #475569 !important;
+  color: #e2e8f0 !important;
+}
+
+html.dark .emp-action-btn:hover {
+  background-color: #475569 !important;
+  color: #ffffff !important;
+}
+
+html.dark .emp-dots-btn {
+  color: #94a3b8 !important;
+}
+
+html.dark .emp-dots-btn:hover {
+  background-color: #334155 !important;
+  color: #f8fafc !important;
+}
+
+html.dark .view-toggle-pill {
+  background: #0f172a !important;
+  border-color: #334155 !important;
+}
+
+html.dark .view-toggle-btn {
+  color: #cbd5e1 !important;
+}
+
+html.dark .view-toggle-btn.active {
+  background: #2563eb !important;
+  color: #ffffff !important;
+}
+
+/* ── Attendance Module ────────────────────────────────────────────────── */
+html.dark .att-summary-card,
+html.dark .att-kpi-card {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+  color: #f8fafc !important;
+}
+
+html.dark .att-summary-card:hover,
+html.dark .att-kpi-card:hover {
+  border-color: #64748b !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4) !important;
+}
+
+html.dark .table-att th {
+  background-color: #0f172a !important;
+  color: #94a3b8 !important;
+  border-bottom-color: #334155 !important;
+}
+
+html.dark .table-att td {
+  background-color: transparent !important;
+  color: #f1f5f9 !important;
+  border-bottom-color: #334155 !important;
+}
+
+html.dark .timeline-bar {
+  color: #cbd5e1 !important;
+}
+
+html.dark .timeline-line {
+  background: #334155 !important;
+}
+
+html.dark .timeline-dot {
+  background: #64748b !important;
+}
+
+/* ── Requisition & Recruitment Portal ─────────────────────────────────── */
+html.dark .recruitment-portal {
+  background-color: #0f172a !important;
+}
+
+html.dark .md-card {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+  color: #f8fafc !important;
+}
+
+html.dark .md-toolbar {
+  background: #0f172a !important;
+  border-color: #334155 !important;
+}
+
+html.dark .md-search-group {
+  background: #0f172a !important;
+  border-color: #334155 !important;
+}
+
+html.dark .md-search-group input {
+  color: #f8fafc !important;
+}
+
+html.dark .md-filter-select {
+  background-color: #0f172a !important;
+  border-color: #334155 !important;
+  color: #f8fafc !important;
+}
+
+html.dark .md-table-wrap {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+}
+
+html.dark .md-table th {
+  background: #0f172a !important;
+  color: #94a3b8 !important;
+  border-bottom-color: #334155 !important;
+}
+
+html.dark .md-table td {
+  background: transparent !important;
+  color: #f1f5f9 !important;
+  border-bottom-color: #334155 !important;
+}
+
+html.dark .md-table tbody tr:hover td {
+  background-color: rgba(30, 41, 59, 0.7) !important;
+}
+
+html.dark .md-table-footer {
+  background: #0f172a !important;
+  border-top-color: #334155 !important;
+  color: #94a3b8 !important;
+}
+
+html.dark .md-tab-btn {
+  color: #94a3b8 !important;
+}
+
+html.dark .md-tab-btn:hover {
+  background: #334155 !important;
+  color: #f8fafc !important;
+}
+
+html.dark .md-tab-btn.active {
+  background: #2563eb !important;
+  color: #ffffff !important;
+}
+
+html.dark .md-btn-tonal {
+  background: #334155 !important;
+  border-color: #475569 !important;
+  color: #f8fafc !important;
+}
+
+html.dark .md-btn-tonal:hover {
+  background: #475569 !important;
+  color: #ffffff !important;
+}
+
+html.dark .md-chip-slate {
+  background-color: #334155 !important;
+  color: #cbd5e1 !important;
+  border-color: #475569 !important;
+}
+
+html.dark .md-chip-blue {
+  background-color: rgba(37, 99, 235, 0.2) !important;
+  color: #60a5fa !important;
+  border-color: rgba(37, 99, 235, 0.4) !important;
+}
+
+html.dark .md-chip-emerald {
+  background-color: rgba(16, 185, 129, 0.2) !important;
+  color: #34d399 !important;
+  border-color: rgba(16, 185, 129, 0.4) !important;
+}
+
+html.dark .md-chip-amber {
+  background-color: rgba(245, 158, 11, 0.2) !important;
+  color: #fbbf24 !important;
+  border-color: rgba(245, 158, 11, 0.4) !important;
+}
+
+html.dark .md-chip-purple {
+  background-color: rgba(147, 51, 234, 0.2) !important;
+  color: #c084fc !important;
+  border-color: rgba(147, 51, 234, 0.4) !important;
+}
+
+html.dark .md-chip-rose {
+  background-color: rgba(239, 68, 68, 0.2) !important;
+  color: #f87171 !important;
+  border-color: rgba(239, 68, 68, 0.4) !important;
+}
+
+/* ── Dashboard Core Elements ─────────────────────────────────────────── */
+html.dark,
+[data-bs-theme="dark"] {
+  --bs-body-bg: #0b1329;
+  --bs-body-color: #f8fafc;
+  --bs-border-color: #334155;
+  --bs-card-bg: #1e293b;
+  --bs-card-border-color: #334155;
+  --bs-card-color: #f8fafc;
+  --bs-modal-bg: #1e293b;
+  --bs-modal-border-color: #334155;
+  --bs-modal-color: #f8fafc;
+  --bs-dropdown-bg: #1e293b;
+  --bs-dropdown-border-color: #334155;
+  --bs-dropdown-color: #f8fafc;
+  --bs-dropdown-link-color: #cbd5e1;
+  --bs-dropdown-link-hover-bg: #334155;
+  --bs-dropdown-link-hover-color: #f8fafc;
+}
+
+html.dark .dash-card,
+html.dark .top-widget-card {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+  color: #f8fafc !important;
+}
+
+/* ── Universal Bootstrap & Custom Table Dark Theming ─────────────────── */
+html.dark .table,
+html.dark table,
+[data-bs-theme="dark"] .table {
+  --bs-table-color: #f8fafc !important;
+  --bs-table-bg: transparent !important;
+  --bs-table-border-color: #334155 !important;
+  --bs-table-striped-bg: rgba(30, 41, 59, 0.45) !important;
+  --bs-table-striped-color: #f8fafc !important;
+  --bs-table-hover-bg: #334155 !important;
+  --bs-table-hover-color: #f8fafc !important;
+  --bs-table-active-bg: #334155 !important;
+  --bs-table-active-color: #f8fafc !important;
+  color: #f8fafc !important;
+  border-color: #334155 !important;
+}
+
+html.dark .table > :not(caption) > * > *,
+html.dark table > tbody > tr > td,
+html.dark table > thead > tr > th,
+html.dark .table-custom tbody td {
+  border-bottom-color: #334155 !important;
+}
+
+html.dark .table-custom thead th {
+  background: #0f172a !important;
+  color: #cbd5e1 !important;
+  border-bottom-color: #334155 !important;
+}
+
+html.dark .table-custom tbody td {
+  border-bottom-color: #334155 !important;
+  color: #e2e8f0 !important;
+  background-color: transparent !important;
+}
+
+/* UNIVERSAL Table Row Hover - prevents light/white hover background */
+html.dark .table-hover > tbody > tr:hover > *,
+html.dark .table > tbody > tr:hover > *,
+html.dark table tbody tr:hover,
+html.dark table tbody tr:hover > td,
+html.dark table tbody tr:hover > th,
+html.dark .table-custom tbody tr:hover,
+html.dark .table-custom tbody tr:hover > td,
+html.dark tr[class*="hover:bg-slate-50"]:hover,
+html.dark tr[class*="hover:bg-slate-50"]:hover > td {
+  background-color: #334155 !important;
+  --bs-table-bg-state: #334155 !important;
+  --bs-table-hover-bg: #334155 !important;
+  color: #f8fafc !important;
+}
+
+/* Active or Selected Table Rows */
+html.dark .table > :not(caption) > *.table-active,
+html.dark .table > :not(caption) > *.table-active > *,
+html.dark table tr.active,
+html.dark table tr.active > td {
+  background-color: #334155 !important;
+  --bs-table-bg-state: #334155 !important;
+  --bs-table-active-bg: #334155 !important;
+  color: #f8fafc !important;
+}
+
+/* Table Cells Text Contrast in Dark Mode */
+html.dark .table td .text-slate-900,
+html.dark .table td .text-slate-800,
+html.dark .table td .text-slate-700,
+html.dark table td .text-slate-900,
+html.dark table td .text-slate-800,
+html.dark table td .text-slate-700,
+html.dark .table-custom td .text-slate-900,
+html.dark .table-custom td .text-slate-800,
+html.dark .table-custom td .text-slate-700 {
+  color: #f8fafc !important;
+}
+
+html.dark .table td .text-slate-500,
+html.dark table td .text-slate-500,
+html.dark .table-custom td .text-slate-500 {
+  color: #94a3b8 !important;
+}
+
+/* Universal Dark Mode Overrides for Bootstrap Utilities */
+html.dark .text-dark,
+html.dark [data-bs-theme="dark"] .text-dark {
+  color: #f8fafc !important;
+}
+
+html.dark .text-muted,
+html.dark [data-bs-theme="dark"] .text-muted {
+  color: #94a3b8 !important;
+}
+
+html.dark .bg-light {
+  background-color: #1e293b !important;
+}
+
+html.dark hr {
+  border-color: #334155 !important;
+  opacity: 0.6 !important;
+}
+
+/* Top Dashboard Widgets Contrast */
+html.dark .top-widget-card h4,
+html.dark .top-widget-card h5,
+html.dark .top-widget-card .text-dark,
+html.dark .top-widget-card strong.text-dark {
+  color: #f8fafc !important;
+}
+
+html.dark .top-widget-card .text-slate-700,
+html.dark .top-widget-card .text-slate-800,
+html.dark .top-widget-card .font-semibold.text-slate-800 {
+  color: #cbd5e1 !important;
+}
+
+html.dark .top-widget-card .text-slate-500,
+html.dark .top-widget-card .text-muted {
+  color: #94a3b8 !important;
+}
+
+html.dark .top-widget-card svg circle[stroke="#f1f5f9"] {
+  stroke: #334155 !important;
+}
+
+html.dark .role-switch-btn:not(.active) {
+  background-color: #1e293b !important;
+  color: #94a3b8 !important;
+  border-color: #334155 !important;
+}
+
+html.dark .role-switch-btn:not(.active):hover {
+  background-color: #334155 !important;
+  color: #f8fafc !important;
+}
+
+/* Ensure Navbar profile card is dark in dark mode */
+html.dark .profile-dropdown-card {
+  background-color: #0f172a !important;
+  border-color: #334155 !important;
+}
+
+/* Dark scrollbars */
+html.dark .scrollbar-thin::-webkit-scrollbar-track {
+  background: #1e293b;
+}
+
+html.dark .scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #475569;
+}
+
+html.dark .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+/* Universal Form Controls & Cards Dark Theme */
+html.dark .card {
+  background-color: #1e293b;
+  border-color: #334155;
+  color: #f8fafc;
+}
+
+html.dark .form-control,
+html.dark .form-select {
+  background-color: #0f172a;
+  border-color: #334155;
+  color: #f8fafc;
+}
+
+html.dark .form-control:focus,
+html.dark .form-select:focus {
+  background-color: #0f172a;
+  border-color: #6366f1;
+  color: #f8fafc;
+  box-shadow: 0 0 0 0.25rem rgba(99, 102, 241, 0.25);
+}
+
+html.dark .form-control:disabled,
+html.dark .form-control[readonly],
+html.dark .form-select:disabled {
+  background-color: #1e293b !important;
+  color: #cbd5e1 !important;
+  border-color: #334155 !important;
+}
+
+html.dark .border-secondary-subtle {
+  border-color: #334155 !important;
+}
+
+html.dark .badge.bg-light,
+html.dark .badge.bg-white {
+  background-color: #1e293b !important;
+  color: #cbd5e1 !important;
+  border-color: #334155 !important;
+}
+
+

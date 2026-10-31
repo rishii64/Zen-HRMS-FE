@@ -582,17 +582,17 @@ export default function HODDashboardView() {
             <tbody>
               {dashData.directReports && dashData.directReports.length > 0 ? (
                 dashData.directReports.map((emp) => (
-                  <tr key={emp.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="font-bold text-slate-900 text-xs">{emp.employee_id}</td>
-                    <td className="font-bold text-slate-900 text-xs">{emp.name}</td>
-                    <td className="text-xs text-slate-600 font-medium">{emp.role}</td>
+                  <tr key={emp.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors">
+                    <td className="font-bold text-slate-900 dark:text-slate-100 text-xs">{emp.employee_id}</td>
+                    <td className="font-bold text-slate-900 dark:text-slate-100 text-xs">{emp.name}</td>
+                    <td className="text-xs text-slate-600 dark:text-slate-300 font-medium">{emp.role}</td>
                     <td>
-                      <span className="px-2.5 py-0.5 text-[11px] font-bold rounded-md bg-slate-100 text-slate-700">
+                      <span className="px-2.5 py-0.5 text-[11px] font-bold rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
                         {emp.dept}
                       </span>
                     </td>
                     <td>
-                      <span className="px-2 py-0.5 text-[10px] font-extrabold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      <span className="px-2 py-0.5 text-[10px] font-extrabold rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/40">
                         Active
                       </span>
                     </td>
@@ -600,8 +600,8 @@ export default function HODDashboardView() {
                       <span
                         className={`px-2.5 py-0.5 text-[10px] font-extrabold rounded-full border ${
                           emp.workMode === "In-Office"
-                            ? "bg-blue-50 text-blue-700 border-blue-200"
-                            : "bg-purple-50 text-purple-700 border-purple-200"
+                            ? "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-900/40"
+                            : "bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-900/40"
                         }`}
                       >
                         {emp.workMode || "In-Office"}
@@ -610,7 +610,7 @@ export default function HODDashboardView() {
                     <td className="text-center">
                       <button
                         onClick={() => navigate(`/employee/profile/${emp.employee_id}`)}
-                        className="text-xs font-bold text-indigo-600 hover:underline"
+                        className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
                       >
                         View Profile
                       </button>
@@ -619,50 +619,50 @@ export default function HODDashboardView() {
                 ))
               ) : (
                 <>
-                  <tr className="hover:bg-slate-50 transition-colors">
-                    <td className="font-bold text-slate-900 text-xs">EMP-1042</td>
-                    <td className="font-bold text-slate-900 text-xs">Aarav Sharma</td>
-                    <td className="text-xs text-slate-600 font-medium">Senior Frontend Engineer</td>
+                  <tr className="hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors">
+                    <td className="font-bold text-slate-900 dark:text-slate-100 text-xs">EMP-1042</td>
+                    <td className="font-bold text-slate-900 dark:text-slate-100 text-xs">Aarav Sharma</td>
+                    <td className="text-xs text-slate-600 dark:text-slate-300 font-medium">Senior Frontend Engineer</td>
                     <td>
-                      <span className="px-2.5 py-0.5 text-[11px] font-bold rounded-md bg-purple-50 text-purple-700">
+                      <span className="px-2.5 py-0.5 text-[11px] font-bold rounded-md bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-400">
                         IT
                       </span>
                     </td>
                     <td>
-                      <span className="px-2 py-0.5 text-[10px] font-extrabold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      <span className="px-2 py-0.5 text-[10px] font-extrabold rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/40">
                         Active
                       </span>
                     </td>
                     <td>
-                      <span className="px-2.5 py-0.5 text-[10px] font-extrabold rounded-full border bg-blue-50 text-blue-700 border-blue-200">
+                      <span className="px-2.5 py-0.5 text-[10px] font-extrabold rounded-full border bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-900/40">
                         In-Office
                       </span>
                     </td>
                     <td className="text-center">
                       <button
                         onClick={() => navigate(`/employee/profile/EMP-1042`)}
-                        className="text-xs font-bold text-indigo-600 hover:underline"
+                        className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
                       >
                         View Profile
                       </button>
                     </td>
                   </tr>
-                  <tr className="hover:bg-slate-50 transition-colors">
-                    <td className="font-bold text-slate-900 text-xs">EMP-1049</td>
-                    <td className="font-bold text-slate-900 text-xs">Priya Patel</td>
-                    <td className="text-xs text-slate-600 font-medium">Fullstack Developer</td>
+                  <tr className="hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors">
+                    <td className="font-bold text-slate-900 dark:text-slate-100 text-xs">EMP-1049</td>
+                    <td className="font-bold text-slate-900 dark:text-slate-100 text-xs">Priya Patel</td>
+                    <td className="text-xs text-slate-600 dark:text-slate-300 font-medium">Fullstack Developer</td>
                     <td>
-                      <span className="px-2.5 py-0.5 text-[11px] font-bold rounded-md bg-purple-50 text-purple-700">
+                      <span className="px-2.5 py-0.5 text-[11px] font-bold rounded-md bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-400">
                         IT
                       </span>
                     </td>
                     <td>
-                      <span className="px-2 py-0.5 text-[10px] font-extrabold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      <span className="px-2 py-0.5 text-[10px] font-extrabold rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/40">
                         Active
                       </span>
                     </td>
                     <td>
-                      <span className="px-2.5 py-0.5 text-[10px] font-extrabold rounded-full border bg-purple-50 text-purple-700 border-purple-200">
+                      <span className="px-2.5 py-0.5 text-[10px] font-extrabold rounded-full border bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-900/40">
                         WFH
                       </span>
                     </td>

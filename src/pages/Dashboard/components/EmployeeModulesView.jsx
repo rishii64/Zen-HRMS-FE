@@ -249,12 +249,24 @@ export default function EmployeeModulesView({ employee = {} }) {
       linkTo: "/admin/tasks",
       onClick: () => navigate("/admin/tasks"),
     },
+    {
+      id: 21,
+      title: "Claims & Reimbursement",
+      desc: "Submit travel & expense claims, upload receipts, and track manager & finance approval.",
+      btnText: "Open Claims",
+      icon: <LuReceipt size={24} />,
+      iconBg: "rgba(16, 185, 129, 0.08)",
+      iconColor: "#10b981",
+      isLink: true,
+      linkTo: "/claims",
+      onClick: () => navigate("/claims"),
+    },
   ];
 
   const enabledTabIds = (() => {
     // 1. If tabs_enabled is true, all 20 modules are granted
     if (employee?.tabs_enabled || localStorage.getItem("tabs_enabled") === "true") {
-      return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
+      return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21];
     }
 
     // 2. Check employee.enabled_tabs or localStorage
@@ -277,7 +289,7 @@ export default function EmployeeModulesView({ employee = {} }) {
     }
 
     // 3. Standard default modules
-    return [1, 2, 3, 4, 8, 9, 10, 11, 12, 14, 16];
+    return [1, 2, 3, 4, 8, 9, 10, 11, 12, 14, 16, 21];
   })();
 
   const visibleActions = quickActions.filter((action) =>

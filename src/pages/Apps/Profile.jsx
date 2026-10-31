@@ -73,62 +73,34 @@ function calculateAgeFromDob(dobStr) {
   return age >= 0 ? String(age) : "0";
 }
 
-function getEmploymentTypeStyle(type) {
+function getEmploymentTypeClass(type) {
   const norm = String(type || "Permanent").toLowerCase().trim();
-  const base = {
+  if (norm.includes("probation")) {
+    return "bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800/60";
+  }
+  if (norm.includes("intern")) {
+    return "bg-fuchsia-50 text-fuchsia-800 border-fuchsia-300 dark:bg-fuchsia-950/60 dark:text-fuchsia-300 dark:border-fuchsia-800/60";
+  }
+  if (norm.includes("contract")) {
+    return "bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700";
+  }
+  if (norm.includes("part")) {
+    return "bg-emerald-50 text-emerald-800 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800/60";
+  }
+  if (norm.includes("trainee")) {
+    return "bg-indigo-50 text-indigo-800 border-indigo-300 dark:bg-indigo-950/60 dark:text-indigo-300 dark:border-indigo-800/60";
+  }
+  // Default: Permanent / Full Time
+  return "bg-blue-50 text-blue-700 border-blue-300 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800/60";
+}
+
+function getEmploymentTypeStyle(type) {
+  return {
     fontSize: "12px",
     fontWeight: "600",
     lineHeight: "1.2",
     whiteSpace: "nowrap",
-    letterSpacing: "0.2px",
-  };
-
-  if (norm.includes("probation")) {
-    return {
-      ...base,
-      backgroundColor: "#fffbeb",
-      color: "#b45309",
-      border: "1px solid #c8a000ff",
-    };
-  }
-  if (norm.includes("intern")) {
-    return {
-      ...base,
-      backgroundColor: "#fdf4ff",
-      color: "#a21caf",
-      border: "1px solid #d83dffff",
-    };
-  }
-  if (norm.includes("contract")) {
-    return {
-      ...base,
-      backgroundColor: "#f1f5f9",
-      color: "#475569",
-      border: "1px solid #7e7e7fff",
-    };
-  }
-  if (norm.includes("part")) {
-    return {
-      ...base,
-      backgroundColor: "#f0fdf4",
-      color: "#15803d",
-      border: "1px solid #00ff59ff",
-    };
-  }
-  if (norm.includes("trainee")) {
-    return {
-      ...base,
-      backgroundColor: "#eef2ff",
-      color: "#4338ca",
-      border: "1px solid #315bffff",
-    };
-  }
-  // Default: Permanent / Full Time
-  return {
-    ...base,
-    backgroundColor: "#ffffff",
-    color: "#1d4ed8",
-    border: "1px solid #2989ffff",
+    letterSpacing: "0.2px"
   };
 }
 
@@ -880,7 +852,7 @@ export default function Profile() {
 
       <Form onSubmit={handleSubmit}>
         {/* Profile Photo Card */}
-        <Card className="p-4 shadow-sm border-0 mb-4 rounded-4" style={{ background: "linear-gradient(135deg, #f8f9fa, #eef1f6)" }}>
+        <Card className="p-4 shadow-sm border-0 mb-4 rounded-4 bg-slate-50 dark:!bg-slate-900 border border-slate-200/80 dark:border-slate-800">
           <Row className="align-items-center">
             <Col md={3} className="text-center mb-3 mb-md-0">
               <img
@@ -892,7 +864,7 @@ export default function Profile() {
                     : "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"
                 }
                 alt="profile"
-                className="rounded-circle border border-4 border-white shadow-sm"
+                className="rounded-circle border border-4 border-white dark:border-slate-700 shadow-sm"
                 style={{ width: "128px", height: "128px", objectFit: "cover" }}
                 onError={(e) => {
                   e.target.onerror = null;
@@ -901,7 +873,7 @@ export default function Profile() {
               />
             </Col>
             <Col md={9}>
-              <h5 className="fw-bold text-dark mb-1">Upload Profile Picture</h5>
+              <h5 className="fw-bold text-dark dark:text-slate-100 mb-1">Upload Profile Picture</h5>
               <p className="text-muted small mb-3">Upload a clean, professional passport-sized photograph (PNG, JPG).</p>
               <Form.Group>
                 <Form.Control
@@ -909,6 +881,7 @@ export default function Profile() {
                   name="profile_photo"
                   accept="image/*"
                   onChange={handleFileChange}
+                  className="dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
                   style={{ maxWidth: "340px" }}
                 />
               </Form.Group>
@@ -930,7 +903,7 @@ export default function Profile() {
                 value={empData?.name || empData?.employee_name || "Employee"}
                 disabled
                 readOnly
-                className="bg-light fw-bold text-dark border-secondary-subtle"
+                className="bg-light dark:!bg-slate-800 fw-bold text-dark dark:!text-slate-100 border-secondary-subtle dark:!border-slate-700"
                 style={{ cursor: "not-allowed" }}
               />
             </Col>
@@ -943,7 +916,7 @@ export default function Profile() {
                 value={empData?.dept || empData?.department || "General"}
                 disabled
                 readOnly
-                className="bg-light fw-bold text-dark border-secondary-subtle"
+                className="bg-light dark:!bg-slate-800 fw-bold text-dark dark:!text-slate-100 border-secondary-subtle dark:!border-slate-700"
                 style={{ cursor: "not-allowed" }}
               />
             </Col>
@@ -956,7 +929,7 @@ export default function Profile() {
                 value={empData?.designation || empData?.job_role || "Team Member"}
                 disabled
                 readOnly
-                className="bg-light fw-bold text-dark border-secondary-subtle"
+                className="bg-light dark:!bg-slate-800 fw-bold text-dark dark:!text-slate-100 border-secondary-subtle dark:!border-slate-700"
                 style={{ cursor: "not-allowed" }}
               />
             </Col>
@@ -985,7 +958,7 @@ export default function Profile() {
                 </Badge>
 
                 <span
-                  className="px-3 py-2 rounded-pill d-inline-flex align-items-center gap-1 shadow-xs"
+                  className={`px-3 py-2 rounded-pill d-inline-flex align-items-center gap-1 shadow-xs border ${getEmploymentTypeClass(empData?.employment_type)}`}
                   style={getEmploymentTypeStyle(empData?.employment_type)}
                 >
                   {empData?.employment_type || "Permanent"}
@@ -1004,7 +977,7 @@ export default function Profile() {
                 value={empData?.work_email || empData?.email || "—"}
                 disabled
                 readOnly
-                className="bg-light fw-semibold text-dark border-secondary-subtle"
+                className="bg-light dark:!bg-slate-800 fw-semibold text-dark dark:!text-slate-100 border-secondary-subtle dark:!border-slate-700"
                 style={{ cursor: "not-allowed" }}
               />
               <Form.Text className="text-muted" style={{ fontSize: "11px" }}>
@@ -1162,10 +1135,10 @@ export default function Profile() {
           </div>
 
           {/* Previous Work Experience Sub-section */}
-          <div className="p-3 mb-4 rounded-4 border bg-white shadow-xs">
-            <div className="d-flex flex-wrap justify-content-between align-items-center border-bottom pb-2 mb-3 gap-2">
+          <div className="p-3 mb-4 rounded-4 border border-slate-200 dark:border-slate-800 bg-white dark:!bg-slate-900 shadow-xs">
+            <div className="d-flex flex-wrap justify-content-between align-items-center border-bottom dark:border-slate-800 pb-2 mb-3 gap-2">
               <div>
-                <h6 className="fw-bold text-dark mb-0 d-flex align-items-center gap-2">
+                <h6 className="fw-bold text-dark dark:text-slate-100 mb-0 d-flex align-items-center gap-2">
                   <FaHistory className="text-secondary" /> Previous Work Experience
                 </h6>
                 <small className="text-muted">
@@ -1188,9 +1161,9 @@ export default function Profile() {
             </div>
 
             {previousExperienceList.length === 0 ? (
-              <div className="text-center py-4 bg-light rounded-3 border border-dashed">
+              <div className="text-center py-4 bg-light dark:!bg-slate-800/60 rounded-3 border border-dashed dark:border-slate-700">
                 <div className="text-muted mb-2 fs-4">🏢</div>
-                <div className="fw-semibold text-secondary small">No previous company records added</div>
+                <div className="fw-semibold text-secondary dark:text-slate-300 small">No previous company records added</div>
                 <p className="text-muted small mb-3" style={{ maxWidth: "480px", margin: "0 auto" }}>
                   Record your prior employers, designation, joining & resign dates, and reporting manager designations.
                 </p>
@@ -1206,7 +1179,7 @@ export default function Profile() {
             ) : (
               <div className="d-flex flex-column gap-3">
                 {previousExperienceList.map((exp, idx) => (
-                  <div key={idx} className="p-3 rounded-3 border bg-light-subtle position-relative">
+                  <div key={idx} className="p-3 rounded-3 border border-slate-200 dark:border-slate-700 bg-light-subtle dark:!bg-slate-800/80 position-relative">
                     <div className="d-flex justify-content-between align-items-center mb-2">
                       <span className="badge bg-secondary-subtle text-secondary-emphasis border px-2 py-1 small fw-bold">
                         Previous Company #{idx + 1}
@@ -1331,12 +1304,12 @@ export default function Profile() {
                     Auto-calculated in real time from official Date of Joining until {isResigned ? "resignation / relieving date" : "present day"}.
                   </p>
 
-                  <div className="my-3 text-center p-3 bg-white rounded-3 border border-secondary-subtle shadow-xs">
+                  <div className="my-3 text-center p-3 bg-white dark:!bg-slate-900 rounded-3 border border-secondary-subtle dark:!border-slate-800 shadow-xs">
                     <div className="text-muted small text-uppercase fw-bold letter-spacing-1 mb-1">
                       {isResigned ? "Total Served Tenure" : "Current Experience"}
                     </div>
                     <div
-                      className={`fw-bold ${isResigned ? "text-danger" : "text-primary"}`}
+                      className={`fw-bold ${isResigned ? "text-danger" : "text-primary dark:text-blue-400"}`}
                       style={{ fontSize: "1.45rem", lineHeight: "1.3" }}
                     >
                       {currentExperience.formatted}
@@ -1355,7 +1328,7 @@ export default function Profile() {
                   </div>
                 </div>
 
-                <div className="pt-2 border-top d-flex flex-wrap justify-content-between gap-1 small text-muted">
+                <div className="pt-2 border-top dark:border-slate-800 d-flex flex-wrap justify-content-between gap-1 small text-muted">
                   <div className="d-flex align-items-center gap-1">
                     <FaCalendarAlt className="me-1 text-secondary" />
                     <strong>Joined:</strong> {formatDate(empData?.joining_date)}
@@ -1371,13 +1344,13 @@ export default function Profile() {
 
             {/* Bottom Breakdown Bar: Summary */}
             <Col xs={12}>
-              <div className="p-3 bg-light rounded-4 border d-flex flex-wrap align-items-center justify-content-between gap-3">
+              <div className="p-3 bg-light dark:!bg-slate-800/90 rounded-4 border border-slate-200 dark:border-slate-700 d-flex flex-wrap align-items-center justify-content-between gap-3">
                 <div className="d-flex align-items-center gap-2">
-                  <div className="p-2 bg-white rounded-circle shadow-xs text-primary">
+                  <div className="p-2 bg-white dark:!bg-slate-900 rounded-circle shadow-xs text-primary dark:text-blue-400 border dark:border-slate-700">
                     <FaCalculator size={18} />
                   </div>
                   <div>
-                    <div className="fw-bold text-dark small">Cumulative Career Summary</div>
+                    <div className="fw-bold text-dark dark:text-slate-100 small">Cumulative Career Summary</div>
                     <div className="text-muted" style={{ fontSize: "0.78rem" }}>
                       Combined summation of previous work history and current organization tenure
                     </div>
@@ -1385,17 +1358,17 @@ export default function Profile() {
                 </div>
 
                 <div className="d-flex flex-wrap align-items-center gap-2">
-                  <span className="badge bg-white text-dark border px-3 py-2">
+                  <span className="badge bg-white dark:!bg-slate-900 text-dark dark:!text-slate-200 border dark:border-slate-700 px-3 py-2">
                     <span className="text-muted small me-1">Previous:</span>
                     <strong>{computedPreviousExperienceText || "0 Yrs"}</strong>
                   </span>
                   <span className="fw-bold text-muted">+</span>
-                  <span className="badge bg-white text-dark border px-3 py-2">
+                  <span className="badge bg-white dark:!bg-slate-900 text-dark dark:!text-slate-200 border dark:border-slate-700 px-3 py-2">
                     <span className="text-muted small me-1">Current:</span>
                     <strong>{currentExperience.shortFormatted || "0m"}</strong>
                   </span>
                   <span className="fw-bold text-muted">=</span>
-                  <span className="badge bg-success-subtle text-success-emphasis border border-success-subtle px-3 py-2 fw-bold">
+                  <span className="badge bg-success-subtle text-success-emphasis border border-success-subtle dark:border-success-800 dark:bg-emerald-950/60 dark:text-emerald-300 px-3 py-2 fw-bold">
                     Total: {totalExperience}
                   </span>
                 </div>

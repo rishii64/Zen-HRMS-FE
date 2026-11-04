@@ -37,6 +37,7 @@ import {
   LuBriefcase,
   LuBuilding,
   LuCalendar,
+  LuCalendarCheck,
   LuUser,
   LuExternalLink,
   LuFilter,
@@ -60,7 +61,9 @@ import { FaListCheck } from "react-icons/fa6";
 import { BsThreeDots } from "react-icons/bs";
 import { getApiBaseUrl, getBackendBaseUrl, getUploadUrl, UPLOADS_BASE } from "../../api/axios";
 import OrganizationStructureModal from "../../components/Admin/OrganizationStructureModal";
-import { LuNetwork } from "react-icons/lu";
+import { LuNetwork,
+  LuArrowLeftRight,
+} from "react-icons/lu";
 
 const API = getApiBaseUrl();
 
@@ -155,6 +158,13 @@ const ALL_TABS = [
   { id: 19, name: "HR Events & Townhalls", desc: "View corporate gatherings, celebrations, meetings, and official event announcements", badge: "Events", category: "Operations", icon: "partypopper" },
   { id: 20, name: "Admin Tasks & Facilities", desc: "Oversee office supplies, facilities maintenance, logistics, and admin requests", badge: "Admin", category: "Operations", icon: "listcheck" },
   { id: 12, name: "Company Policies", desc: "Access company policies, code of conduct, and employee handbook", badge: "Policy", category: "Operations", icon: "shieldcheck" },
+  { id: 22, name: "Interactive Org Chart & Analytics", desc: "Explore interactive company reporting tree, department hierarchy, and visual HR analytics", badge: "Org Chart", category: "Core", icon: "network" },
+  { id: 23, name: "Holiday Manager", desc: "Manage corporate holiday calendar, gazetted breaks, and assign working days", badge: "Holidays", category: "Operations", icon: "calendarcheck" },
+  { id: 24, name: "Employee Directory & Staff", desc: "Browse full employee directory, designations, and corporate profiles", badge: "Directory", category: "Operations", icon: "users" },
+  { id: 25, name: "Accounts & Finance Dashboard", desc: "Financial billing ledger, payroll expenses, and account analytics", badge: "Finance", category: "Finance", icon: "trendingup" },
+  { id: 26, name: "Transfers & Deputation", desc: "Manage inter-departmental transfers, branch deputation, role reassignment, and transfer letters", badge: "Transfers", category: "Operations", icon: "arrowleftright" },
+  { id: 27, name: "Promotions & Progression", desc: "Automate promotion workflows, grade progression, salary increment revision, and promotion letters", badge: "Promotions", category: "Growth", icon: "trendingup" },
+  { id: 28, name: "Overtime (OT) Engine", desc: "Automatic overtime tracking beyond shift hours, approval tickets, and payroll payout sync", badge: "Overtime", category: "Operations", icon: "clock" },
 ];
 
 const renderTabIcon = (iconName) => {
@@ -179,6 +189,9 @@ const renderTabIcon = (iconName) => {
     case "usercheck": return <LuUserCheck size={16} className="text-violet-600" />;
     case "partypopper": return <LuPartyPopper size={16} className="text-pink-600" />;
     case "listcheck": return <FaListCheck size={15} className="text-slate-600" />;
+    case "network": return <LuNetwork size={16} className="text-indigo-600" />;
+    case "calendarcheck": return <LuCalendarCheck size={16} className="text-emerald-600" />;
+    case "arrowleftright": return <LuArrowLeftRight size={16} className="text-blue-600" />;
     default: return <LuLayoutGrid size={16} className="text-primary" />;
   }
 };

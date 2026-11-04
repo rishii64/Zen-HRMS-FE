@@ -59,6 +59,16 @@ const DEPARTMENTS = [
 ];
 
 // Experience brackets
+// Common corporate requisition rejection reasons
+const REJECTION_REASONS = [
+    "Headcount Freeze",
+    "Budget Constraints / Cap Exceeded",
+    "Duplicate Requisition",
+    "Role Deferred to Next Quarter",
+    "Internal Redeployment Feasible",
+    "Incomplete Role Specifications",
+];
+
 const EXP_OPTIONS = [
     "0 - 1 Year (Fresher/Entry)",
     "1 - 3 Years (Junior)",
@@ -313,9 +323,20 @@ const Requisition = () => {
     // MATERIAL DESIGN 3 CHIPS & BADGES (High-contrast, defined borders)
     // =========================================================================
 
-    const renderStatusBadge = (status) => {
+    const renderStatusBadge = (status, reqObj = null) => {
         switch (status) {
             case "PENDING_CHRO_APPROVAL":
+                if (reqObj?.delegated_finalizer_name) {
+                    return (
+                        <span
+                            className="md-chip md-chip-amber"
+                            title={`Delegated to ${reqObj.delegated_finalizer_name}`}
+                        >
+                            <span className="md-dot md-dot-amber" />
+                            Awaiting GM-HR Finalization
+                        </span>
+                    );
+                }
                 return (
                     <span className="md-chip md-chip-amber">
                         <span className="md-dot md-dot-amber" />
@@ -331,7 +352,10 @@ const Requisition = () => {
                 );
             case "SOURCING_CANDIDATES":
                 return (
-                    <span className="md-chip md-chip-blue">
+                    <span
+                        className="md-chip md-chip-blue"
+                        title={reqObj?.finalized_by_name ? `Approved & finalized by ${reqObj.finalized_by_name}` : undefined}
+                    >
                         <span className="md-dot md-dot-blue" />
                         Sourcing Resumes
                     </span>
@@ -357,13 +381,44 @@ const Requisition = () => {
                         Closed
                     </span>
                 );
-            case "REJECTED":
+            case "REJECTED": {
+                if (reqObj?.finalization_status === "REJECTED_BY_CHRO") {
+                    const tip = reqObj.chro_comments
+                        ? `Rejected by CHRO (${reqObj.finalized_by_name || 'CHRO'}): ${reqObj.chro_comments}`
+                        : `Rejected by CHRO (${reqObj.finalized_by_name || 'CHRO'})`;
+                    return (
+                        <span className="md-chip md-chip-rose" title={tip}>
+                            <LuCircleX size={13} />
+                            Rejected by CHRO
+                        </span>
+                    );
+                }
+                if (reqObj?.finalization_status === "REJECTED_BY_GM_HR") {
+                    const tip = reqObj.chro_comments
+                        ? `Rejected by GM-HR (${reqObj.finalized_by_name || 'GM-HR'}): ${reqObj.chro_comments}`
+                        : `Rejected by GM-HR (${reqObj.finalized_by_name || 'GM-HR'})`;
+                    return (
+                        <span className="md-chip md-chip-rose" title={tip}>
+                            <LuCircleX size={13} />
+                            Rejected by GM-HR
+                        </span>
+                    );
+                }
+                if (reqObj?.budget_approval_status === "REJECTED_BY_CEO") {
+                    return (
+                        <span className="md-chip md-chip-rose" title={reqObj.ceo_coo_comments || "Budget Rejected by CEO"}>
+                            <LuCircleX size={13} />
+                            Budget Rejected (CEO)
+                        </span>
+                    );
+                }
                 return (
-                    <span className="md-chip md-chip-rose">
+                    <span className="md-chip md-chip-rose" title={reqObj?.chro_comments || undefined}>
                         <LuCircleX size={13} />
-                        Budget Rejected
+                        Requisition Rejected
                     </span>
                 );
+            }
             default:
                 return (
                     <span className="md-chip md-chip-slate">
@@ -499,11 +554,23 @@ const Requisition = () => {
     // HANDLERS: CHRO / VP HR REQUISITION FINALIZATION
     // =========================================================================
 
-    const handleOpenFinalizeModal = (requisition) => {
+    const handleOpenFinalizeModal = (requisition, defaultAction = "APPROVE_AND_FINALIZE") => {
         setSelectedRequisition(requisition);
-        setFinalizeAction("APPROVE_AND_FINALIZE");
+        setFinalizeAction(defaultAction);
         const roleTitle = isCHRO ? "CHRO / VP HR" : "General Manager - HR (Delegated Authority)";
-        setFinalizeComments(`Approved and finalized for workforce candidate sourcing by ${roleTitle}.`);
+        if (defaultAction === "REJECT") {
+            setFinalizeComments(`Requisition rejected by ${roleTitle}: `);
+        } else {
+            setFinalizeComments(`Approved and finalized for workforce candidate sourcing by ${roleTitle}.`);
+        }
+        setShowFinalizeModal(true);
+    };
+
+    const handleOpenRejectModal = (requisition) => {
+        setSelectedRequisition(requisition);
+        setFinalizeAction("REJECT");
+        const roleTitle = isCHRO ? "CHRO / VP HR" : "General Manager - HR (Delegated Authority)";
+        setFinalizeComments(`Requisition rejected by ${roleTitle}: `);
         setShowFinalizeModal(true);
     };
 
@@ -555,6 +622,10 @@ const Requisition = () => {
 
     const handleProcessFinalize = async () => {
         if (!selectedRequisition) return;
+        if (finalizeAction === "REJECT" && (!finalizeComments || !finalizeComments.trim())) {
+            toast.error("Please enter a reason or justification for rejecting this requisition.");
+            return;
+        }
         try {
             setSubmittingFinalize(true);
             const res = await api.post(`/recruitment/requisitions/${selectedRequisition.id}/finalize`, {
@@ -563,13 +634,13 @@ const Requisition = () => {
             });
 
             if (res.data?.success) {
-                toast.success(res.data.message || "Requisition finalized successfully by CHRO / VP HR!");
+                toast.success(res.data.message || (finalizeAction === "REJECT" ? "Requisition rejected successfully." : "Requisition finalized and approved!"));
                 setShowFinalizeModal(false);
                 fetchAllData();
             }
         } catch (err) {
             console.error("Finalize requisition error:", err);
-            toast.error(err.response?.data?.error || "Failed to finalize requisition");
+            toast.error(err.response?.data?.error || "Failed to process requisition");
         } finally {
             setSubmittingFinalize(false);
         }
@@ -1404,6 +1475,7 @@ const Requisition = () => {
                                         <option value="HOD_REVIEW">HOD Reviewing</option>
                                         <option value="INTERVIEWS_IN_PROGRESS">Interviews Active</option>
                                         <option value="CLOSED">Closed / Filled</option>
+                                        <option value="REJECTED">Rejected Requisitions</option>
                                     </Form.Select>
                                 </div>
 
@@ -1573,66 +1645,9 @@ const Requisition = () => {
                                                         )}
                                                     </td>
 
-                                                    {/* Workflow Status */}
+                                                    {/* Workflow Status (Clean single chip, actions in Actions menu) */}
                                                     <td>
-                                                        {renderStatusBadge(req.status)}
-                                                        {req.finalization_status === "FINALIZED_BY_GM_HR" && (
-                                                            <div className="mt-1">
-                                                                <span className="badge bg-teal-50 text-teal-800 border border-teal-200 text-3xs">
-                                                                    Finalized by GM-HR ({req.finalized_by_name || "Delegated"})
-                                                                </span>
-                                                            </div>
-                                                        )}
-                                                        {req.finalization_status === "FINALIZED_BY_CHRO" && (
-                                                            <div className="mt-1">
-                                                                <span className="badge bg-purple-50 text-purple-700 border border-purple-200 text-3xs">
-                                                                    CHRO Finalized ({req.finalized_by_name || "CHRO / VP HR"})
-                                                                </span>
-                                                            </div>
-                                                        )}
-                                                        {req.delegated_finalizer_name && (req.status === "PENDING_CHRO_APPROVAL" || req.finalization_status === "PENDING_CHRO") && (
-                                                            <div className="mt-1">
-                                                                <span className="badge bg-purple-100 text-purple-900 border border-purple-300 text-3xs fw-semibold d-inline-flex align-items-center gap-1">
-                                                                    <LuUserCheck size={10} className="text-purple-700" />
-                                                                    Delegated: {req.delegated_finalizer_name}
-                                                                </span>
-                                                            </div>
-                                                        )}
-                                                        {(req.status === "PENDING_CHRO_APPROVAL" || req.finalization_status === "PENDING_CHRO") && (
-                                                            <div className="mt-1 d-flex flex-wrap gap-1">
-                                                                {isCHRO && (
-                                                                    <>
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => handleOpenFinalizeModal(req)}
-                                                                            className="btn btn-sm btn-outline-purple py-0.5 px-2 text-3xs fw-bold d-inline-flex align-items-center gap-1 rounded-pill"
-                                                                            style={{ borderColor: "#a855f7", color: "#6b21a8" }}
-                                                                            title="Finalize Requisition as CHRO / VP HR"
-                                                                        >
-                                                                            <LuFileCheck size={11} /> Finalize
-                                                                        </button>
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => handleOpenDelegateModal(req)}
-                                                                            className="btn btn-sm btn-light border py-0.5 px-2 text-3xs fw-semibold d-inline-flex align-items-center gap-1 rounded-pill text-slate-700 hover:bg-slate-100"
-                                                                            title="Assign General Manager - HR to finalize"
-                                                                        >
-                                                                            <LuUserCheck size={11} className="text-purple-600" /> Assign GM-HR
-                                                                        </button>
-                                                                    </>
-                                                                )}
-                                                                {!isCHRO && (isGMHR || req.delegated_finalizer_id === employeeId) && (
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => handleOpenFinalizeModal(req)}
-                                                                        className="btn btn-sm btn-outline-success py-0.5 px-2 text-3xs fw-bold d-inline-flex align-items-center gap-1 rounded-pill"
-                                                                        title="Finalize as Delegated General Manager - HR"
-                                                                    >
-                                                                        <LuFileCheck size={11} /> Finalize (GM-HR)
-                                                                    </button>
-                                                                )}
-                                                            </div>
-                                                        )}
+                                                        {renderStatusBadge(req.status, req)}
                                                     </td>
 
                                                     {/* Candidates */}
@@ -1681,9 +1696,16 @@ const Requisition = () => {
                                                                         <Dropdown.Item
                                                                             as="button"
                                                                             className="d-flex align-items-center gap-2 py-1.5 text-xs text-purple-900 bg-purple-50 fw-bold border-bottom border-purple-100"
-                                                                            onClick={() => handleOpenFinalizeModal(req)}
+                                                                            onClick={() => handleOpenFinalizeModal(req, "APPROVE_AND_FINALIZE")}
                                                                         >
-                                                                            <LuFileCheck size={14} className="text-purple-700" /> Finalize Requisition (CHRO)
+                                                                            <LuCheck size={14} className="text-purple-700" /> Approve Requisition (CHRO)
+                                                                        </Dropdown.Item>
+                                                                        <Dropdown.Item
+                                                                            as="button"
+                                                                            className="d-flex align-items-center gap-2 py-1.5 text-xs text-rose-800 bg-rose-50 fw-bold border-bottom border-rose-100"
+                                                                            onClick={() => handleOpenRejectModal(req)}
+                                                                        >
+                                                                            <LuCircleX size={14} className="text-rose-600" /> Reject Requisition (CHRO)
                                                                         </Dropdown.Item>
                                                                         <Dropdown.Item
                                                                             as="button"
@@ -1696,13 +1718,22 @@ const Requisition = () => {
                                                                 )}
                                                                 {/* Delegated GM-HR Action */}
                                                                 {!isCHRO && (isGMHR || req.delegated_finalizer_id === employeeId) && (req.status === "PENDING_CHRO_APPROVAL" || req.finalization_status === "PENDING_CHRO") && (
-                                                                    <Dropdown.Item
-                                                                        as="button"
-                                                                        className="d-flex align-items-center gap-2 py-1.5 text-xs text-emerald-900 bg-emerald-50 fw-bold border-bottom border-emerald-100"
-                                                                        onClick={() => handleOpenFinalizeModal(req)}
-                                                                    >
-                                                                        <LuFileCheck size={14} className="text-emerald-700" /> Finalize (General Manager - HR)
-                                                                    </Dropdown.Item>
+                                                                    <>
+                                                                        <Dropdown.Item
+                                                                            as="button"
+                                                                            className="d-flex align-items-center gap-2 py-1.5 text-xs text-emerald-900 bg-emerald-50 fw-bold border-bottom border-emerald-100"
+                                                                            onClick={() => handleOpenFinalizeModal(req, "APPROVE_AND_FINALIZE")}
+                                                                        >
+                                                                            <LuCheck size={14} className="text-emerald-700" /> Approve Requisition (GM-HR)
+                                                                        </Dropdown.Item>
+                                                                        <Dropdown.Item
+                                                                            as="button"
+                                                                            className="d-flex align-items-center gap-2 py-1.5 text-xs text-rose-800 bg-rose-50 fw-bold border-bottom border-rose-100"
+                                                                            onClick={() => handleOpenRejectModal(req)}
+                                                                        >
+                                                                            <LuCircleX size={14} className="text-rose-600" /> Reject Requisition (GM-HR)
+                                                                        </Dropdown.Item>
+                                                                    </>
                                                                 )}
 
                                                                 <Dropdown.Item
@@ -2761,13 +2792,22 @@ const Requisition = () => {
 
             {/* ───────────────────────────────────────────────────────────────── */}
             {/* ───────────────────────────────────────────────────────────────── */}
-            {/* MODAL: CHRO / VP HR (OR DELEGATED GM-HR) REQUISITION FINALIZATION */}
+            {/* MODAL: CHRO / VP HR (OR DELEGATED GM-HR) REQUISITION DECISION     */}
             {/* ───────────────────────────────────────────────────────────────── */}
             <Modal show={showFinalizeModal} onHide={() => setShowFinalizeModal(false)} size="lg" centered backdrop="static">
-                <Modal.Header closeButton className="bg-purple-50 border-bottom border-purple-200 py-3">
-                    <Modal.Title className="fs-6 fw-bold d-flex align-items-center gap-2 text-purple-950">
-                        <LuFileCheck className="text-purple-700" size={18} />
-                        {isCHRO ? "Finalize Workforce Requisition (CHRO / VP HR)" : "Finalize Workforce Requisition (General Manager - HR)"}
+                <Modal.Header closeButton className={`${finalizeAction === "REJECT" ? "bg-rose-50 border-bottom border-rose-200" : "bg-purple-50 border-bottom border-purple-200"} py-3`}>
+                    <Modal.Title className={`fs-6 fw-bold d-flex align-items-center gap-2 ${finalizeAction === "REJECT" ? "text-rose-950" : "text-purple-950"}`}>
+                        {finalizeAction === "REJECT" ? (
+                            <>
+                                <LuCircleX className="text-rose-600" size={18} />
+                                {isCHRO ? "Reject Workforce Requisition (CHRO / VP HR)" : "Reject Workforce Requisition (General Manager - HR)"}
+                            </>
+                        ) : (
+                            <>
+                                <LuFileCheck className="text-purple-700" size={18} />
+                                {isCHRO ? "Approve & Finalize Workforce Requisition (CHRO / VP HR)" : "Approve & Finalize Workforce Requisition (General Manager - HR)"}
+                            </>
+                        )}
                     </Modal.Title>
                 </Modal.Header>
                 <Modal.Body className="p-3.5">
@@ -2808,37 +2848,101 @@ const Requisition = () => {
 
                             <Form.Group className="mb-3">
                                 <Form.Label className="fw-bold text-xs text-slate-800 mb-2">Finalization Decision *</Form.Label>
-                                <div className="d-flex flex-column gap-2 bg-white border rounded-2 p-2.5">
-                                    <Form.Check
-                                        type="radio"
-                                        id="fin-approve"
-                                        name="finalizeAction"
-                                        label={<span className="fw-bold text-emerald-800">Approve & Finalize for Hiring (Opens workforce candidate sourcing for HR recruiters)</span>}
-                                        checked={finalizeAction === "APPROVE_AND_FINALIZE"}
-                                        onChange={() => setFinalizeAction("APPROVE_AND_FINALIZE")}
-                                    />
-                                    <Form.Check
-                                        type="radio"
-                                        id="fin-reject"
-                                        name="finalizeAction"
-                                        label={<span className="fw-bold text-rose-800">Reject Requisition (Cancels requisition & halts sourcing)</span>}
-                                        checked={finalizeAction === "REJECT"}
-                                        onChange={() => setFinalizeAction("REJECT")}
-                                    />
-                                </div>
+                                <Row className="g-2.5">
+                                    <Col sm={6}>
+                                        <div
+                                            onClick={() => {
+                                                setFinalizeAction("APPROVE_AND_FINALIZE");
+                                                const roleTitle = isCHRO ? "CHRO / VP HR" : "General Manager - HR (Delegated Authority)";
+                                                setFinalizeComments(`Approved and finalized for workforce candidate sourcing by ${roleTitle}.`);
+                                            }}
+                                            className={`p-3 rounded-3 border transition-all ${
+                                                finalizeAction === "APPROVE_AND_FINALIZE"
+                                                    ? "bg-emerald-50 border-emerald-400 shadow-xs"
+                                                    : "bg-white border-slate-200 hover:border-slate-300"
+                                            }`}
+                                            style={{ cursor: "pointer" }}
+                                        >
+                                            <div className="d-flex align-items-center justify-content-between mb-1.5">
+                                                <span className="fw-bold text-xs text-emerald-900 d-flex align-items-center gap-1.5">
+                                                    <LuCheck size={15} className="text-emerald-600" /> Approve & Finalize
+                                                </span>
+                                                <span className={`badge ${finalizeAction === "APPROVE_AND_FINALIZE" ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-600"} text-3xs`}>
+                                                    Approve
+                                                </span>
+                                            </div>
+                                            <p className="text-muted text-2xs mb-0">
+                                                Approves candidate requisition and opens workforce candidate sourcing for HR recruiters.
+                                            </p>
+                                        </div>
+                                    </Col>
+
+                                    <Col sm={6}>
+                                        <div
+                                            onClick={() => {
+                                                setFinalizeAction("REJECT");
+                                                const roleTitle = isCHRO ? "CHRO / VP HR" : "General Manager - HR (Delegated Authority)";
+                                                setFinalizeComments(`Requisition rejected by ${roleTitle}: `);
+                                            }}
+                                            className={`p-3 rounded-3 border transition-all ${
+                                                finalizeAction === "REJECT"
+                                                    ? "bg-rose-50 border-rose-400 shadow-xs"
+                                                    : "bg-white border-slate-200 hover:border-slate-300"
+                                            }`}
+                                            style={{ cursor: "pointer" }}
+                                        >
+                                            <div className="d-flex align-items-center justify-content-between mb-1.5">
+                                                <span className="fw-bold text-xs text-rose-900 d-flex align-items-center gap-1.5">
+                                                    <LuCircleX size={15} className="text-rose-600" /> Reject Requisition
+                                                </span>
+                                                <span className={`badge ${finalizeAction === "REJECT" ? "bg-rose-600 text-white" : "bg-slate-100 text-slate-600"} text-3xs`}>
+                                                    Reject
+                                                </span>
+                                            </div>
+                                            <p className="text-muted text-2xs mb-0">
+                                                Turns down the hiring requisition, halting candidate sourcing and recording reason in audit history.
+                                            </p>
+                                        </div>
+                                    </Col>
+                                </Row>
                             </Form.Group>
 
+                            {finalizeAction === "REJECT" && (
+                                <div className="mb-3 bg-rose-50 border border-rose-200 rounded-3 p-2.5">
+                                    <div className="text-2xs fw-bold text-rose-900 text-uppercase tracking-wider mb-1.5 d-flex align-items-center gap-1">
+                                        <LuTriangleAlert size={12} className="text-rose-600" /> Select Common Rejection Reason:
+                                    </div>
+                                    <div className="d-flex flex-wrap gap-1.5">
+                                        {REJECTION_REASONS.map((reason) => (
+                                            <button
+                                                key={reason}
+                                                type="button"
+                                                onClick={() => {
+                                                    const roleTitle = isCHRO ? "CHRO / VP HR" : "General Manager - HR (Delegated Authority)";
+                                                    setFinalizeComments(`Requisition rejected by ${roleTitle}: ${reason}.`);
+                                                }}
+                                                className="badge bg-white hover:bg-rose-100 text-rose-800 border border-rose-300 py-1 px-2 text-3xs cursor-pointer rounded-pill transition-all"
+                                            >
+                                                + {reason}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
                             <Form.Group>
-                                <Form.Label className="fw-bold text-xs text-slate-800">
-                                    CHRO / VP HR Directives & Strategic Remarks
+                                <Form.Label className="fw-bold text-xs text-slate-800 d-flex align-items-center justify-content-between">
+                                    <span>{finalizeAction === "REJECT" ? "Rejection Justification & Reason *" : "Strategic Directives & Approval Remarks"}</span>
+                                    {finalizeAction === "REJECT" && <span className="text-rose-600 text-2xs font-normal">Required for audit trail</span>}
                                 </Form.Label>
                                 <Form.Control
                                     as="textarea"
                                     rows={3}
-                                    placeholder="Enter strategic directives, talent guidelines, or approved hiring timeline..."
+                                    placeholder={finalizeAction === "REJECT" ? "Enter the detailed reason for turning down this requisition (e.g. Budget constraints, freeze)..." : "Enter strategic directives, talent guidelines, or approved hiring timeline..."}
                                     value={finalizeComments}
                                     onChange={(e) => setFinalizeComments(e.target.value)}
-                                    className="text-xs"
+                                    className={`text-xs ${finalizeAction === "REJECT" ? "border-rose-300" : ""}`}
+                                    required={finalizeAction === "REJECT"}
                                 />
                             </Form.Group>
                         </div>
@@ -2853,10 +2957,18 @@ const Requisition = () => {
                         size="sm"
                         onClick={handleProcessFinalize}
                         disabled={submittingFinalize}
-                        className="text-xs px-3"
+                        className="text-xs px-3 d-inline-flex align-items-center gap-1.5"
                     >
-                        {submittingFinalize ? <Spinner size="sm" animation="border" /> : <LuCircleCheck size={13} className="me-1" />}
-                        {finalizeAction === "REJECT" ? "Reject Requisition" : (isCHRO ? "Confirm CHRO Finalization" : "Confirm Finalization (GM-HR)")}
+                        {submittingFinalize ? (
+                            <Spinner size="sm" animation="border" />
+                        ) : finalizeAction === "REJECT" ? (
+                            <LuCircleX size={14} />
+                        ) : (
+                            <LuCheck size={14} />
+                        )}
+                        {finalizeAction === "REJECT"
+                            ? (isCHRO ? "Confirm Rejection (CHRO)" : "Confirm Rejection (GM-HR)")
+                            : (isCHRO ? "Approve & Finalize (CHRO)" : "Approve & Finalize (GM-HR)")}
                     </Button>
                 </Modal.Footer>
             </Modal>
@@ -3553,6 +3665,34 @@ const Requisition = () => {
                                     >
                                         <LuExternalLink size={12} /> View Approval PDF
                                     </a>
+                                </div>
+                            )}
+
+                            {/* CHRO / GM-HR Finalization or Rejection Details */}
+                            {selectedRequisition.finalized_by_name && (
+                                <div className={`p-2.5 rounded-2 mb-3 text-xs border ${
+                                    selectedRequisition.status === "REJECTED" ? "bg-rose-50 border-rose-200" : "bg-purple-50 border-purple-200"
+                                }`}>
+                                    <span className={`fw-bold d-block mb-0.5 ${
+                                        selectedRequisition.status === "REJECTED" ? "text-rose-800" : "text-purple-800"
+                                    }`}>
+                                        {selectedRequisition.status === "REJECTED" ? (
+                                            <span className="d-inline-flex align-items-center gap-1">
+                                                <LuCircleX size={13} className="text-rose-600" /> Rejection Details ({selectedRequisition.finalized_by_role || "HR Management"}):
+                                            </span>
+                                        ) : (
+                                            <span className="d-inline-flex align-items-center gap-1">
+                                                <LuCircleCheck size={13} className="text-purple-600" /> Finalized & Approved by {selectedRequisition.finalized_by_role || "HR Management"}:
+                                            </span>
+                                        )}
+                                    </span>
+                                    <div className="text-slate-700 mt-1">Reviewer: <strong>{selectedRequisition.finalized_by_name}</strong> ({selectedRequisition.finalized_by_role})</div>
+                                    {selectedRequisition.chro_comments && (
+                                        <div className="text-slate-700 mt-0.5">Notes / Feedback: <em>{selectedRequisition.chro_comments}</em></div>
+                                    )}
+                                    {selectedRequisition.finalized_at && (
+                                        <div className="text-slate-400 text-2xs mt-1">Date: {formatDate(selectedRequisition.finalized_at)}</div>
+                                    )}
                                 </div>
                             )}
 

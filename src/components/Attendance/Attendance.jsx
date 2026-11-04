@@ -83,6 +83,29 @@ const STATUS_BADGES = {
   "Half Day": { bg: "#fff7ed", color: "#ea580c", border: "#ffedd5", label: "Half Day", className: "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/60 dark:text-orange-300 dark:border-orange-800/60" }
 };
 
+// Upto 10:15:00 AM (or shift_start + 15m) is On Time; beyond is Late
+const isCheckInLate = (checkInStr, shiftStartStr = "10:00") => {
+  if (!checkInStr || typeof checkInStr !== "string" || checkInStr === "—" || !checkInStr.includes(":")) {
+    return false;
+  }
+  const cParts = checkInStr.trim().split(":");
+  const cHour = parseInt(cParts[0], 10) || 0;
+  const cMin = parseInt(cParts[1], 10) || 0;
+  const cSec = parseInt(cParts[2] || "0", 10) || 0;
+  const totalSec = cHour * 3600 + cMin * 60 + cSec;
+
+  const sParts = (shiftStartStr || "10:00").split(":");
+  const sHour = parseInt(sParts[0], 10) || 10;
+  const sMin = parseInt(sParts[1], 10) || 0;
+  const cutoffSec = sHour * 3600 + sMin * 60 + (15 * 60);
+
+  if (sHour >= 18 && cHour < 6) {
+    const adjSec = (cHour + 24) * 3600 + cMin * 60 + cSec;
+    return adjSec > cutoffSec;
+  }
+  return totalSec > cutoffSec;
+};
+
 const MyAttendance = () => {
   const [attendanceList, setAttendanceList] = useState([]);
   const [employees, setEmployees] = useState([]);
@@ -473,8 +496,11 @@ const MyAttendance = () => {
 
     // 3. Status Filter
     if (selectedStatus !== "All") {
-      if (selectedStatus === "Present" && r.status !== "Present" && r.status !== "On Time") return false;
-      if (selectedStatus === "Late" && r.status !== "Late Present" && r.status !== "Late") return false;
+      const isLateRecord = r.status === "Late Present" || r.status === "Late" || Number(r.late_count) > 0 || isCheckInLate(r.check_in, r.shift_start);
+      const isPresentRecord = (r.status === "Present" || r.status === "On Time") && !isLateRecord;
+
+      if (selectedStatus === "Present" && !isPresentRecord) return false;
+      if (selectedStatus === "Late" && !isLateRecord) return false;
       if (selectedStatus === "Absent" && r.status !== "Absent") return false;
       if (selectedStatus === "Holiday" && r.status !== "Holiday") return false;
       if (selectedStatus === "Week Off" && r.status !== "Week Off") return false;
@@ -537,6 +563,7 @@ const MyAttendance = () => {
   const getHolidayForDate = (dateStr) => {
     if (!dateStr || !holidaysList.length) return null;
     return holidaysList.find((h) => {
+      if (h.is_working_day || h.type === "Working Day") return false;
       const hDate = (h.dateStr || h.date || "").split("T")[0];
       if (hDate !== dateStr) return false;
       const hDept = (h.dept || "all").toLowerCase().trim();
@@ -544,7 +571,17 @@ const MyAttendance = () => {
     });
   };
 
+  const getAssignedWorkingDayForDate = (dateStr) => {
+    if (!dateStr || !holidaysList.length) return null;
+    return holidaysList.find((h) => {
+      if (!h.is_working_day && h.type !== "Working Day") return false;
+      const hDate = (h.dateStr || h.date || "").split("T")[0];
+      return hDate === dateStr;
+    });
+  };
+
   const selectedDateHoliday = getHolidayForDate(selectedDateStr);
+  const selectedDateAssignedWorkingDay = getAssignedWorkingDayForDate(selectedDateStr);
 
   // 3. Reporting Manager Resolution
   const rawReportingManager =
@@ -787,6 +824,16 @@ const MyAttendance = () => {
             >
               <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
               Holiday: {selectedDateHoliday.name}
+            </span>
+          )}
+
+          {selectedDateAssignedWorkingDay && (
+            <span
+              className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 px-2.5 py-1.5 rounded-xl shadow-xs animate-fade-in"
+              title={`Assigned Working Day: ${selectedDateAssignedWorkingDay.name}`}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Assigned Working Day: {selectedDateAssignedWorkingDay.name}
             </span>
           )}
         </div>
@@ -1316,7 +1363,9 @@ const MyAttendance = () => {
                 </tr>
               ) : (
                 paginatedRecords.map((r) => {
-                  const sBadge = STATUS_BADGES[r.status] || STATUS_BADGES.Present;
+                  const isLatePunch = r.status === "Late Present" || r.status === "Late" || Number(r.late_count) > 0 || isCheckInLate(r.check_in, r.shift_start);
+                  const effectiveStatus = isLatePunch ? "Late Present" : r.status;
+                  const sBadge = STATUS_BADGES[effectiveStatus] || STATUS_BADGES.Present;
                   const matchedEmp = employees.find(
                     (e) => (e.employee_code || e.employee_id || "").toLowerCase() === (r.employee_id || "").toLowerCase()
                   );
@@ -1465,7 +1514,7 @@ const MyAttendance = () => {
                             sBadge.className || "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800/60"
                           }`}
                         >
-                          {r.status === "Present" && !r.late_count ? "On Time" : sBadge.label}
+                          {isLatePunch ? "Late" : (r.status === "Present" || r.status === "On Time" ? "On Time" : sBadge.label)}
                         </span>
                       </td>
 

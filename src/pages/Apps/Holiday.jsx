@@ -133,10 +133,14 @@ const Holiday = () => {
     const prefix = isToday ? "Today" : "Selected";
 
     if (activeHoliday) {
+      const isWorkingDay = Boolean(activeHoliday.is_working_day || activeHoliday.type === "Working Day");
       return {
         dateStr: `${prefix} ${formattedDate}`,
         title: activeHoliday.name,
-        subtext: "Company branches will be closed today for holiday"
+        subtext: isWorkingDay
+          ? "Assigned Working Day — company branches are open as scheduled by HR"
+          : "Company branches will be closed today for holiday",
+        isWorkingDay
       };
     }
 
@@ -190,10 +194,14 @@ const Holiday = () => {
       };
     }
 
+    const isUpcomingWorkingDay = Boolean(upcoming.is_working_day || upcoming.type === "Working Day");
     return {
       dateStr: `Upcoming ${upcoming.date || upcoming.dateStr}`,
       title: upcoming.name,
-      subtext: "Company branches will be closed from 09:00 AM to 07:00 PM"
+      subtext: isUpcomingWorkingDay
+        ? "Assigned Working Day — company branches are open"
+        : "Company branches will be closed from 09:00 AM to 07:00 PM",
+      isWorkingDay: isUpcomingWorkingDay
     };
   };
 
@@ -257,6 +265,7 @@ const Holiday = () => {
               return (h.month || "").toUpperCase() === mName && Number(h.dayNum) === cell.val;
             });
             const isHoliday = Boolean(matchedHoliday);
+            const isAssignedWorkingDay = Boolean(matchedHoliday && (matchedHoliday.is_working_day || matchedHoliday.type === "Working Day"));
 
             return (
               <div
@@ -267,22 +276,32 @@ const Holiday = () => {
                 {isToday ? (
                   <span
                     className={`w-7 h-7 flex items-center justify-center bg-slate-900 text-white font-bold rounded-lg shadow-sm ${
-                      isSelected ? "ring-2 ring-blue-500 ring-offset-1" : ""
+                      isSelected ? (isAssignedWorkingDay ? "ring-2 ring-emerald-500 ring-offset-1" : "ring-2 ring-blue-500 ring-offset-1") : ""
                     }`}
-                    title={matchedHoliday ? `${matchedHoliday.name} (Today)` : "Today"}
+                    title={matchedHoliday ? `${matchedHoliday.name} (Today${isAssignedWorkingDay ? ' - Assigned Working Day' : ''})` : "Today"}
                   >
                     {cell.val}
                   </span>
                 ) : isSelected ? (
                   <span
                     className={`w-7 h-7 flex items-center justify-center font-bold rounded-lg shadow-xs ${
-                      isHoliday
+                      isAssignedWorkingDay
+                        ? "bg-emerald-100 text-emerald-800 ring-2 ring-emerald-500"
+                        : isHoliday
                         ? "bg-rose-100 text-rose-700 ring-2 ring-rose-500"
                         : "bg-blue-100 text-blue-700 ring-2 ring-blue-500"
                     }`}
-                    title={matchedHoliday ? `${matchedHoliday.name} (${matchedHoliday.type || "Holiday"})` : undefined}
+                    title={matchedHoliday ? `${matchedHoliday.name} (${isAssignedWorkingDay ? 'Assigned Working Day' : (matchedHoliday.type || "Holiday")})` : undefined}
                   >
                     {cell.val}
+                  </span>
+                ) : isAssignedWorkingDay ? (
+                  <span
+                    className="relative font-bold text-emerald-600 hover:text-emerald-700"
+                    title={`${matchedHoliday?.name || "Working Day"} (Assigned Working Day)`}
+                  >
+                    {cell.val}
+                    <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-500 rounded-full"></span>
                   </span>
                 ) : isHoliday ? (
                   <span
@@ -407,7 +426,7 @@ const Holiday = () => {
               <div className="flex flex-wrap items-center gap-8 w-full md:w-auto">
                 {/* Today Card */}
                 <div className="flex items-start gap-3">
-                  <span className="h-3 w-3 rounded-full bg-slate-900 mt-1"></span>
+                  <span className={`h-3 w-3 rounded-full mt-1 ${todayInfo.isWorkingDay ? "bg-emerald-500 shadow-xs" : (todayInfo.title === "Regular Working Day" ? "bg-slate-900" : "bg-rose-500")}`}></span>
                   <div>
                     <div className="text-xs font-bold text-slate-900">{todayInfo.dateStr}</div>
                     <div className="text-xs font-semibold text-slate-800 mt-0.5">{todayInfo.title}</div>
@@ -419,7 +438,7 @@ const Holiday = () => {
 
                 {/* Upcoming Card */}
                 <div className="flex items-start gap-3">
-                  <span className="h-3 w-3 rounded-full bg-rose-500 mt-1"></span>
+                  <span className={`h-3 w-3 rounded-full mt-1 ${upcomingInfo.isWorkingDay ? "bg-emerald-500 shadow-xs" : "bg-rose-500"}`}></span>
                   <div>
                     <div className="text-xs font-bold text-slate-900">{upcomingInfo.dateStr}</div>
                     <div className="text-xs font-semibold text-slate-800 mt-0.5">{upcomingInfo.title}</div>
@@ -466,7 +485,7 @@ const Holiday = () => {
                 <div className="space-y-5">
                   {/* Today Card */}
                   <div className="flex items-start gap-3">
-                    <span className="h-3 w-3 rounded-full bg-slate-900 mt-1"></span>
+                    <span className={`h-3 w-3 rounded-full mt-1 ${todayInfo.isWorkingDay ? "bg-emerald-500 shadow-xs" : (todayInfo.title === "Regular Working Day" ? "bg-slate-900" : "bg-rose-500")}`}></span>
                     <div>
                       <div className="text-xs font-bold text-slate-900">{todayInfo.dateStr}</div>
                       <div className="text-xs font-semibold text-slate-800 mt-0.5">{todayInfo.title}</div>
@@ -478,7 +497,7 @@ const Holiday = () => {
 
                   {/* Upcoming Card */}
                   <div className="flex items-start gap-3">
-                    <span className="h-3 w-3 rounded-full bg-rose-500 mt-1"></span>
+                    <span className={`h-3 w-3 rounded-full mt-1 ${upcomingInfo.isWorkingDay ? "bg-emerald-500 shadow-xs" : "bg-rose-500"}`}></span>
                     <div>
                       <div className="text-xs font-bold text-slate-900">{upcomingInfo.dateStr}</div>
                       <div className="text-xs font-semibold text-slate-800 mt-0.5">{upcomingInfo.title}</div>
@@ -506,22 +525,32 @@ const Holiday = () => {
                     .sort((a, b) => (a.dateStr || "").localeCompare(b.dateStr || ""))
                     .map((h, idx) => {
                       const isUpcomingNext = upcomingInfo.title === h.name;
+                      const isWorkingDay = Boolean(h.is_working_day || h.type === "Working Day");
                       return (
                         <div
                           key={h.id || idx}
                           onClick={() => h.dateStr && setSelectedDateStr(h.dateStr)}
                           className={`holiday-table-row grid grid-cols-12 items-center py-3.5 px-3 transition-colors cursor-pointer ${
-                            selectedDateStr === h.dateStr ? "bg-rose-50/80 rounded-2xl" : "hover:bg-slate-50"
+                            selectedDateStr === h.dateStr
+                              ? (isWorkingDay ? "bg-emerald-50/80 rounded-2xl" : "bg-rose-50/80 rounded-2xl")
+                              : "hover:bg-slate-50"
                           }`}
                         >
                           <div className="col-span-6 flex items-center gap-2.5">
                             {isUpcomingNext ? (
-                              <div className="active-indicator-bar bg-rose-500"></div>
+                              <div className={`active-indicator-bar ${isWorkingDay ? 'bg-emerald-500' : 'bg-rose-500'}`}></div>
                             ) : (
                               <div className="w-1 h-6"></div>
                             )}
                             <div>
-                              <span className="text-xs font-bold text-slate-800">{h.name}</span>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-xs font-bold text-slate-800">{h.name}</span>
+                                {isWorkingDay && (
+                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                    Assigned Working Day
+                                  </span>
+                                )}
+                              </div>
                               {h.dept && h.dept !== "All" && (
                                 <div className="text-[10px] text-blue-600 font-semibold">
                                   Dept: {h.dept}
@@ -535,7 +564,9 @@ const Holiday = () => {
                           <div className="col-span-3 text-right">
                             <div className="text-xs text-slate-700 font-semibold">{h.date}</div>
                             {h.type && (
-                              <div className="text-[10px] text-rose-500 font-medium">{h.type}</div>
+                              <div className={`text-[10px] font-semibold ${isWorkingDay ? 'text-emerald-600' : 'text-rose-500'}`}>
+                                {isWorkingDay ? 'Working Day' : h.type}
+                              </div>
                             )}
                           </div>
                         </div>

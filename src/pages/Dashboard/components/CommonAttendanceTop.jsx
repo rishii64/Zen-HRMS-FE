@@ -161,9 +161,10 @@ export default function CommonAttendanceTop({
   };
 
   // Attendance metrics counts strictly for logged-in user in current month
-  const onTimeCount = uniqueMonthLogs.filter((log) => log.status === "Present" || log.status === "On Time").length;
+  const isLateLog = (log) => log.status === "Late Present" || log.status === "Late" || Number(log.late_count) > 0;
+  const onTimeCount = uniqueMonthLogs.filter((log) => (log.status === "Present" || log.status === "On Time") && !isLateLog(log)).length;
   const wfhCount = uniqueMonthLogs.filter((log) => log.status === "WFH" || log.status === "Work from home").length;
-  const lateCount = uniqueMonthLogs.filter((log) => log.status === "Late Present" || log.status === "Late").length;
+  const lateCount = uniqueMonthLogs.filter(isLateLog).length;
   const absentCount = uniqueMonthLogs.filter((log) => log.status === "Absent").length;
   const totalPresentCount = onTimeCount + wfhCount + lateCount;
 

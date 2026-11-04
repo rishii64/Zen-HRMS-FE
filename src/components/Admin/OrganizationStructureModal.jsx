@@ -11,6 +11,7 @@ import {
   LuUsers,
   LuCircleDollarSign,
   LuClock,
+  LuSparkles,
 } from "react-icons/lu";
 import toast from "react-hot-toast";
 import { getApiBaseUrl } from "../../api/axios";
@@ -236,6 +237,24 @@ const OrganizationStructureModal = ({ show, onHide, onStructureUpdated }) => {
             </div>
           </Col>
         </Row>
+
+        {/* Launcher Banner for Interactive Org Chart */}
+        <div className="mb-3 d-flex justify-content-between align-items-center bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 p-2.5 rounded-3">
+          <div className="d-flex align-items-center gap-2">
+            <LuSparkles className="text-blue-600" size={16} />
+            <span className="text-xs fw-semibold text-blue-900">
+              Interactive Org Chart Engine & Visual Chart.js Analytics is available!
+            </span>
+          </div>
+          <a
+            href="/org-chart"
+            target="_blank"
+            rel="noreferrer"
+            className="btn btn-sm btn-primary py-1 px-3 text-xs fw-bold d-inline-flex align-items-center gap-1.5 shadow-2xs rounded-2"
+          >
+            <LuNetwork size={14} /> Open Org Chart & Analytics ↗
+          </a>
+        </div>
 
         <Tabs
           activeKey={activeTab}

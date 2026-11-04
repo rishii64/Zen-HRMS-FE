@@ -31,6 +31,9 @@ import {
   LuSun,
   LuMoon,
   LuLaptop,
+  LuNetwork,
+  LuCalendarCheck,
+  LuArrowLeftRight,
 } from "react-icons/lu";
 import { SiGoogledocs } from "react-icons/si";
 import { FaListCheck } from "react-icons/fa6";
@@ -50,6 +53,7 @@ import { TbPassword } from "react-icons/tb";
 import api, { getUploadUrl } from "../../api/axios";
 import ChangePasswordModal from "../common/ChangePasswordModal";
 import DailyAttendanceNoticeModal from "../common/DailyAttendanceNoticeModal";
+import NotificationCenter from "../common/NotificationCenter";
 
 const ALL_STAFF_ROLES = [
   "employee", "hr", "accounts", "payroll", "hod", "admin", "manager", "teamlead", "ceo", "coo", "cto", "cfo", "vp", "secretary", "management", "hrmanager"
@@ -255,9 +259,27 @@ const ALL_APPS = [
     keywords: ["claim", "claims", "reimbursement", "expenses", "travel claim", "bills", "receipts", "travel expense", "finance claim", "voucher", "claims & reimbursement"],
   },
   {
+    id: "app_org_chart",
+    title: "Interactive Org Chart & Analytics",
+    tabId: 22,
+    icon: <LuNetwork className="text-indigo-600" />,
+    route: "/org-chart",
+    roles: ALL_STAFF_ROLES,
+    keywords: ["org chart", "organization", "tree", "reporting tree", "hierarchy", "analytics", "chart", "charts", "graph", "graphs", "structure", "department tree"],
+  },
+  {
+    id: "app_holiday_manager",
+    title: "Holiday Manager",
+    tabId: 23,
+    icon: <LuCalendarCheck className="text-emerald-600" />,
+    route: "/holidaymanager",
+    roles: ["hr", "admin", "ceo", "coo", "management", "hrmanager"],
+    keywords: ["holiday manager", "assign working day", "holidays", "calendar management", "manage holidays"],
+  },
+  {
     id: "app_manage_emp",
     title: "Employee Directory",
-    tabId: null,
+    tabId: 24,
     icon: <LuUsers className="text-blue-600" />,
     route: "/hr/manage-employees",
     roles: ["hr", "admin", "hod", "manager", "accounts", "ceo", "coo", "management"],
@@ -266,11 +288,38 @@ const ALL_APPS = [
   {
     id: "app_accounts_dash",
     title: "Accounts Dashboard",
-    tabId: null,
+    tabId: 25,
     icon: <LuTrendingUp className="text-emerald-500" />,
     route: "/accounts/dashboard",
     roles: ["accounts", "payroll", "ceo", "management"],
     keywords: ["accounts", "finance", "billing", "dashboard", "ledger"],
+  },
+  {
+    id: "app_transfers",
+    title: "Transfers & Deputation",
+    tabId: 26,
+    icon: <LuArrowLeftRight className="text-blue-600" />,
+    route: "/transfers",
+    roles: ALL_STAFF_ROLES,
+    keywords: ["transfer", "transfers", "deputation", "mobility", "department transfer", "branch transfer", "relocation", "transfer letter", "lifecycle", "reassignment"],
+  },
+  {
+    id: "app_promotions",
+    title: "Promotions & Progression",
+    tabId: 27,
+    icon: <LuTrendingUp className="text-indigo-600" />,
+    route: "/promotions",
+    roles: ALL_STAFF_ROLES,
+    keywords: ["promotion", "promotions", "progression", "grade", "increment", "designation upgrade", "hike", "career advancement", "promotion letter"],
+  },
+  {
+    id: "app_overtime",
+    title: "Overtime (OT) Engine",
+    tabId: 28,
+    icon: <LuClock className="text-amber-600" />,
+    route: "/overtime",
+    roles: ALL_STAFF_ROLES,
+    keywords: ["overtime", "ot", "hours", "shifts", "extra hours", "approval", "payout", "timesheet"],
   },
 ];
 
@@ -795,7 +844,7 @@ const AppNavbar = () => {
             { to: "/payroll", label: "Payroll" },
             { to: "/attendance", label: "Attendance" },
             { to: "/requisition", label: "Requisition" },
-            { to: "/it-declaration", label: "IT Declarations" },
+            // { to: "/it-declaration", label: "IT Declarations" },
           ];
         }
         return [
@@ -876,7 +925,7 @@ const AppNavbar = () => {
       })();
 
     if (isFullAccess) {
-      return new Set([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]);
+      return new Set(ALL_APPS.map((a) => a.tabId).filter(Boolean));
     }
 
     // 2. Read explicit enabled_tabs set by HR
@@ -908,12 +957,12 @@ const AppNavbar = () => {
     }
 
     // 3. Fallback standard default tabs if not explicitly set
-    return new Set([1, 2, 3, 4, 8, 9, 10, 11, 12, 14, 16, 21]);
+    return new Set([1, 2, 3, 4, 8, 9, 10, 11, 12, 14, 16, 21, 22]);
   })();
 
   const filteredApps = ALL_APPS.filter((app) => {
     // Only display the exact modules configured by HR (matching individual dashboard)
-    if (!app.tabId || !configuredTabIds.has(app.tabId)) {
+    if (app.tabId && !configuredTabIds.has(app.tabId)) {
       return false;
     }
 
@@ -1004,6 +1053,7 @@ const AppNavbar = () => {
 
           {/* Right menu (Desktop): Global Theme Toggle + Profile or Login Button */}
           <div className="hidden md:flex md:items-center md:gap-3">
+            {isLoggedIn && <NotificationCenter />}
             {/* Global Theme Toggle Button */}
             <button
               type="button"
@@ -1168,6 +1218,7 @@ const AppNavbar = () => {
 
           {/* Mobile action area: Global Theme Toggle + Hamburger menu */}
           <div className="flex items-center gap-1.5 md:hidden">
+            {isLoggedIn && <NotificationCenter />}
             <button
               type="button"
               onClick={handleCycleTheme}

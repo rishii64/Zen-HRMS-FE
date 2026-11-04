@@ -20,6 +20,8 @@ import {
   LuBriefcase,
   LuUserCheck,
   LuPartyPopper,
+  LuNetwork,
+  LuCalendarCheck,
 } from "react-icons/lu";
 import { FaListCheck } from "react-icons/fa6";
 
@@ -261,12 +263,36 @@ export default function EmployeeModulesView({ employee = {} }) {
       linkTo: "/claims",
       onClick: () => navigate("/claims"),
     },
+    {
+      id: 22,
+      title: "Interactive Org Chart & Analytics",
+      desc: "Explore visual company reporting tree, department hierarchy, and HR analytics.",
+      btnText: "Open Org Chart",
+      icon: <LuNetwork size={24} />,
+      iconBg: "rgba(99, 102, 241, 0.08)",
+      iconColor: "#6366f1",
+      isLink: true,
+      linkTo: "/org-chart",
+      onClick: () => navigate("/org-chart"),
+    },
+    {
+      id: 23,
+      title: "Holiday Calendar & Manager",
+      desc: "Manage company holidays, gazetted calendar, and assign working days.",
+      btnText: "Open Manager",
+      icon: <LuCalendarCheck size={24} />,
+      iconBg: "rgba(16, 185, 129, 0.08)",
+      iconColor: "#10b981",
+      isLink: true,
+      linkTo: "/holidaymanager",
+      onClick: () => navigate("/holidaymanager"),
+    },
   ];
 
   const enabledTabIds = (() => {
     // 1. If tabs_enabled is true, all 20 modules are granted
     if (employee?.tabs_enabled || localStorage.getItem("tabs_enabled") === "true") {
-      return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21];
+      return quickActions.map((a) => a.id);
     }
 
     // 2. Check employee.enabled_tabs or localStorage
@@ -289,7 +315,7 @@ export default function EmployeeModulesView({ employee = {} }) {
     }
 
     // 3. Standard default modules
-    return [1, 2, 3, 4, 8, 9, 10, 11, 12, 14, 16, 21];
+    return [1, 2, 3, 4, 8, 9, 10, 11, 12, 14, 16, 21, 22];
   })();
 
   const visibleActions = quickActions.filter((action) =>

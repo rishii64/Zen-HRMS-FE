@@ -63,6 +63,10 @@ import Home from "../pages/Home";
 import Appraisal from "../pages/Apps/Apprasial";
 import CandidateOfferAcceptance from "../pages/Apps/CandidateOfferAcceptance";
 import ClaimsReimbursement from "../pages/Apps/ClaimsReimbursement";
+import OrgChart from "../pages/Apps/OrgChart";
+import Transfers from "../pages/Apps/Transfers";
+import Promotions from "../pages/Apps/Promotions";
+import Overtime from "../pages/Apps/Overtime";
 
 // ✅ ProtectedRoute — checks token presence, expiry validity, role authorization & designation RBAC
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -174,6 +178,26 @@ export default function AppRoute() {
       <Route path="/payslips" element={<Navigate to="/payslip" replace />} />
       <Route path="/salary-slips" element={<Navigate to="/payslip" replace />} />
       <Route path="/salary-slip" element={<Navigate to="/payslip" replace />} />
+
+      {/* Interactive Org Chart & Visual Analytics */}
+      <Route path="/org-chart" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "accounts", "payroll", "hod", "manager", "teamlead", "ceo", "coo", "cto", "cfo", "vp", "secretary", "management", "hrmanager"]}><OrgChart /></ProtectedRoute>} />
+      <Route path="/organization/chart" element={<Navigate to="/org-chart" replace />} />
+      <Route path="/hierarchy" element={<Navigate to="/org-chart" replace />} />
+      <Route path="/analytics" element={<Navigate to="/org-chart" replace />} />
+
+      {/* Transfers & Deputation Workflow */}
+      <Route path="/transfers" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "accounts", "payroll", "hod", "manager", "teamlead", "ceo", "coo", "cto", "cfo", "vp", "secretary", "management", "hrmanager"]}><Transfers /></ProtectedRoute>} />
+      <Route path="/transfer" element={<Navigate to="/transfers" replace />} />
+      <Route path="/deputation" element={<Navigate to="/transfers" replace />} />
+
+      {/* Promotions & Grade Progression Engine */}
+      <Route path="/promotions" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "accounts", "payroll", "hod", "manager", "teamlead", "ceo", "coo", "cto", "cfo", "vp", "secretary", "management", "hrmanager"]}><Promotions /></ProtectedRoute>} />
+      <Route path="/promotion" element={<Navigate to="/promotions" replace />} />
+      <Route path="/progression" element={<Navigate to="/promotions" replace />} />
+
+      {/* Overtime (OT) Tracking & Approval Engine */}
+      <Route path="/overtime" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "accounts", "payroll", "hod", "manager", "teamlead", "ceo", "coo", "cto", "cfo", "vp", "secretary", "management", "hrmanager"]}><Overtime /></ProtectedRoute>} />
+      <Route path="/ot" element={<Navigate to="/overtime" replace />} />
 
       {/* 404 Page */}
       <Route path="*" element={<h2 className="text-center mt-4">Page Not Found</h2>} />

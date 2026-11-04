@@ -32,18 +32,24 @@ code {
 /* Material Design & Custom Scrollbars */
 .scrollbar-none::-webkit-scrollbar {
   display: none;
+  width: 0;
+  height: 0;
 }
 .scrollbar-none {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
 
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
 .scrollbar-thin::-webkit-scrollbar {
-  height: 6px;
-  width: 6px;
+  height: 5px;
+  width: 5px;
 }
 .scrollbar-thin::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  background: transparent;
   border-radius: 9999px;
 }
 .scrollbar-thin::-webkit-scrollbar-thumb {
@@ -609,8 +615,11 @@ html.dark .profile-dropdown-card {
 }
 
 /* Dark scrollbars */
+html.dark .scrollbar-thin {
+  scrollbar-color: #475569 transparent;
+}
 html.dark .scrollbar-thin::-webkit-scrollbar-track {
-  background: #1e293b;
+  background: transparent;
 }
 
 html.dark .scrollbar-thin::-webkit-scrollbar-thumb {

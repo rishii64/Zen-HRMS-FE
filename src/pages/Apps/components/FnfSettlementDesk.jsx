@@ -100,13 +100,14 @@ export default function FnfSettlementDesk({ token, isEmployeeOnly = false }) {
     loan_outstanding_recovery: 0,
     advance_salary_recovery: 0,
     asset_damage_recovery: 0,
-    statutory_pf: 1800,
+    statutory_pf: 0,
     statutory_esi: 0,
-    statutory_pt: 200,
+    mediclaim_deduction: 0,
+    statutory_pt: 0,
     tax_tds_deduction: 0,
     other_deductions: 0,
     other_deductions_remarks: "",
-    total_deductions: 2000,
+    total_deductions: 0,
     net_payable_amount: 0,
     settlement_type: "PAYABLE_TO_EMPLOYEE",
     payment_status: "Pending",
@@ -222,7 +223,7 @@ export default function FnfSettlementDesk({ token, isEmployeeOnly = false }) {
     const updated = { ...form, ...updatedFields };
 
     const monthlyGross = parseFloat(updated.monthly_gross || 0);
-    const monthlyBasic = parseFloat(updated.monthly_basic || monthlyGross * 0.5);
+    const monthlyBasic = parseFloat(updated.monthly_basic != null && !isNaN(parseFloat(updated.monthly_basic)) ? updated.monthly_basic : monthlyGross * 0.45);
     const perDayRate = parseFloat(updated.per_day_rate || (monthlyGross > 0 ? monthlyGross / 26 : 0));
     const basicPerDayRate = parseFloat(updated.leave_encashment_rate || (monthlyBasic > 0 ? monthlyBasic / 26 : 0));
 
@@ -256,11 +257,12 @@ export default function FnfSettlementDesk({ token, isEmployeeOnly = false }) {
     const assetDmg = parseFloat(updated.asset_damage_recovery || 0);
     const pf = parseFloat(updated.statutory_pf || 0);
     const esi = parseFloat(updated.statutory_esi || 0);
+    const mediclaim = parseFloat(updated.mediclaim_deduction || 0);
     const pt = parseFloat(updated.statutory_pt || 0);
     const tds = parseFloat(updated.tax_tds_deduction || 0);
     const otherDed = parseFloat(updated.other_deductions || 0);
 
-    const totalDed = parseFloat((noticeRecovery + loanRec + advRec + assetDmg + pf + esi + pt + tds + otherDed).toFixed(2));
+    const totalDed = parseFloat((noticeRecovery + loanRec + advRec + assetDmg + pf + esi + mediclaim + pt + tds + otherDed).toFixed(2));
     const netPay = parseFloat((totalEarn - totalDed).toFixed(2));
     const setType = netPay >= 0 ? "PAYABLE_TO_EMPLOYEE" : "RECOVERABLE_FROM_EMPLOYEE";
 
@@ -274,6 +276,11 @@ export default function FnfSettlementDesk({ token, isEmployeeOnly = false }) {
       unpaid_salary_amount: unpaidSalary,
       leave_encashment_amount: encashAmount,
       gratuity_amount: gratuity,
+      statutory_pf: pf,
+      statutory_esi: esi,
+      mediclaim_deduction: mediclaim,
+      statutory_pt: pt,
+      tax_tds_deduction: tds,
       total_earnings: totalEarn,
       total_deductions: totalDed,
       net_payable_amount: netPay,
@@ -297,7 +304,7 @@ export default function FnfSettlementDesk({ token, isEmployeeOnly = false }) {
       settlement_date: new Date().toISOString().split("T")[0],
       status: "Draft",
       monthly_gross: 50000,
-      monthly_basic: 25000,
+      monthly_basic: 22500,
       per_day_rate: 1923.08,
       notice_period_days: 30,
       notice_served_days: 30,
@@ -307,7 +314,7 @@ export default function FnfSettlementDesk({ token, isEmployeeOnly = false }) {
       unpaid_salary_days: 0,
       unpaid_salary_amount: 0,
       leave_encashment_days: 0,
-      leave_encashment_rate: 961.54,
+      leave_encashment_rate: 865.38,
       leave_encashment_amount: 0,
       gratuity_eligible: false,
       tenure_years: 0,
@@ -320,13 +327,14 @@ export default function FnfSettlementDesk({ token, isEmployeeOnly = false }) {
       loan_outstanding_recovery: 0,
       advance_salary_recovery: 0,
       asset_damage_recovery: 0,
-      statutory_pf: 1800,
+      statutory_pf: 0,
       statutory_esi: 0,
-      statutory_pt: 200,
+      mediclaim_deduction: 0,
+      statutory_pt: 0,
       tax_tds_deduction: 0,
       other_deductions: 0,
       other_deductions_remarks: "",
-      total_deductions: 2000,
+      total_deductions: 0,
       net_payable_amount: 0,
       settlement_type: "PAYABLE_TO_EMPLOYEE",
       payment_status: "Pending",
@@ -878,7 +886,7 @@ export default function FnfSettlementDesk({ token, isEmployeeOnly = false }) {
       {/* ════════════════════════════════════════════════════════ */}
       {/* 3. MODAL: CREATE / REVIEW / EDIT F&F SETTLEMENT          */}
       {/* ════════════════════════════════════════════════════════ */}
-      <Modal show={showModal} onHide={() => setShowModal(false)} size="xl" centered>
+      <Modal show={showModal} onHide={() => setShowModal(false)} size="lg" centered>
         <Modal.Header closeButton className="border-0 pb-0">
           <Modal.Title className="text-base font-black text-slate-900 flex items-center gap-2">
             <LuReceipt className="text-indigo-600 w-5 h-5" />
@@ -1199,48 +1207,63 @@ export default function FnfSettlementDesk({ token, isEmployeeOnly = false }) {
                       />
                     </div>
 
-                    {/* Statutory PF, ESI, PT, TDS */}
+                    {/* Statutory PF, ESI, Mediclaim, PT, TDS */}
                     <div className="pt-2 border-t border-rose-100">
-                      <div className="text-[10px] font-extrabold text-slate-600 uppercase mb-1">Statutory Deductions</div>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[10px] font-extrabold text-slate-600 uppercase">
+                          Statutory &amp; Salary Structure Deductions
+                        </span>
+                        <span className="text-[9px] text-slate-400 italic">Auto-mapped from Salary Structure</span>
+                      </div>
                       <Row className="g-2">
-                        <Col xs={3}>
+                        <Col xs={4}>
                           <Form.Label className="text-[9px] font-bold text-slate-500">PF</Form.Label>
                           <Form.Control
                             type="number"
                             size="sm"
                             value={form.statutory_pf}
                             onChange={(e) => recalculateForm({ statutory_pf: parseFloat(e.target.value) || 0 })}
-                            className="text-xs rounded-lg"
+                            className="text-xs rounded-lg font-bold"
                           />
                         </Col>
-                        <Col xs={3}>
+                        <Col xs={4}>
                           <Form.Label className="text-[9px] font-bold text-slate-500">ESI</Form.Label>
                           <Form.Control
                             type="number"
                             size="sm"
                             value={form.statutory_esi}
                             onChange={(e) => recalculateForm({ statutory_esi: parseFloat(e.target.value) || 0 })}
-                            className="text-xs rounded-lg"
+                            className="text-xs rounded-lg font-bold"
                           />
                         </Col>
-                        <Col xs={3}>
-                          <Form.Label className="text-[9px] font-bold text-slate-500">PT</Form.Label>
+                        <Col xs={4}>
+                          <Form.Label className="text-[9px] font-bold text-slate-500">Mediclaim</Form.Label>
+                          <Form.Control
+                            type="number"
+                            size="sm"
+                            value={form.mediclaim_deduction}
+                            onChange={(e) => recalculateForm({ mediclaim_deduction: parseFloat(e.target.value) || 0 })}
+                            className="text-xs rounded-lg font-bold"
+                          />
+                        </Col>
+                        <Col xs={6}>
+                          <Form.Label className="text-[9px] font-bold text-slate-500">PT (Professional Tax)</Form.Label>
                           <Form.Control
                             type="number"
                             size="sm"
                             value={form.statutory_pt}
                             onChange={(e) => recalculateForm({ statutory_pt: parseFloat(e.target.value) || 0 })}
-                            className="text-xs rounded-lg"
+                            className="text-xs rounded-lg font-bold"
                           />
                         </Col>
-                        <Col xs={3}>
-                          <Form.Label className="text-[9px] font-bold text-slate-500">TDS</Form.Label>
+                        <Col xs={6}>
+                          <Form.Label className="text-[9px] font-bold text-slate-500">TDS (Tax)</Form.Label>
                           <Form.Control
                             type="number"
                             size="sm"
                             value={form.tax_tds_deduction}
                             onChange={(e) => recalculateForm({ tax_tds_deduction: parseFloat(e.target.value) || 0 })}
-                            className="text-xs rounded-lg"
+                            className="text-xs rounded-lg font-bold"
                           />
                         </Col>
                       </Row>

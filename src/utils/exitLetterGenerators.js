@@ -386,6 +386,7 @@ export const generateFnfSettlementSlipPDF = (settlement, company = {}) => {
     ["Unreturned Asset Damage / Replacement", "IT / Admin Recovery", formatPDFAmount(settlement.asset_damage_recovery)],
     ["Statutory Provident Fund (PF)", "Employee PF Contribution", formatPDFAmount(settlement.statutory_pf)],
     ["Statutory ESI Contribution", "Employee ESI", formatPDFAmount(settlement.statutory_esi)],
+    ...(parseFloat(settlement.mediclaim_deduction || 0) > 0 ? [["Mediclaim / Health Insurance", "Policy Deduction", formatPDFAmount(settlement.mediclaim_deduction)]] : []),
     ["Professional Tax (PT)", "State Statutory Tax", formatPDFAmount(settlement.statutory_pt)],
     ["TDS / Tax Withheld", "Tax Deduction", formatPDFAmount(settlement.tax_tds_deduction)],
     ["Other Deductions / Adjustments", settlement.other_deductions_remarks || "Miscellaneous", formatPDFAmount(settlement.other_deductions)],

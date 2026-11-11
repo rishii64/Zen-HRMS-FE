@@ -543,6 +543,14 @@ const OrgChart = () => {
                     <span className="text-slate-800">{selectedNode.work_location}</span>
                   </div>
                   <div className="d-flex justify-content-between">
+                    <span className="text-slate-500">Department Head / HOD:</span>
+                    <span className="text-slate-800 fw-medium">
+                      {selectedNode.hod_name && selectedNode.hod_name !== "N/A"
+                        ? `${selectedNode.hod_name}${selectedNode.hod_id ? ` (${selectedNode.hod_id})` : ""}`
+                        : (selectedNode.hod_id ? `HOD ID: ${selectedNode.hod_id}` : "—")}
+                    </span>
+                  </div>
+                  <div className="d-flex justify-content-between">
                     <span className="text-slate-500">Email:</span>
                     <span className="text-slate-800 font-mono text-3xs">{selectedNode.email}</span>
                   </div>

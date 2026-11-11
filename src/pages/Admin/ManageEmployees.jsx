@@ -206,6 +206,9 @@ const EMPTY_FORM = {
   designation_id: "",
   grade_id: "",
   reporting_manager_id: "",
+  reporting_manager: "",
+  hod_id: "",
+  hod_name: "",
   email: "",
   work_email: "",
   personal_email: "",
@@ -217,7 +220,6 @@ const EMPTY_FORM = {
   employment_type: "Permanent",
   current_salary: "",
   salary_type: "Monthly (In Hand)",
-  reporting_manager: "",
   joining_date: "",
   phone_no: "",
   password: "User@123",
@@ -1517,7 +1519,10 @@ const ManageEmployees = () => {
       department_id: emp.department_id || "",
       designation_id: emp.designation_id || "",
       grade_id: emp.grade_id || "",
-      reporting_manager_id: emp.reporting_manager_id || "",
+      reporting_manager_id: emp.reporting_manager_id || (employees.find((m) => m.name && m.name.toLowerCase().trim() === (emp.reporting_manager || "").toLowerCase().trim())?.employee_code || ""),
+      reporting_manager: emp.reporting_manager || "",
+      hod_id: emp.hod_id || "",
+      hod_name: emp.hod_name || "",
       company_name: emp.company_name || "TATA Steel",
       work_location: emp.work_location || "Kolkata",
     });
@@ -1542,6 +1547,7 @@ const ManageEmployees = () => {
       salary_type,
       joining_date,
       reporting_manager,
+      reporting_manager_id,
       phone_no,
     } = empForm;
 
@@ -1557,7 +1563,7 @@ const ManageEmployees = () => {
       !primaryWorkEmail ||
       !current_salary ||
       !joining_date ||
-      !reporting_manager ||
+      (!reporting_manager && !reporting_manager_id) ||
       !phone_no
     ) {
       toast.error("Please fill all required fields (including Work Email and Department)!");
@@ -1602,6 +1608,14 @@ const ManageEmployees = () => {
       email: primaryWorkEmail,
       work_email: primaryWorkEmail,
       personal_email: primaryPersonalEmail,
+      reporting_manager: empForm.reporting_manager && empForm.reporting_manager !== "N/A"
+        ? empForm.reporting_manager.trim()
+        : (employees.find((m) => (m.employee_code || "").toLowerCase() === (empForm.reporting_manager_id || "").toLowerCase())?.name || "N/A"),
+      reporting_manager_id: empForm.reporting_manager_id ? empForm.reporting_manager_id.trim() : null,
+      hod_id: empForm.hod_id ? empForm.hod_id.trim() : null,
+      hod_name: empForm.hod_name && empForm.hod_name !== "N/A"
+        ? empForm.hod_name.trim()
+        : (employees.find((m) => (m.employee_code || "").toLowerCase() === (empForm.hod_id || "").toLowerCase())?.name || null),
       current_salary: monthlySalary,
       salary_type: salary_type || "Monthly (In Hand)",
       facilities: empForm.facilities,
@@ -2452,6 +2466,26 @@ const ManageEmployees = () => {
                       <td className="py-3">
                         <div className="fw-semibold text-dark">{emp.designation || emp.job_role || "—"}</div>
                         <div className="text-muted small" style={{ fontSize: "11px" }}>{emp.dept || "General"}</div>
+                        {((emp.reporting_manager && emp.reporting_manager !== "N/A" && emp.reporting_manager !== "None") || emp.reporting_manager_id) && (
+                          <div className="text-muted small mt-1 d-flex flex-wrap align-items-center gap-1" style={{ fontSize: "11px" }}>
+                            <span className="text-slate-600">👤 {emp.reporting_manager && emp.reporting_manager !== "N/A" ? emp.reporting_manager : "Manager"}</span>
+                            {emp.reporting_manager_id && (
+                              <span className="badge bg-light text-primary border px-1.5 py-0.5" style={{ fontSize: "9.5px", fontWeight: "600" }}>
+                                {emp.reporting_manager_id}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        {((emp.hod_name && emp.hod_name !== "N/A" && emp.hod_name !== "None") || emp.hod_id) && (
+                          <div className="text-muted small mt-0.5 d-flex flex-wrap align-items-center gap-1" style={{ fontSize: "11px" }}>
+                            <span className="text-slate-600">🏛️ {emp.hod_name && emp.hod_name !== "N/A" ? emp.hod_name : "HOD"}</span>
+                            {emp.hod_id && (
+                              <span className="badge bg-light text-purple-700 border px-1.5 py-0.5" style={{ fontSize: "9.5px", fontWeight: "600" }}>
+                                {emp.hod_id}
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </td>
                       <td className="py-3">
                         <div className="d-flex align-items-center gap-2">
@@ -2739,7 +2773,11 @@ const ManageEmployees = () => {
                         setEmpForm(prev => ({
                           ...prev,
                           dept: matchedDept.dept_name,
-                          department_id: matchedDept.id
+                          department_id: matchedDept.id,
+                          ...(!prev.hod_id && matchedDept.hod_employee_id ? {
+                            hod_id: matchedDept.hod_employee_id,
+                            hod_name: matchedDept.hod_name || (employees.find(m => (m.employee_code || "").toLowerCase() === (matchedDept.hod_employee_id || "").toLowerCase())?.name || "Department Head")
+                          } : {})
                         }));
                       } else {
                         setEmpForm(prev => ({ ...prev, dept: val, department_id: "" }));
@@ -2981,11 +3019,144 @@ const ManageEmployees = () => {
                 <Form.Label className="small fw-bold">Joining Date</Form.Label>
                 <Form.Control size="sm" type="date" name="joining_date" value={empForm.joining_date} onChange={handleChange} />
               </Col>
-              <Col xs={12} md={4}>
+              <Col xs={12} md={6}>
                 <Form.Label className="small fw-bold">
                   Reporting Manager
                 </Form.Label>
-                <Form.Control size="sm" name="reporting_manager" value={empForm.reporting_manager} onChange={handleChange} />
+                <Form.Select
+                  size="sm"
+                  value={empForm.reporting_manager_id || ""}
+                  onChange={(e) => {
+                    const selId = e.target.value;
+                    if (!selId) {
+                      setEmpForm((prev) => ({
+                        ...prev,
+                        reporting_manager_id: "",
+                        reporting_manager: "N/A"
+                      }));
+                    } else {
+                      const found = employees.find(
+                        (m) => (m.employee_code || "").toLowerCase() === selId.toLowerCase()
+                      );
+                      setEmpForm((prev) => ({
+                        ...prev,
+                        reporting_manager_id: selId,
+                        reporting_manager: found ? found.name : prev.reporting_manager
+                      }));
+                    }
+                  }}
+                >
+                  <option value="">-- None   --</option>
+                  {employees
+                    .filter((m) => !editMode || (m.employee_code || "").toLowerCase() !== (empForm.employee_code || "").toLowerCase())
+                    .map((m) => (
+                      <option key={m.employee_code || m.id} value={m.employee_code}>
+                        {m.name} 
+                        {/* ({m.employee_code}) {m.designation ? `— ${m.designation}` : ""} */}
+                      </option>
+                    ))}
+                </Form.Select>
+                <div className="text-muted mt-1" style={{ fontSize: "11px" }}>
+                  Select manager from staff directory to auto-map ID & hierarchy
+                </div>
+              </Col>
+              <Col xs={12} md={6}>
+                <Form.Label className="small fw-bold d-flex align-items-center gap-1">
+                  Reporting Manager ID
+                  <Badge bg="light" text="dark" className="border" style={{ fontSize: "10px" }}>Code</Badge>
+                </Form.Label>
+                <Form.Control
+                  size="sm"
+                  type="text"
+                  placeholder="e.g. EMP-RM-66"
+                  name="reporting_manager_id"
+                  value={empForm.reporting_manager_id || ""}
+                  onChange={(e) => {
+                    const val = e.target.value.trim();
+                    const matched = employees.find(
+                      (m) => (m.employee_code || "").toLowerCase() === val.toLowerCase()
+                    );
+                    setEmpForm((prev) => ({
+                      ...prev,
+                      reporting_manager_id: val,
+                      reporting_manager: matched ? matched.name : (val ? prev.reporting_manager : "N/A")
+                    }));
+                  }}
+                />
+                <div className="text-muted mt-1" style={{ fontSize: "11px" }}>
+                  {empForm.reporting_manager && empForm.reporting_manager !== "N/A"
+                    ? `Mapped: ${empForm.reporting_manager}`
+                    : "Direct supervisor employee code"}
+                </div>
+              </Col>
+              <Col xs={12} md={6}>
+                <Form.Label className="small fw-bold">
+                  Department Head / HOD
+                </Form.Label>
+                <Form.Select
+                  size="sm"
+                  value={empForm.hod_id || ""}
+                  onChange={(e) => {
+                    const selId = e.target.value;
+                    if (!selId) {
+                      setEmpForm((prev) => ({
+                        ...prev,
+                        hod_id: "",
+                        hod_name: "N/A"
+                      }));
+                    } else {
+                      const found = employees.find(
+                        (m) => (m.employee_code || "").toLowerCase() === selId.toLowerCase()
+                      );
+                      setEmpForm((prev) => ({
+                        ...prev,
+                        hod_id: selId,
+                        hod_name: found ? found.name : prev.hod_name
+                      }));
+                    }
+                  }}
+                >
+                  <option value="">-- None / Default Dept Head --</option>
+                  {employees
+                    .filter((m) => !editMode || (m.employee_code || "").toLowerCase() !== (empForm.employee_code || "").toLowerCase())
+                    .map((m) => (
+                      <option key={m.employee_code || m.id} value={m.employee_code}>
+                        {m.name}
+                      </option>
+                    ))}
+                </Form.Select>
+                <div className="text-muted mt-1" style={{ fontSize: "11px" }}>
+                  Assigned HOD for department approvals, resignations, and appraisals
+                </div>
+              </Col>
+              <Col xs={12} md={6}>
+                <Form.Label className="small fw-bold d-flex align-items-center gap-1">
+                  Department Head / HOD ID
+                  <Badge bg="light" text="dark" className="border" style={{ fontSize: "10px" }}>Code</Badge>
+                </Form.Label>
+                <Form.Control
+                  size="sm"
+                  type="text"
+                  placeholder="e.g. HOD-ENG-01"
+                  name="hod_id"
+                  value={empForm.hod_id || ""}
+                  onChange={(e) => {
+                    const val = e.target.value.trim();
+                    const matched = employees.find(
+                      (m) => (m.employee_code || "").toLowerCase() === val.toLowerCase()
+                    );
+                    setEmpForm((prev) => ({
+                      ...prev,
+                      hod_id: val,
+                      hod_name: matched ? matched.name : (val ? prev.hod_name : "N/A")
+                    }));
+                  }}
+                />
+                <div className="text-muted mt-1" style={{ fontSize: "11px" }}>
+                  {empForm.hod_name && empForm.hod_name !== "N/A"
+                    ? `Mapped HOD: ${empForm.hod_name}`
+                    : "Assigned department head employee code"}
+                </div>
               </Col>
               <Col xs={12} md={4}>
                 <Form.Label className="small fw-bold">Phone</Form.Label>
@@ -3560,7 +3731,24 @@ const ManageEmployees = () => {
                         <InfoRow label="Aadhaar Number" value={emp.aadhaar_no} />
                         <InfoRow label="Department" value={emp.dept} />
                         <InfoRow label="Employment Type" value={emp.employment_type || "Permanent"} />
-                        <InfoRow label="Reporting Manager" value={emp.reporting_manager} />
+                        <InfoRow
+                          label="Reporting Manager"
+                          value={
+                            emp.reporting_manager && emp.reporting_manager !== "N/A"
+                              ? `${emp.reporting_manager} ${emp.reporting_manager_id ? `(${emp.reporting_manager_id})` : ""}`
+                              : (emp.reporting_manager_id ? `Manager ID: ${emp.reporting_manager_id}` : "None (Top Root)")
+                          }
+                        />
+                        <InfoRow label="Reporting Manager ID" value={emp.reporting_manager_id || "—"} />
+                        <InfoRow
+                          label="Department Head / HOD"
+                          value={
+                            emp.hod_name && emp.hod_name !== "N/A"
+                              ? `${emp.hod_name} ${emp.hod_id ? `(${emp.hod_id})` : ""}`
+                              : (emp.hod_id ? `HOD ID: ${emp.hod_id}` : "—")
+                          }
+                        />
+                        <InfoRow label="HOD ID" value={emp.hod_id || "—"} />
                         <InfoRow label="Joining Date" value={emp.joining_date ? emp.joining_date.split("T")[0] : "—"} />
                       </div>
                     </Col>

@@ -155,6 +155,10 @@ const PayslipPage = () => {
   const [selectedDept, setSelectedDept] = useState("all");
   const [viewMode, setViewMode] = useState("split"); // 'split' | 'table'
 
+  // Monthly Summary Register state (all employees attendance & working days deductions)
+  const [monthlySummaryList, setMonthlySummaryList] = useState([]);
+  const [loadingSummary, setLoadingSummary] = useState(false);
+
   // 1. Initial Load: Fetch all employees, all payroll records & ESI settings
   useEffect(() => {
     fetchInitialData();
@@ -217,12 +221,43 @@ const PayslipPage = () => {
     setLoadingEmployees(false);
   };
 
-  // 2. Fetch specific payslip data when selected employee or month/year changes
+  // 2. Fetch specific payslip data & monthly summary register when selected employee or month/year changes
   useEffect(() => {
     if (selectedEmpCode) {
       fetchEmployeeSlipData(selectedEmpCode, currentMonthYear);
     }
   }, [selectedEmpCode, currentMonthYear]);
+
+  // Fetch monthly summary register (working days, present days, LOP, monthly deductions for all employees)
+  const fetchSummaryData = async (monthYear) => {
+    setLoadingSummary(true);
+    try {
+      const userRole = (localStorage.getItem("role") || "admin").toLowerCase();
+      const res = await fetch(
+        `${API}/payroll/summary-sheet?month=${encodeURIComponent(
+          monthYear || currentMonthYear
+        )}&_t=${Date.now()}`,
+        {
+          cache: "no-store",
+          headers: { "Cache-Control": "no-cache", role: userRole },
+        }
+      );
+      const d = await res.json();
+      if (d.success && Array.isArray(d.summary)) {
+        setMonthlySummaryList(d.summary);
+        return d.summary;
+      }
+    } catch (err) {
+      console.warn("Could not fetch monthly summary-sheet:", err);
+    } finally {
+      setLoadingSummary(false);
+    }
+    return [];
+  };
+
+  useEffect(() => {
+    fetchSummaryData(currentMonthYear);
+  }, [currentMonthYear]);
 
   const fetchEmployeeSlipData = async (empCode, monthYear) => {
     setLoadingSlip(true);
@@ -385,7 +420,8 @@ const PayslipPage = () => {
       ? { label: "Employee State Insurance (ESI)", amount: parseFloat(stat.esi) || 0 }
       : { label: "Mediclaim", amount: parseFloat(stat.mediclaim) || 0 };
 
-    const deductions = [
+    // 1. Fixed Monthly & Statutory Deductions (recurring)
+    const monthlyStatutoryList = [
       { label: "Provident Fund (PF)", amount: parseFloat(stat.pf) || 0 },
       healthDeduction,
       { label: "Professional Tax (PT)", amount: parseFloat(stat.pt) || 0 },
@@ -393,41 +429,57 @@ const PayslipPage = () => {
         label: "TDS / Income Tax",
         amount: (parseFloat(tax.tds) || 0) + (parseFloat(tax.other_tax) || 0),
       },
-      { label: "Loss of Pay (LOP)", amount: lopCalc },
       { label: "Other Deductions", amount: parseFloat(stat.others) || 0 },
     ];
 
     if (isPermanent) {
       if (parseFloat(adj.advance_deduction) > 0) {
-        deductions.push({
+        monthlyStatutoryList.push({
           label: "Advance Payment Recovery",
           amount: parseFloat(adj.advance_deduction) || 0,
         });
       }
       if (parseFloat(adj.loan_emi) > 0) {
-        deductions.push({
+        monthlyStatutoryList.push({
           label: "Company Loan EMI",
           amount: parseFloat(adj.loan_emi) || 0,
         });
       }
       if (parseFloat(adj.insurance_deduction) > 0) {
-        deductions.push({
+        monthlyStatutoryList.push({
           label: "Corporate Group Insurance",
           amount: parseFloat(adj.insurance_deduction) || 0,
         });
       }
     }
 
-    const filteredDeductions = deductions.filter((item) => item.amount > 0);
+    const filteredMonthlyDeductions = monthlyStatutoryList.filter((item) => item.amount > 0);
+    const monthlyDedsTotal = filteredMonthlyDeductions.reduce((acc, it) => acc + it.amount, 0);
+
+    // 2. Attendance-Based Loss of Pay (LOP) for unpaid days in current month
+    const lopItem = lopCalc > 0 ? {
+      label: `Loss of Pay (LOP) — ${att.lop_days || 0} Unpaid Days`,
+      amount: lopCalc,
+      isLop: true,
+      subtext: `Attendance Proration: ${att.paid_days || 0} of ${att.total_days || 30} days paid`,
+    } : null;
+
+    const filteredDeductions = lopItem ? [...filteredMonthlyDeductions, lopItem] : filteredMonthlyDeductions;
     const gross = earnings.reduce((acc, it) => acc + it.amount, 0);
-    const totalDeds = filteredDeductions.reduce((acc, it) => acc + it.amount, 0);
+    const totalDeds = monthlyDedsTotal + lopCalc;
+    const earnedGross = Math.max(0, gross - lopCalc);
     const net = Math.max(0, gross - totalDeds);
     const status = isFinal ? "Finalized" : "Unpaid";
 
     return {
       earnings,
       deductions: filteredDeductions,
+      monthlyDeductions: filteredMonthlyDeductions,
+      monthlyDedsTotal,
+      lopDeduction: lopCalc,
+      lopItem,
       gross,
+      earnedGross,
       totalDeds,
       net,
       status,
@@ -720,6 +772,9 @@ const PayslipPage = () => {
 
   // Fetch full monthly register from summary-sheet API (with fallback)
   const fetchMonthlyRegister = async () => {
+    if (monthlySummaryList && monthlySummaryList.length > 0) {
+      return monthlySummaryList;
+    }
     try {
       const userRole = (localStorage.getItem("role") || "admin").toLowerCase();
       const res = await fetch(
@@ -733,6 +788,7 @@ const PayslipPage = () => {
       );
       const d = await res.json();
       if (d.success && Array.isArray(d.summary) && d.summary.length > 0) {
+        setMonthlySummaryList(d.summary);
         return d.summary;
       }
     } catch (err) {
@@ -1547,57 +1603,107 @@ const PayslipPage = () => {
 
                     {/* Right: Non-Zero Deductions */}
                     <Col xs={12} md={6}>
-                      <div className="p-3 rounded-3 border bg-white h-100">
+                      <div className="p-3 rounded-3 border bg-white h-100 d-flex flex-column">
                         <div className="fw-bold text-danger pb-2 mb-2 border-bottom d-flex justify-content-between align-items-center">
-                          <span>Monthly Deductions</span>
+                          <span>Deductions &amp; Recoveries</span>
                           <span className="small text-muted fw-normal">INR (₹)</span>
                         </div>
 
-                        {slipBreakdown.deductions.length === 0 ? (
-                          <div className="small text-muted fst-italic py-2">
-                            No deductions applicable for this period.
+                        {/* 1. Monthly Statutory & Benefit Deductions */}
+                        <div className="mb-2.5">
+                          <div className="d-flex justify-content-between align-items-center mb-1.5 pb-1 border-bottom border-light">
+                            <span className="text-uppercase fw-bold text-muted" style={{ fontSize: "10px", letterSpacing: "0.5px" }}>
+                              1. Fixed Monthly &amp; Statutory Deductions
+                            </span>
+                            <span className="fw-bold text-dark" style={{ fontSize: "11px" }}>
+                              Subtotal: {fmt(slipBreakdown.monthlyDedsTotal || 0)}
+                            </span>
                           </div>
-                        ) : (
-                          slipBreakdown.deductions.map((ded, i) => (
-                            <div
-                              key={i}
-                              className="d-flex justify-content-between align-items-center small text-muted mb-2"
-                            >
-                              <span className="d-flex align-items-center gap-1.5 flex-wrap">
-                                <span>{ded.label}</span>
-                                {ded.label.includes("ESI") && (
-                                  <Badge
-                                    bg="primary"
-                                    className="cursor-pointer"
-                                    style={{ fontSize: "10px", cursor: "pointer" }}
-                                    onClick={() => setShowEsiAuditModal(true)}
-                                    title="Click to view statutory ESI wage ceiling & audit history"
-                                  >
-                                    ₹{Number(globalEsiThreshold).toLocaleString("en-IN")} Ceiling ⓘ
-                                  </Badge>
-                                )}
-                                {ded.label.includes("Mediclaim") && (
-                                  <Badge
-                                    bg="secondary"
-                                    className="cursor-pointer fw-normal"
-                                    style={{ fontSize: "10px", cursor: "pointer" }}
-                                    onClick={() => setShowEsiAuditModal(true)}
-                                    title="Gross exceeds ₹21,000 statutory limit - covered under corporate Mediclaim instead of ESI"
-                                  >
-                                    Gross &gt; ₹{Number(globalEsiThreshold).toLocaleString("en-IN")} ⓘ
-                                  </Badge>
-                                )}
-                              </span>
-                              <span className="text-danger fw-semibold">
-                                {fmt(ded.amount)}
-                              </span>
-                            </div>
-                          ))
-                        )}
 
-                        <div className="d-flex justify-content-between small fw-bold text-dark pt-2 border-top mt-auto">
-                          <span>Total Deductions</span>
-                          <span className="text-danger">
+                          {(!slipBreakdown.monthlyDeductions || slipBreakdown.monthlyDeductions.length === 0) ? (
+                            <div className="small text-muted fst-italic py-1" style={{ fontSize: "11px" }}>
+                              No fixed statutory deductions.
+                            </div>
+                          ) : (
+                            slipBreakdown.monthlyDeductions.map((ded, i) => (
+                              <div
+                                key={i}
+                                className="d-flex justify-content-between align-items-center small text-muted mb-1.5"
+                              >
+                                <span className="d-flex align-items-center gap-1.5 flex-wrap">
+                                  <span>{ded.label}</span>
+                                  {ded.label.includes("ESI") && (
+                                    <Badge
+                                      bg="primary"
+                                      className="cursor-pointer"
+                                      style={{ fontSize: "9.5px", cursor: "pointer" }}
+                                      onClick={() => setShowEsiAuditModal(true)}
+                                      title="Click to view statutory ESI wage ceiling & audit history"
+                                    >
+                                      ₹{Number(globalEsiThreshold).toLocaleString("en-IN")} Ceiling ⓘ
+                                    </Badge>
+                                  )}
+                                  {ded.label.includes("Mediclaim") && (
+                                    <Badge
+                                      bg="secondary"
+                                      className="cursor-pointer fw-normal"
+                                      style={{ fontSize: "9.5px", cursor: "pointer" }}
+                                      onClick={() => setShowEsiAuditModal(true)}
+                                      title="Gross exceeds ₹21,000 statutory limit - covered under corporate Mediclaim instead of ESI"
+                                    >
+                                      Gross &gt; ₹{Number(globalEsiThreshold).toLocaleString("en-IN")} ⓘ
+                                    </Badge>
+                                  )}
+                                </span>
+                                <span className="text-danger fw-semibold">
+                                  {fmt(ded.amount)}
+                                </span>
+                              </div>
+                            ))
+                          )}
+                        </div>
+
+                        {/* 2. Attendance / Working Days Loss of Pay (LOP) */}
+                        <div className="mb-2.5">
+                          <div className="d-flex justify-content-between align-items-center mb-1.5 pb-1 border-bottom border-light">
+                            <span className="text-uppercase fw-bold text-muted" style={{ fontSize: "10px", letterSpacing: "0.5px" }}>
+                              2. Attendance / Working Days Deduction
+                            </span>
+                            <span className="fw-bold text-danger" style={{ fontSize: "11px" }}>
+                              {fmt(slipBreakdown.lopDeduction || 0)}
+                            </span>
+                          </div>
+
+                          {(slipBreakdown.lopDeduction || 0) > 0 ? (
+                            <div className="p-2 rounded-2 border mb-1" style={{ background: "#fff1f2", borderColor: "#fecdd3" }}>
+                              <div className="d-flex justify-content-between align-items-center">
+                                <span className="fw-bold text-danger" style={{ fontSize: "11.5px" }}>
+                                  Loss of Pay (LOP) — {slipBreakdown.attendance?.lop_days || 0} Unpaid Days
+                                </span>
+                                <span className="fw-bold text-danger">
+                                  {fmt(slipBreakdown.lopDeduction)}
+                                </span>
+                              </div>
+                              <div className="text-muted mt-0.5" style={{ fontSize: "10px" }}>
+                                Attendance Proration: {slipBreakdown.attendance?.present_days ?? 0} Present + {((slipBreakdown.attendance?.paid_days ?? 0) - (slipBreakdown.attendance?.present_days ?? 0))} Offs/Holidays = {slipBreakdown.attendance?.paid_days ?? 0} Paid Days (out of {slipBreakdown.attendance?.total_days || 30} days in month)
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="small text-success fst-italic py-1" style={{ fontSize: "11px" }}>
+                              ✓ Full Attendance ({slipBreakdown.attendance?.paid_days ?? 30}/{slipBreakdown.attendance?.total_days || 30} days paid) — No Loss of Pay (₹0 LOP).
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Total Deductions Footer */}
+                        <div className="d-flex justify-content-between align-items-center small fw-bold text-dark pt-2 border-top mt-auto">
+                          <div>
+                            <span>Total Deductions</span>
+                            <div className="text-muted fw-normal" style={{ fontSize: "10.5px" }}>
+                              Monthly ({fmt(slipBreakdown.monthlyDedsTotal || 0)}) + LOP ({fmt(slipBreakdown.lopDeduction || 0)})
+                            </div>
+                          </div>
+                          <span className="text-danger fs-6">
                             {fmt(slipBreakdown.totalDeds)}
                           </span>
                         </div>
@@ -1607,7 +1713,7 @@ const PayslipPage = () => {
 
                   {/* Net Salary Payable Highlight Banner */}
                   <div
-                    className="p-3.5 rounded-3 mb-4 d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-2"
+                    className="p-3.5 rounded-3 mb-4 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3"
                     style={{ background: "#f0fdf4", border: "1px solid #bbf7d0" }}
                   >
                     <div>
@@ -1617,8 +1723,31 @@ const PayslipPage = () => {
                       <span className="small text-muted fst-italic">
                         {numberToWords(slipBreakdown.net)}
                       </span>
+                      {/* Clear Net Calculation Equation Pill */}
+                      <div className="d-flex align-items-center gap-1.5 flex-wrap mt-2" style={{ fontSize: "11px" }}>
+                        <span className="badge bg-white text-dark border px-2 py-1 shadow-2xs">
+                          Gross: {fmt(slipBreakdown.gross)}
+                        </span>
+                        <span className="text-muted fw-bold">−</span>
+                        <span className="badge bg-white text-danger border px-2 py-1 shadow-2xs">
+                          Monthly Ded: {fmt(slipBreakdown.monthlyDedsTotal || 0)}
+                        </span>
+                        {(slipBreakdown.lopDeduction || 0) > 0 && (
+                          <>
+                            <span className="text-muted fw-bold">−</span>
+                            <span className="badge bg-white text-danger border px-2 py-1 shadow-2xs">
+                              LOP ({slipBreakdown.attendance?.lop_days || 0}d): {fmt(slipBreakdown.lopDeduction)}
+                            </span>
+                          </>
+                        )}
+                        <span className="text-muted fw-bold">=</span>
+                        <span className="badge bg-success text-white fw-bold px-2 py-1 shadow-2xs">
+                          Net In-Hand: {fmt(slipBreakdown.net)}
+                        </span>
+                      </div>
                     </div>
-                    <div className="text-sm-end">
+                    <div className="text-md-end">
+                      <div className="text-muted small mb-0.5">Final Net Amount</div>
                       <h2 className="fw-bold mb-0 text-success">
                         {fmt(slipBreakdown.net)}
                       </h2>
@@ -1736,6 +1865,7 @@ const PayslipPage = () => {
                 <tr>
                   <th className="py-2.5 ps-3">Staff Member</th>
                   <th className="py-2.5">Role / Dept</th>
+                  <th className="py-2.5 text-center">Working &amp; Paid Days</th>
                   <th className="py-2.5 text-end">Gross Pay</th>
                   <th className="py-2.5 text-center">Statutory Cover</th>
                   <th className="py-2.5 text-end">Total Deductions</th>
@@ -1746,6 +1876,11 @@ const PayslipPage = () => {
               </thead>
               <tbody>
                 {filteredEmployees.map((emp) => {
+                  const cleanCode = String(emp.employee_code || "").replace(/^#/, "").trim().toLowerCase();
+                  const summaryItem = monthlySummaryList.find(
+                    (s) => String(s.employee_code || "").replace(/^#/, "").trim().toLowerCase() === cleanCode
+                  );
+
                   let ss = {};
                   try {
                     ss =
@@ -1758,7 +1893,7 @@ const PayslipPage = () => {
                   const ded = ss.deductions || {};
                   const curSal = parseFloat(emp.current_salary) || 25000;
 
-                  const gross =
+                  const fallbackGross =
                     (parseFloat(earn.basic) || 0) +
                     (parseFloat(earn.da) || 0) +
                     (parseFloat(earn.hra) || 0) +
@@ -1767,25 +1902,30 @@ const PayslipPage = () => {
                     (parseFloat(earn.allowance) || 0) ||
                     curSal;
 
-                  const totalDeds =
+                  const fallbackMonthlyDeds =
                     (parseFloat(ded.professional_tax) || 0) +
                     (parseFloat(ded.income_tax) || 0) +
                     (parseFloat(ded.pf) || 0) +
                     (parseFloat(ded.esi) || 0) +
-                    (parseFloat(ded.tds) || 0) +
-                    (parseFloat(ded.lop) || 0);
+                    (parseFloat(ded.mediclaim) || 0) +
+                    (parseFloat(ded.tds) || 0);
 
-                  const net =
-                    parseFloat(ss.net_salary) ||
-                    Math.max(0, gross - totalDeds);
+                  const gross = summaryItem ? summaryItem.gross_pay : fallbackGross;
+                  const earnedGross = summaryItem ? summaryItem.earned_gross : gross;
+                  const paidDays = summaryItem?.attendance?.paid_days ?? 30;
+                  const totalDays = summaryItem?.attendance?.total_days ?? 30;
+                  const presentDays = summaryItem?.attendance?.present_days ?? 30;
+                  const lopDays = summaryItem?.lop_days ?? 0;
+                  const lopAmount = summaryItem?.lop_amount ?? 0;
+                  const monthlyDeds = summaryItem ? summaryItem.statutory_deductions : fallbackMonthlyDeds;
+                  const totalDeds = summaryItem ? summaryItem.total_deductions : (monthlyDeds + lopAmount);
+                  const net = summaryItem ? (summaryItem.payable_salary ?? summaryItem.net_salary) : Math.max(0, gross - totalDeds);
 
                   // Check if finalized in allPayrolls
-                  const isPaid = allPayrolls.some(
+                  const isPaid = summaryItem ? summaryItem.is_paid : allPayrolls.some(
                     (p) =>
-                      String(p.employee_id).toLowerCase() ===
-                      String(emp.employee_code).toLowerCase() &&
-                      String(p.month_year).toLowerCase() ===
-                      currentMonthYear.toLowerCase() &&
+                      String(p.employee_id).toLowerCase() === cleanCode &&
+                      String(p.month_year).toLowerCase() === currentMonthYear.toLowerCase() &&
                       p.status === "Finalized"
                   );
 
@@ -1813,8 +1953,26 @@ const PayslipPage = () => {
                           {emp.dept || "General"}
                         </div>
                       </td>
+                      <td className="text-center">
+                        <div className="fw-semibold text-dark" style={{ fontSize: "11.5px" }}>
+                          {paidDays} / {totalDays} Days
+                        </div>
+                        <div className="text-muted" style={{ fontSize: "10.5px" }}>
+                          {presentDays} Present
+                          {lopDays > 0 ? (
+                            <span className="text-danger fw-semibold"> • {lopDays}d LOP</span>
+                          ) : (
+                            <span className="text-success fw-semibold"> • Full</span>
+                          )}
+                        </div>
+                      </td>
                       <td className="text-end fw-semibold text-dark">
-                        {fmt(gross)}
+                        <div>{fmt(gross)}</div>
+                        {lopAmount > 0 && (
+                          <div className="text-muted fw-normal" style={{ fontSize: "10px" }}>
+                            Earned: <span className="text-success fw-semibold">{fmt(earnedGross)}</span>
+                          </div>
+                        )}
                       </td>
                       <td className="text-center">
                         <span
@@ -1832,11 +1990,27 @@ const PayslipPage = () => {
                           {isEsiCovered ? `🛡️ ESI (≤₹${Number(globalEsiThreshold).toLocaleString("en-IN")})` : "Mediclaim"}
                         </span>
                       </td>
-                      <td className="text-end text-danger">
-                        {fmt(totalDeds)}
+                      <td className="text-end">
+                        <div className="fw-bold text-danger fs-6">
+                          {fmt(totalDeds)}
+                        </div>
+                        <div className="text-muted" style={{ fontSize: "10.5px" }}>
+                          {lopAmount > 0 ? (
+                            <span>
+                              Monthly: <span className="text-dark fw-semibold">{fmt(monthlyDeds)}</span>
+                              {" + "}
+                              LOP ({lopDays}d): <span className="text-danger fw-semibold">{fmt(lopAmount)}</span>
+                            </span>
+                          ) : (
+                            <span>Monthly: {fmt(monthlyDeds)} (0 LOP)</span>
+                          )}
+                        </div>
                       </td>
                       <td className="text-end fw-bold text-success fs-6">
-                        {fmt(net)}
+                        <div>{fmt(net)}</div>
+                        <div className="text-muted fw-normal" style={{ fontSize: "10px" }}>
+                          {lopAmount > 0 ? `In-Hand (${paidDays}d)` : "Full Month"}
+                        </div>
                       </td>
                       <td className="text-center">
                         <span
@@ -1855,7 +2029,7 @@ const PayslipPage = () => {
                         <Button
                           size="sm"
                           variant="outline-dark"
-                          className="rounded-pill py-1 px-3 small fw-semibold"
+                          className="rounded-pill py-1 px-3 text-[10px] small fw-semibold"
                           onClick={() => {
                             setSelectedEmpCode((emp.employee_code || "").toString().replace(/^#/, "").trim());
                             setViewMode("split");

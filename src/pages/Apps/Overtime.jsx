@@ -113,9 +113,9 @@ export default function Overtime() {
   const currentRole = (getAuthRole() || "").toLowerCase().trim();
   const currentEmpId = String(
     currentUser.employee_id ||
-      currentUser.employee_code ||
-      currentUser.id ||
-      ""
+    currentUser.employee_code ||
+    currentUser.id ||
+    ""
   ).trim();
   const currentUserName = String(currentUser.name || currentUser.userName || "").trim();
 
@@ -419,7 +419,7 @@ export default function Overtime() {
       ticket.reporting_manager &&
       currentUserName &&
       ticket.reporting_manager.toLowerCase().trim() ===
-        currentUserName.toLowerCase().trim()
+      currentUserName.toLowerCase().trim()
     ) {
       return true;
     }
@@ -480,7 +480,8 @@ export default function Overtime() {
   };
 
   return (
-    <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6">
+    <>
+      <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6">
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -491,9 +492,9 @@ export default function Overtime() {
             <div>
               <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
                 Overtime (OT) Tracking & Approval Engine
-                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-700">
+                {/* <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-700">
                   Tab 28
-                </span>
+                </span> */}
               </h1>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-medium">
                 Automatic OT tracking beyond shift end, manager ticket approvals, and payroll payout sync
@@ -809,10 +810,10 @@ export default function Overtime() {
                         <div className="h-8 w-8 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center font-bold text-slate-700 dark:text-slate-300 text-xs shrink-0">
                           {t.employee_name
                             ? t.employee_name
-                                .split(" ")
-                                .map((n) => n[0])
-                                .slice(0, 2)
-                                .join("")
+                              .split(" ")
+                              .map((n) => n[0])
+                              .slice(0, 2)
+                              .join("")
                             : "EM"}
                         </div>
                         <div>
@@ -960,14 +961,15 @@ export default function Overtime() {
           </table>
         </div>
       </div>
+    </div>
 
       {/* ======================================================== */}
       {/* MODAL 1: RAISE OVERTIME TICKET */}
       {/* ======================================================== */}
       {isRaiseModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
-          <div className="relative w-full max-w-xl rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xl p-6 my-8">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
+        <div className="fixed inset-0 z-[100] m-0 !mt-0 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsRaiseModalOpen(false)}>
+          <div className="relative w-full max-w-xl rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 pb-3 sm:p-5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/80 shrink-0">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center">
                   <LuClock className="h-5 w-5" />
@@ -989,230 +991,232 @@ export default function Overtime() {
               </button>
             </div>
 
-            <form onSubmit={handleSubmitTicket} className="mt-4 space-y-4">
-              {/* Employee Selection (if privileged) */}
-              {isPrivileged && eligibleEmployees.length > 0 && (
+            <form onSubmit={handleSubmitTicket} className="flex flex-col flex-1 overflow-hidden">
+              <div className="px-5 pt-2 overflow-y-auto space-y-4 text-xs scrollbar-thin">
+                {/* Employee Selection (if privileged) */}
+                {isPrivileged && eligibleEmployees.length > 0 && (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      Select Employee <span className="text-rose-500">*</span>
+                    </label>
+                    <select
+                      value={formData.employee_id}
+                      onChange={(e) => {
+                        const empId = e.target.value;
+                        const emp = eligibleEmployees.find((e) => e.employee_id === empId);
+                        setFormData((prev) => ({
+                          ...prev,
+                          employee_id: empId,
+                          hourly_rate: emp?.hourly_rate || prev.hourly_rate,
+                          estimated_payout: Math.round(
+                            (prev.overtime_hours || 0) * (emp?.hourly_rate || 200) * (prev.ot_multiplier || 1.5)
+                          ),
+                        }));
+                      }}
+                      className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium"
+                    >
+                      {eligibleEmployees.map((emp) => (
+                        <option key={emp.employee_id} value={emp.employee_id}>
+                          {emp.name} ({emp.employee_id}) • {emp.department} • ₹{emp.hourly_rate}/hr
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Attendance Date & Shift End */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      Attendance Date <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      value={formData.attendance_date}
+                      onChange={(e) =>
+                        setFormData({ ...formData, attendance_date: e.target.value })
+                      }
+                      className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      Shift Name
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.shift_name}
+                      onChange={(e) =>
+                        setFormData({ ...formData, shift_name: e.target.value })
+                      }
+                      className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium"
+                    />
+                  </div>
+                </div>
+
+                {/* Punch Timings & Shift Timings */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 text-xs">
+                  <div>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase block">
+                      Shift Start
+                    </span>
+                    <input
+                      type="text"
+                      value={formData.shift_start}
+                      onChange={(e) =>
+                        setFormData({ ...formData, shift_start: e.target.value })
+                      }
+                      className="w-full mt-1 px-2 py-1 text-xs font-mono font-bold rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase block">
+                      Shift End
+                    </span>
+                    <input
+                      type="text"
+                      value={formData.shift_end}
+                      onChange={(e) =>
+                        setFormData({ ...formData, shift_end: e.target.value })
+                      }
+                      className="w-full mt-1 px-2 py-1 text-xs font-mono font-bold rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase block">
+                      Punched In
+                    </span>
+                    <input
+                      type="text"
+                      value={formData.check_in}
+                      onChange={(e) =>
+                        setFormData({ ...formData, check_in: e.target.value })
+                      }
+                      className="w-full mt-1 px-2 py-1 text-xs font-mono font-bold rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold uppercase block">
+                      Punched Out
+                    </span>
+                    <input
+                      type="text"
+                      value={formData.check_out}
+                      onChange={(e) =>
+                        setFormData({ ...formData, check_out: e.target.value })
+                      }
+                      className="w-full mt-1 px-2 py-1 text-xs font-mono font-bold rounded border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-800 text-amber-700 dark:text-amber-300"
+                    />
+                  </div>
+                </div>
+
+                {/* Overtime Hours, Rate & Estimated Payout */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      Overtime Hours <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        step="0.25"
+                        min="0.25"
+                        max="12"
+                        required
+                        value={formData.overtime_hours}
+                        onChange={(e) => handleHoursChange(e.target.value)}
+                        className="w-full pl-3 pr-10 py-2 text-xs font-black rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50/40 dark:bg-slate-800 text-amber-800 dark:text-amber-200 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      />
+                      <span className="absolute right-3 top-2 text-[11px] font-bold text-amber-600">
+                        hrs
+                      </span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      Standard Hourly Rate
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        step="1"
+                        min="1"
+                        value={formData.hourly_rate}
+                        onChange={(e) => {
+                          const rate = parseFloat(e.target.value) || 0;
+                          setFormData((prev) => ({
+                            ...prev,
+                            hourly_rate: rate,
+                            estimated_payout: Math.round(
+                              (prev.overtime_hours || 0) * rate * (prev.ot_multiplier || 1.5)
+                            ),
+                          }));
+                        }}
+                        className="w-full pl-6 pr-3 py-2 text-xs font-mono font-bold rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                      />
+                      <span className="absolute left-2.5 top-2 text-xs text-slate-400">
+                        ₹
+                      </span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-emerald-800 dark:text-emerald-300 mb-1">
+                      Est. Payout (1.5x rate)
+                    </label>
+                    <div className="px-3 py-2 text-xs font-black rounded-lg border border-emerald-300 dark:border-emerald-700 bg-emerald-50/60 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 flex items-center justify-between">
+                      <span>{formatINR(formData.estimated_payout)}</span>
+                      <span className="text-[10px] font-semibold text-emerald-600">
+                        1.5x
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Reason for Overtime */}
                 <div>
                   <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    Select Employee <span className="text-rose-500">*</span>
+                    Reason for Overtime <span className="text-rose-500">*</span>
                   </label>
                   <select
-                    value={formData.employee_id}
-                    onChange={(e) => {
-                      const empId = e.target.value;
-                      const emp = eligibleEmployees.find((e) => e.employee_id === empId);
-                      setFormData((prev) => ({
-                        ...prev,
-                        employee_id: empId,
-                        hourly_rate: emp?.hourly_rate || prev.hourly_rate,
-                        estimated_payout: Math.round(
-                          (prev.overtime_hours || 0) * (emp?.hourly_rate || 200) * (prev.ot_multiplier || 1.5)
-                        ),
-                      }));
-                    }}
+                    value={formData.reason_for_ot}
+                    onChange={(e) =>
+                      setFormData({ ...formData, reason_for_ot: e.target.value })
+                    }
                     className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium"
                   >
-                    {eligibleEmployees.map((emp) => (
-                      <option key={emp.employee_id} value={emp.employee_id}>
-                        {emp.name} ({emp.employee_id}) • {emp.department} • ₹{emp.hourly_rate}/hr
+                    {OT_REASONS.map((r, i) => (
+                      <option key={i} value={r}>
+                        {r}
                       </option>
                     ))}
                   </select>
                 </div>
-              )}
 
-              {/* Attendance Date & Shift End */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Task Description */}
                 <div>
                   <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    Attendance Date <span className="text-rose-500">*</span>
+                    Detailed Task Description & Justification{" "}
+                    <span className="text-rose-500">*</span>
                   </label>
-                  <input
-                    type="date"
+                  <textarea
                     required
-                    value={formData.attendance_date}
+                    rows={3}
+                    placeholder="Explain the specific deliverables, critical issues resolved, or tickets worked on past shift hours..."
+                    value={formData.task_description}
                     onChange={(e) =>
-                      setFormData({ ...formData, attendance_date: e.target.value })
+                      setFormData({ ...formData, task_description: e.target.value })
                     }
                     className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium"
                   />
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    Shift Name
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.shift_name}
-                    onChange={(e) =>
-                      setFormData({ ...formData, shift_name: e.target.value })
-                    }
-                    className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium"
-                  />
-                </div>
+                {/* Action Buttons */}
               </div>
-
-              {/* Punch Timings & Shift Timings */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 text-xs">
-                <div>
-                  <span className="text-[10px] text-slate-400 font-bold uppercase block">
-                    Shift Start
-                  </span>
-                  <input
-                    type="text"
-                    value={formData.shift_start}
-                    onChange={(e) =>
-                      setFormData({ ...formData, shift_start: e.target.value })
-                    }
-                    className="w-full mt-1 px-2 py-1 text-xs font-mono font-bold rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
-                  />
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-400 font-bold uppercase block">
-                    Shift End
-                  </span>
-                  <input
-                    type="text"
-                    value={formData.shift_end}
-                    onChange={(e) =>
-                      setFormData({ ...formData, shift_end: e.target.value })
-                    }
-                    className="w-full mt-1 px-2 py-1 text-xs font-mono font-bold rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
-                  />
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-400 font-bold uppercase block">
-                    Punched In
-                  </span>
-                  <input
-                    type="text"
-                    value={formData.check_in}
-                    onChange={(e) =>
-                      setFormData({ ...formData, check_in: e.target.value })
-                    }
-                    className="w-full mt-1 px-2 py-1 text-xs font-mono font-bold rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
-                  />
-                </div>
-                <div>
-                  <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold uppercase block">
-                    Punched Out
-                  </span>
-                  <input
-                    type="text"
-                    value={formData.check_out}
-                    onChange={(e) =>
-                      setFormData({ ...formData, check_out: e.target.value })
-                    }
-                    className="w-full mt-1 px-2 py-1 text-xs font-mono font-bold rounded border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-800 text-amber-700 dark:text-amber-300"
-                  />
-                </div>
-              </div>
-
-              {/* Overtime Hours, Rate & Estimated Payout */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    Overtime Hours <span className="text-rose-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      step="0.25"
-                      min="0.25"
-                      max="12"
-                      required
-                      value={formData.overtime_hours}
-                      onChange={(e) => handleHoursChange(e.target.value)}
-                      className="w-full pl-3 pr-10 py-2 text-xs font-black rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50/40 dark:bg-slate-800 text-amber-800 dark:text-amber-200 focus:outline-none focus:ring-2 focus:ring-amber-500"
-                    />
-                    <span className="absolute right-3 top-2 text-[11px] font-bold text-amber-600">
-                      hrs
-                    </span>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    Standard Hourly Rate
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      step="1"
-                      min="1"
-                      value={formData.hourly_rate}
-                      onChange={(e) => {
-                        const rate = parseFloat(e.target.value) || 0;
-                        setFormData((prev) => ({
-                          ...prev,
-                          hourly_rate: rate,
-                          estimated_payout: Math.round(
-                            (prev.overtime_hours || 0) * rate * (prev.ot_multiplier || 1.5)
-                          ),
-                        }));
-                      }}
-                      className="w-full pl-6 pr-3 py-2 text-xs font-mono font-bold rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-                    />
-                    <span className="absolute left-2.5 top-2 text-xs text-slate-400">
-                      ₹
-                    </span>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-emerald-800 dark:text-emerald-300 mb-1">
-                    Est. Payout (1.5x rate)
-                  </label>
-                  <div className="px-3 py-2 text-xs font-black rounded-lg border border-emerald-300 dark:border-emerald-700 bg-emerald-50/60 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 flex items-center justify-between">
-                    <span>{formatINR(formData.estimated_payout)}</span>
-                    <span className="text-[10px] font-semibold text-emerald-600">
-                      1.5x OT Multiplier
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Reason for Overtime */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  Reason for Overtime <span className="text-rose-500">*</span>
-                </label>
-                <select
-                  value={formData.reason_for_ot}
-                  onChange={(e) =>
-                    setFormData({ ...formData, reason_for_ot: e.target.value })
-                  }
-                  className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium"
-                >
-                  {OT_REASONS.map((r, i) => (
-                    <option key={i} value={r}>
-                      {r}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Task Description */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  Detailed Task Description & Justification{" "}
-                  <span className="text-rose-500">*</span>
-                </label>
-                <textarea
-                  required
-                  rows={3}
-                  placeholder="Explain the specific deliverables, critical issues resolved, or tickets worked on past shift hours..."
-                  value={formData.task_description}
-                  onChange={(e) =>
-                    setFormData({ ...formData, task_description: e.target.value })
-                  }
-                  className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium"
-                />
-              </div>
-
-              {/* Action Buttons */}
-              <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2.5">
+              <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 flex items-center justify-end gap-2.5 shrink-0">
                 <button
                   type="button"
                   onClick={() => setIsRaiseModalOpen(false)}
@@ -1237,11 +1241,11 @@ export default function Overtime() {
       {/* MODAL 2: MANAGER REVIEW & DECISION MODAL */}
       {/* ======================================================== */}
       {isReviewModalOpen && activeTicket && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
-          <div className="relative w-full max-w-lg rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xl p-6 my-8">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
+        <div className="fixed inset-0 z-[100] m-0 !mt-0 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsReviewModalOpen(false)}>
+          <div className="relative w-full max-w-lg rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/80 shrink-0">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center">
+                <div className="h-10 w-10 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0">
                   <LuUserCheck className="h-5 w-5" />
                 </div>
                 <div>
@@ -1261,7 +1265,7 @@ export default function Overtime() {
               </button>
             </div>
 
-            <div className="mt-4 space-y-4">
+            <div className="px-5 overflow-y-auto space-y-4 text-xs scrollbar-thin">
               {/* Ticket Overview Card */}
               <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 space-y-2 text-xs">
                 <div className="flex items-center justify-between">
@@ -1331,8 +1335,8 @@ export default function Overtime() {
                       {formatINR(
                         Math.round(
                           (parseFloat(reviewData.approved_hours) || 0) *
-                            (activeTicket.hourly_rate || 0) *
-                            (activeTicket.ot_multiplier || 1.5)
+                          (activeTicket.hourly_rate || 0) *
+                          (activeTicket.ot_multiplier || 1.5)
                         )
                       )}
                     </strong>
@@ -1359,186 +1363,189 @@ export default function Overtime() {
               </div>
 
               {/* Decision Action Buttons */}
-              <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3">
+            </div>
+            <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 flex items-center justify-between gap-3 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsReviewModalOpen(false)}
+                className="px-3.5 py-2 text-xs font-bold rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+              >
+                Cancel
+              </button>
+
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setIsReviewModalOpen(false)}
-                  className="px-3.5 py-2 text-xs font-bold rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                  onClick={() => handleSubmitReview("Rejected")}
+                  className="px-4 py-2 text-xs font-bold rounded-lg bg-rose-600 hover:bg-rose-700 text-white shadow-sm shadow-rose-600/25 transition flex items-center gap-1.5"
                 >
-                  Cancel
+                  <LuCircleX className="h-3.5 w-3.5" />
+                  Reject Request
                 </button>
 
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleSubmitReview("Rejected")}
-                    className="px-4 py-2 text-xs font-bold rounded-lg bg-rose-600 hover:bg-rose-700 text-white shadow-sm shadow-rose-600/25 transition flex items-center gap-1.5"
-                  >
-                    <LuCircleX className="h-3.5 w-3.5" />
-                    Reject Request
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleSubmitReview("Approved")}
-                    className="px-4 py-2 text-xs font-bold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm shadow-emerald-600/25 transition flex items-center gap-1.5"
-                  >
-                    <LuCheck className="h-3.5 w-3.5" />
-                    Approve Overtime
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => handleSubmitReview("Approved")}
+                  className="px-4 py-2 text-xs font-bold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm shadow-emerald-600/25 transition flex items-center gap-1.5"
+                >
+                  <LuCheck className="h-3.5 w-3.5" />
+                  Approve Overtime
+                </button>
               </div>
             </div>
           </div>
         </div>
-      )}
+      )
+      }
 
       {/* ======================================================== */}
       {/* MODAL 3: TICKET DETAILS MODAL */}
       {/* ======================================================== */}
-      {isDetailsModalOpen && activeTicket && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
-          <div className="relative w-full max-w-lg rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xl p-6 my-8">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center">
-                  <LuClock className="h-5 w-5" />
+      {
+        isDetailsModalOpen && activeTicket && (
+          <div className="fixed inset-0 z-[100] m-0 !mt-0 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsDetailsModalOpen(false)}>
+            <div className="relative w-full max-w-lg rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/80 shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0">
+                    <LuClock className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                      Ticket #{activeTicket.ticket_number}
+                    </h2>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Complete Overtime Audit & Approval History
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="text-base font-bold text-slate-900 dark:text-white">
-                    Ticket #{activeTicket.ticket_number}
-                  </h2>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Complete Overtime Audit & Approval History
+                <button
+                  onClick={() => setIsDetailsModalOpen(false)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                >
+                  <LuX className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="px-5 overflow-y-auto space-y-4 text-xs scrollbar-thin">
+                {/* Status Header */}
+                <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                  <div>
+                    <span className="text-[10px] text-slate-400 uppercase font-bold block">
+                      Decision Status
+                    </span>
+                    <div className="mt-1">{renderStatusBadge(activeTicket.status)}</div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] text-slate-400 uppercase font-bold block">
+                      Payroll Integration
+                    </span>
+                    <div className="mt-1">{renderPayoutBadge(activeTicket.payout_status)}</div>
+                  </div>
+                </div>
+
+                {/* Employee & Attendance Grid */}
+                <div className="grid grid-cols-2 gap-3 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/40">
+                  <div>
+                    <span className="text-slate-400 block text-[10px]">Employee</span>
+                    <strong className="text-slate-900 dark:text-white">
+                      {activeTicket.employee_name}
+                    </strong>
+                    <div className="text-slate-500 font-mono text-[11px]">
+                      {activeTicket.employee_id}
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="text-slate-400 block text-[10px]">Department</span>
+                    <strong className="text-slate-900 dark:text-white">
+                      {activeTicket.department}
+                    </strong>
+                    <div className="text-slate-500 text-[11px]">{activeTicket.designation}</div>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-100 dark:border-slate-700">
+                    <span className="text-slate-400 block text-[10px]">Attendance Date</span>
+                    <strong className="text-slate-900 dark:text-white">
+                      {formatDateStr(activeTicket.attendance_date)}
+                    </strong>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-100 dark:border-slate-700">
+                    <span className="text-slate-400 block text-[10px]">Shift & Timings</span>
+                    <div className="font-mono text-slate-800 dark:text-slate-200">
+                      {activeTicket.shift_start} - {activeTicket.shift_end}
+                    </div>
+                    <div className="text-[10px] text-amber-600 font-mono">
+                      Out: {activeTicket.check_out}
+                    </div>
+                  </div>
+                </div>
+
+                {/* OT Hours & Payout Breakdown */}
+                <div className="p-3.5 rounded-xl border border-amber-200 dark:border-amber-800/60 bg-amber-50/40 dark:bg-amber-950/20 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-600 dark:text-slate-300">
+                      Claimed Overtime Hours:
+                    </span>
+                    <span className="font-black text-amber-700 dark:text-amber-300">
+                      {activeTicket.overtime_hours} hrs ({activeTicket.overtime_minutes} mins)
+                    </span>
+                  </div>
+                  {activeTicket.approved_hours !== null && (
+                    <div className="flex items-center justify-between font-bold text-emerald-700 dark:text-emerald-400">
+                      <span>Approved Hours:</span>
+                      <span>{activeTicket.approved_hours} hrs</span>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-600 dark:text-slate-300">Hourly Rate & Multiplier:</span>
+                    <span className="font-mono">
+                      ₹{Number(activeTicket.hourly_rate).toFixed(2)}/hr ({activeTicket.ot_multiplier || 1.5}x)
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between pt-1 border-t border-amber-200 dark:border-amber-800 font-bold text-sm">
+                    <span>
+                      {activeTicket.status === "Approved" ? "Approved Payout:" : "Estimated Payout:"}
+                    </span>
+                    <span className="text-emerald-600 dark:text-emerald-400 font-black">
+                      {activeTicket.status === "Approved" && activeTicket.approved_payout !== null
+                        ? formatINR(activeTicket.approved_payout)
+                        : formatINR(activeTicket.estimated_payout)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Reason & Task Description */}
+                <div className="space-y-1.5">
+                  <span className="text-slate-500 font-bold block">Reason for Overtime:</span>
+                  <p className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200">
+                    {activeTicket.reason_for_ot}
                   </p>
                 </div>
-              </div>
-              <button
-                onClick={() => setIsDetailsModalOpen(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
-              >
-                <LuX className="h-5 w-5" />
-              </button>
-            </div>
 
-            <div className="mt-4 space-y-4 text-xs">
-              {/* Status Header */}
-              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-                <div>
-                  <span className="text-[10px] text-slate-400 uppercase font-bold block">
-                    Decision Status
-                  </span>
-                  <div className="mt-1">{renderStatusBadge(activeTicket.status)}</div>
-                </div>
-                <div className="text-right">
-                  <span className="text-[10px] text-slate-400 uppercase font-bold block">
-                    Payroll Integration
-                  </span>
-                  <div className="mt-1">{renderPayoutBadge(activeTicket.payout_status)}</div>
-                </div>
-              </div>
-
-              {/* Employee & Attendance Grid */}
-              <div className="grid grid-cols-2 gap-3 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/40">
-                <div>
-                  <span className="text-slate-400 block text-[10px]">Employee</span>
-                  <strong className="text-slate-900 dark:text-white">
-                    {activeTicket.employee_name}
-                  </strong>
-                  <div className="text-slate-500 font-mono text-[11px]">
-                    {activeTicket.employee_id}
-                  </div>
+                <div className="space-y-1.5">
+                  <span className="text-slate-500 font-bold block">Task Description:</span>
+                  <p className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200">
+                    {activeTicket.task_description}
+                  </p>
                 </div>
 
-                <div>
-                  <span className="text-slate-400 block text-[10px]">Department</span>
-                  <strong className="text-slate-900 dark:text-white">
-                    {activeTicket.department}
-                  </strong>
-                  <div className="text-slate-500 text-[11px]">{activeTicket.designation}</div>
-                </div>
-
-                <div className="pt-2 border-t border-slate-100 dark:border-slate-700">
-                  <span className="text-slate-400 block text-[10px]">Attendance Date</span>
-                  <strong className="text-slate-900 dark:text-white">
-                    {formatDateStr(activeTicket.attendance_date)}
-                  </strong>
-                </div>
-
-                <div className="pt-2 border-t border-slate-100 dark:border-slate-700">
-                  <span className="text-slate-400 block text-[10px]">Shift & Timings</span>
-                  <div className="font-mono text-slate-800 dark:text-slate-200">
-                    {activeTicket.shift_start} - {activeTicket.shift_end}
-                  </div>
-                  <div className="text-[10px] text-amber-600 font-mono">
-                    Out: {activeTicket.check_out}
-                  </div>
-                </div>
-              </div>
-
-              {/* OT Hours & Payout Breakdown */}
-              <div className="p-3.5 rounded-xl border border-amber-200 dark:border-amber-800/60 bg-amber-50/40 dark:bg-amber-950/20 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-600 dark:text-slate-300">
-                    Claimed Overtime Hours:
-                  </span>
-                  <span className="font-black text-amber-700 dark:text-amber-300">
-                    {activeTicket.overtime_hours} hrs ({activeTicket.overtime_minutes} mins)
-                  </span>
-                </div>
-                {activeTicket.approved_hours !== null && (
-                  <div className="flex items-center justify-between font-bold text-emerald-700 dark:text-emerald-400">
-                    <span>Approved Hours:</span>
-                    <span>{activeTicket.approved_hours} hrs</span>
+                {/* Manager Feedback */}
+                {activeTicket.manager_remarks && (
+                  <div className="space-y-1.5">
+                    <span className="text-slate-500 font-bold block">
+                      Reporting Manager Remarks ({activeTicket.reviewed_by_name || activeTicket.reporting_manager}):
+                    </span>
+                    <p className="p-2.5 rounded-lg bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 text-purple-900 dark:text-purple-200 italic font-medium">
+                      "{activeTicket.manager_remarks}"
+                    </p>
                   </div>
                 )}
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-600 dark:text-slate-300">Hourly Rate & Multiplier:</span>
-                  <span className="font-mono">
-                    ₹{Number(activeTicket.hourly_rate).toFixed(2)}/hr ({activeTicket.ot_multiplier || 1.5}x)
-                  </span>
-                </div>
-                <div className="flex items-center justify-between pt-1 border-t border-amber-200 dark:border-amber-800 font-bold text-sm">
-                  <span>
-                    {activeTicket.status === "Approved" ? "Approved Payout:" : "Estimated Payout:"}
-                  </span>
-                  <span className="text-emerald-600 dark:text-emerald-400 font-black">
-                    {activeTicket.status === "Approved" && activeTicket.approved_payout !== null
-                      ? formatINR(activeTicket.approved_payout)
-                      : formatINR(activeTicket.estimated_payout)}
-                  </span>
-                </div>
+
+                {/* Close Button */}
               </div>
-
-              {/* Reason & Task Description */}
-              <div className="space-y-1.5">
-                <span className="text-slate-500 font-bold block">Reason for Overtime:</span>
-                <p className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200">
-                  {activeTicket.reason_for_ot}
-                </p>
-              </div>
-
-              <div className="space-y-1.5">
-                <span className="text-slate-500 font-bold block">Task Description:</span>
-                <p className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200">
-                  {activeTicket.task_description}
-                </p>
-              </div>
-
-              {/* Manager Feedback */}
-              {activeTicket.manager_remarks && (
-                <div className="space-y-1.5">
-                  <span className="text-slate-500 font-bold block">
-                    Reporting Manager Remarks ({activeTicket.reviewed_by_name || activeTicket.reporting_manager}):
-                  </span>
-                  <p className="p-2.5 rounded-lg bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 text-purple-900 dark:text-purple-200 italic font-medium">
-                    "{activeTicket.manager_remarks}"
-                  </p>
-                </div>
-              )}
-
-              {/* Close Button */}
-              <div className="pt-2 flex justify-end">
+              <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 flex items-center justify-end shrink-0">
                 <button
                   type="button"
                   onClick={() => setIsDetailsModalOpen(false)}
@@ -1549,58 +1556,60 @@ export default function Overtime() {
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
       {/* ======================================================== */}
       {/* MODAL 4: SYNC WITH PAYROLL MODAL */}
       {/* ======================================================== */}
-      {isSyncModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-          <div className="relative w-full max-w-md rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xl p-6">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-xl bg-indigo-500/10 text-indigo-600 flex items-center justify-center">
-                  <LuFileSpreadsheet className="h-5 w-5" />
+      {
+        isSyncModalOpen && (
+          <div className="fixed inset-0 z-[100] m-0 !mt-0 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsSyncModalOpen(false)}>
+            <div className="relative w-full max-w-md rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/80 shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-indigo-500/10 text-indigo-600 flex items-center justify-center shrink-0">
+                    <LuFileSpreadsheet className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                      Sync Overtime with Payroll
+                    </h2>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Push approved unpaid overtime claims into employee salary slips
+                    </p>
+                  </div>
                 </div>
+                <button
+                  onClick={() => setIsSyncModalOpen(false)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                >
+                  <LuX className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="px-5 overflow-y-auto space-y-4 text-xs scrollbar-thin">
                 <div>
-                  <h2 className="text-base font-bold text-slate-900 dark:text-white">
-                    Sync Overtime with Payroll
-                  </h2>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Push approved unpaid overtime claims into employee salary slips
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Target Payroll Month (YYYY-MM)
+                  </label>
+                  <input
+                    type="month"
+                    value={syncMonthYear}
+                    onChange={(e) => setSyncMonthYear(e.target.value)}
+                    className="w-full px-3 py-2 text-xs font-bold rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 text-xs text-indigo-950 dark:text-indigo-200 space-y-1">
+                  <span className="font-bold block">How Overtime Sync Works:</span>
+                  <p className="text-[11px] leading-relaxed">
+                    The engine will collect all <strong>Approved & Unpaid</strong> overtime tickets for {syncMonthYear}, aggregate the hours and approved payouts for each employee, update their Payroll record's <code>variable_pay.overtime</code> and <code>attendance_summary.overtime_hours</code>, recalculate gross and net salaries, and mark the tickets as <em>Synced to Payroll</em>.
                   </p>
                 </div>
-              </div>
-              <button
-                onClick={() => setIsSyncModalOpen(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
-              >
-                <LuX className="h-5 w-5" />
-              </button>
-            </div>
 
-            <div className="mt-4 space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  Target Payroll Month (YYYY-MM)
-                </label>
-                <input
-                  type="month"
-                  value={syncMonthYear}
-                  onChange={(e) => setSyncMonthYear(e.target.value)}
-                  className="w-full px-3 py-2 text-xs font-bold rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
               </div>
-
-              <div className="p-3.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 text-xs text-indigo-950 dark:text-indigo-200 space-y-1">
-                <span className="font-bold block">How Overtime Sync Works:</span>
-                <p className="text-[11px] leading-relaxed">
-                  The engine will collect all <strong>Approved & Unpaid</strong> overtime tickets for {syncMonthYear}, aggregate the hours and approved payouts for each employee, update their Payroll record's <code>variable_pay.overtime</code> and <code>attendance_summary.overtime_hours</code>, recalculate gross and net salaries, and mark the tickets as <em>Synced to Payroll</em>.
-                </p>
-              </div>
-
-              <div className="pt-2 flex items-center justify-end gap-2.5">
+              <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 flex items-center justify-end gap-2.5 shrink-0">
                 <button
                   type="button"
                   onClick={() => setIsSyncModalOpen(false)}
@@ -1624,9 +1633,8 @@ export default function Overtime() {
               </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )
+      }
+    </>
   );
 }
-

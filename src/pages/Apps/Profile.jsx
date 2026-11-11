@@ -1003,6 +1003,66 @@ export default function Profile() {
               </Form.Text>
             </Col>
 
+            {/* Reporting Manager (Supervisor) */}
+            <Col md={6}>
+              <Form.Label className="small fw-bold text-muted d-flex align-items-center justify-content-between">
+                <span className="d-flex align-items-center gap-1">
+                  Reporting Manager
+                  <Badge bg="info" className="text-white" style={{ fontSize: "10px", fontWeight: "normal" }}>Supervisor</Badge>
+                </span>
+                {empData?.reporting_manager_id && (
+                  <Badge bg="light" text="dark" className="border" style={{ fontSize: "10px" }}>
+                    ID: {empData.reporting_manager_id}
+                  </Badge>
+                )}
+              </Form.Label>
+              <Form.Control
+                type="text"
+                value={
+                  empData?.reporting_manager && empData.reporting_manager !== "N/A" && empData.reporting_manager !== "None"
+                    ? `${empData.reporting_manager}${empData?.reporting_manager_id ? ` (${empData.reporting_manager_id})` : ""}`
+                    : (empData?.reporting_manager_id ? `Manager ID: ${empData.reporting_manager_id}` : "Not Assigned / Top Level Root")
+                }
+                disabled
+                readOnly
+                className="bg-light dark:!bg-slate-800 fw-semibold text-dark dark:!text-slate-100 border-secondary-subtle dark:!border-slate-700"
+                style={{ cursor: "not-allowed" }}
+              />
+              <Form.Text className="text-muted" style={{ fontSize: "11px" }}>
+                Direct reporting supervisor for workflows, leaves, and appraisal reviews
+              </Form.Text>
+            </Col>
+
+            {/* Department Head (HOD) */}
+            <Col md={6}>
+              <Form.Label className="small fw-bold text-muted d-flex align-items-center justify-content-between">
+                <span className="d-flex align-items-center gap-1">
+                  Department Head (HOD)
+                  <Badge bg="primary" className="text-white" style={{ fontSize: "10px", fontWeight: "normal" }}>HOD</Badge>
+                </span>
+                {empData?.hod_id && (
+                  <Badge bg="light" text="dark" className="border" style={{ fontSize: "10px" }}>
+                    ID: {empData.hod_id}
+                  </Badge>
+                )}
+              </Form.Label>
+              <Form.Control
+                type="text"
+                value={
+                  empData?.hod_name && empData.hod_name !== "N/A" && empData.hod_name !== "None"
+                    ? `${empData.hod_name}${empData?.hod_id ? ` (${empData.hod_id})` : ""}`
+                    : (empData?.hod_id ? `HOD ID: ${empData.hod_id}` : "Not Assigned")
+                }
+                disabled
+                readOnly
+                className="bg-light dark:!bg-slate-800 fw-semibold text-dark dark:!text-slate-100 border-secondary-subtle dark:!border-slate-700"
+                style={{ cursor: "not-allowed" }}
+              />
+              <Form.Text className="text-muted" style={{ fontSize: "11px" }}>
+                Designated Head of Department for departmental permissions and final approvals
+              </Form.Text>
+            </Col>
+
             <Col md={6}>
               <Form.Label className="small fw-bold">Date of Birth</Form.Label>
               <Form.Control

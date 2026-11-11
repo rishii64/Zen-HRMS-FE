@@ -347,7 +347,8 @@ export default function Transfers() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto p-4 bg-slate-50 dark:bg-slate-950 space-y-6">
+    <>
+      <div className="max-w-7xl mx-auto p-4 bg-slate-50 dark:bg-slate-950 space-y-6">
       {/* ══════════════════════════════════════════════════════════════ */}
       {/* 1. HEADER SECTION                                            */}
       {/* ══════════════════════════════════════════════════════════════ */}
@@ -814,12 +815,13 @@ export default function Transfers() {
           </div>
         )}
       </div>
+    </div>
 
       {/* ══════════════════════════════════════════════════════════════ */}
       {/* 5. INITIATE TRANSFER / DEPUTATION MODAL                      */}
       {/* ══════════════════════════════════════════════════════════════ */}
       {showInitiateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
+        <div className="fixed inset-0 z-[100] m-0 !mt-0 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
           <div className="relative w-full max-w-2xl bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden my-8 animate-fade-in">
             {/* Header */}
             <div className="flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/80">
@@ -1143,7 +1145,7 @@ export default function Transfers() {
       {/* 6. REVIEW & APPROVAL MODAL                                   */}
       {/* ══════════════════════════════════════════════════════════════ */}
       {showReviewModal && selectedTransferForReview && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+        <div className="fixed inset-0 z-[100] m-0 !mt-0 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
           <div className="relative w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden animate-fade-in">
             <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/80 flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -1296,7 +1298,7 @@ export default function Transfers() {
       {/* 7. HANDOVER MODAL                                            */}
       {/* ══════════════════════════════════════════════════════════════ */}
       {showHandoverModal && selectedTransferForHandover && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+        <div className="fixed inset-0 z-[100] m-0 !mt-0 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
           <div className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl p-5 space-y-4 animate-fade-in text-xs">
             <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
               <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm flex items-center gap-2">
@@ -1366,7 +1368,7 @@ export default function Transfers() {
       {/* 8. OFFICIAL TRANSFER LETTER PREVIEW & PRINT MODAL           */}
       {/* ══════════════════════════════════════════════════════════════ */}
       {showLetterModal && selectedTransferForLetter && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-900/70 backdrop-blur-xs overflow-y-auto">
+        <div className="fixed inset-0 z-[100] m-0 !mt-0 flex items-center justify-center p-3 sm:p-6 bg-slate-900/70 backdrop-blur-xs overflow-y-auto">
           <div className="relative w-full max-w-3xl bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden my-6 animate-fade-in">
             {/* Modal Top Bar */}
             <div className="flex items-center justify-between p-3.5 sm:p-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/90 print:hidden">
@@ -1544,7 +1546,7 @@ export default function Transfers() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
 

@@ -45,7 +45,27 @@ export default function ResignationModal({
   const empDept = currentEmp.dept || currentEmp.department || storedUser.dept || "General";
   const empDesig = currentEmp.designation || storedUser.designation || "Associate";
   const empJoining = currentEmp.joining_date || storedUser.joining_date || "—";
-  const empManager = currentEmp.reporting_manager || storedUser.reporting_manager || "Management";
+  const empManagerId = currentEmp.reporting_manager_id || storedUser.reporting_manager_id || null;
+  let empManager = currentEmp.reporting_manager || storedUser.reporting_manager || null;
+  if (empManagerId && employees && employees.length > 0) {
+    const matchedMgr = employees.find(
+      (e) => (e.employee_code || e.employee_id || "").toLowerCase() === empManagerId.toLowerCase()
+    );
+    if (matchedMgr) {
+      empManager = matchedMgr.name || `${matchedMgr.first_name || ""} ${matchedMgr.last_name || ""}`.trim() || matchedMgr.employee_name || empManager;
+    }
+  }
+
+  const empHodId = currentEmp.hod_id || storedUser.hod_id || null;
+  let empHod = currentEmp.hod_name || storedUser.hod_name || null;
+  if (empHodId && employees && employees.length > 0) {
+    const matchedHod = employees.find(
+      (e) => (e.employee_code || e.employee_id || "").toLowerCase() === empHodId.toLowerCase()
+    );
+    if (matchedHod) {
+      empHod = matchedHod.name || `${matchedHod.first_name || ""} ${matchedHod.last_name || ""}`.trim() || matchedHod.employee_name || empHod;
+    }
+  }
   const empEmail = currentEmp.work_email || currentEmp.email || storedUser.email || "—";
 
   // Calculate default LWD (1 month from today)
@@ -188,16 +208,46 @@ export default function ResignationModal({
               </span>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px]">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
               <div>
                 <span className="text-slate-400 block text-[10px]">Joining Date</span>
                 <span className="font-semibold text-slate-700 dark:text-slate-200">{empJoining}</span>
               </div>
               <div>
                 <span className="text-slate-400 block text-[10px]">Reporting Manager</span>
-                <span className="font-semibold text-slate-700 dark:text-slate-200 truncate block">{empManager}</span>
+                <span className="font-semibold text-slate-700 dark:text-slate-200 truncate block">
+                  {empManager ? (
+                    <>
+                      {empManager}
+                      {empManagerId && (
+                        <span className="ml-1 text-[9px] font-mono px-1 py-0.2 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 rounded border border-amber-200 dark:border-amber-900/50">
+                          {empManagerId}
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <span className="italic text-slate-400 font-normal">Direct to HOD</span>
+                  )}
+                </span>
               </div>
-              <div className="col-span-2 sm:col-span-1">
+              <div>
+                <span className="text-slate-400 block text-[10px]">Department Head (HOD)</span>
+                <span className="font-semibold text-slate-700 dark:text-slate-200 truncate block">
+                  {empHod ? (
+                    <>
+                      {empHod}
+                      {empHodId && (
+                        <span className="ml-1 text-[9px] font-mono px-1 py-0.2 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 rounded border border-indigo-200 dark:border-indigo-900/50">
+                          {empHodId}
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <span className="italic text-slate-400 font-normal">Direct to HR</span>
+                  )}
+                </span>
+              </div>
+              <div>
                 <span className="text-slate-400 block text-[10px]">Work Email</span>
                 <span className="font-semibold text-slate-700 dark:text-slate-200 truncate block">{empEmail}</span>
               </div>
@@ -208,21 +258,21 @@ export default function ResignationModal({
           <div className="p-3.5 bg-gradient-to-r from-blue-50/70 to-indigo-50/70 dark:from-blue-950/30 dark:to-indigo-950/30 rounded-xl border border-blue-200/80 dark:border-blue-900/50 space-y-2">
             <div className="flex items-center gap-1.5 font-bold text-[11px] text-blue-900 dark:text-blue-300">
               <FiInfo className="w-3.5 h-3.5 text-blue-600" />
-              <span>Resignation Workflow & Approval Stages</span>
+              <span>Resignation Workflow & Consecutive Approval Stages</span>
             </div>
             <div className="flex flex-wrap items-center gap-1 text-[10px] font-semibold text-slate-700 dark:text-slate-300">
               <span className="px-1.5 py-0.5 rounded bg-white dark:bg-slate-800 shadow-xs border border-slate-200 dark:border-slate-700">1. TL Review</span>
               <span className="text-blue-400">➔</span>
               <span className="px-1.5 py-0.5 rounded bg-white dark:bg-slate-800 shadow-xs border border-slate-200 dark:border-slate-700">2. Manager Review</span>
               <span className="text-blue-400">➔</span>
-              <span className="px-1.5 py-0.5 rounded bg-white dark:bg-slate-800 shadow-xs border border-slate-200 dark:border-slate-700 text-indigo-700 dark:text-indigo-400 font-bold">3. HOD Approval & Handover Assignment</span>
+              <span className="px-1.5 py-0.5 rounded bg-white dark:bg-slate-800 shadow-xs border border-slate-200 dark:border-slate-700 text-indigo-700 dark:text-indigo-400 font-bold">3. HOD Approval & Handover</span>
               <span className="text-blue-400">➔</span>
-              <span className="px-1.5 py-0.5 rounded bg-white dark:bg-slate-800 shadow-xs border border-slate-200 dark:border-slate-700 text-amber-700 dark:text-amber-400 font-bold">4. Handover Completion & Confirmation</span>
+              <span className="px-1.5 py-0.5 rounded bg-white dark:bg-slate-800 shadow-xs border border-slate-200 dark:border-slate-700 text-amber-700 dark:text-amber-400 font-bold">4. Files & Task Handover</span>
               <span className="text-blue-400">➔</span>
-              <span className="px-1.5 py-0.5 rounded bg-white dark:bg-slate-800 shadow-xs border border-slate-200 dark:border-slate-700 text-purple-700 dark:text-purple-400 font-bold">5. HR Final Approval & Clearance</span>
+              <span className="px-1.5 py-0.5 rounded bg-white dark:bg-slate-800 shadow-xs border border-slate-200 dark:border-slate-700 text-purple-700 dark:text-purple-400 font-bold">5. HR Final Approval</span>
             </div>
             <p className="text-[10px] text-slate-600 dark:text-slate-400 leading-relaxed">
-              • <strong>Handover Workflow</strong>: When your HOD approves, they assign an employee to take over your documents and projects. You and the assigned employee will complete and confirm the handover before final HR approval. HR monitors the entire process.
+              • <strong>Consecutive Fallback Routing</strong>: If your assigned Reporting Manager or HOD is unavailable or unassigned, your resignation automatically flows directly to the next consecutive authorized personnel without interruption.
             </p>
           </div>
 

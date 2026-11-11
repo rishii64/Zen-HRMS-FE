@@ -29,7 +29,9 @@ import {
   FiBell,
   FiArrowUp,
   FiArrowDown,
-  FiArchive
+  FiArchive,
+  FiEye,
+  FiLoader
 } from "react-icons/fi";
 import {
   LuLogOut,
@@ -149,12 +151,13 @@ const DEFAULT_EXIT_QUESTIONS = [
 export default function Separation() {
   const token = localStorage.getItem("token");
   const storedRole = (localStorage.getItem("role") || "employee").toLowerCase();
-  const userEmpId = localStorage.getItem("employeeCode") || localStorage.getItem("empId") || "";
-  const userName = localStorage.getItem("userName") || "User";
+  const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+  const userEmpId = localStorage.getItem("employeeCode") || localStorage.getItem("empId") || storedUser.employee_id || "";
+  const userName = localStorage.getItem("userName") || storedUser.name || "User";
 
   // RBAC checks
-  const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
   const userDesig = (storedUser.designation || "").toLowerCase().trim();
+  const userDept = (storedUser.dept || storedUser.department || "").toLowerCase().trim();
   const isLeadershipDesig =
     /\b(hod|head|manager|mgr|lead|tl|agm|dgm|gm|director|supervisor)\b/i.test(userDesig) ||
     userDesig.includes("team lead") ||
@@ -221,6 +224,8 @@ export default function Separation() {
   const [customDeptTextInput, setCustomDeptTextInput] = useState("");
   const [clearanceActiveStepRemarks, setClearanceActiveStepRemarks] = useState("");
   const [clearanceProcessing, setClearanceProcessing] = useState(false);
+  const [clearingStepId, setClearingStepId] = useState(null);
+  const [reassigningStepId, setReassigningStepId] = useState(null);
 
   // Exit Interview Modal States
   const [showExitInterviewModal, setShowExitInterviewModal] = useState(false);
@@ -488,10 +493,10 @@ export default function Separation() {
     else if (actionType === "hr_action") endpoint = `${API}/resignation/${selectedRecordForAction.id}/hr-action`;
 
     try {
-      // If HOD is approving, require assigning an employee for handover
+      // If HOD is approving, require assigning a TL, Manager, or Colleague for handover
       if (actionType === "hod_action" && actionDecision === "Approved") {
         if (!hodHandoverPersonId || !hodHandoverPersonName) {
-          toast.error("Please assign an employee for document & task handover before Department Head approval.");
+          toast.error("Please assign a Team Lead, Manager, or Colleague for document & task handover before Department Head approval.");
           setActionProcessing(false);
           return;
         }
@@ -601,11 +606,11 @@ export default function Separation() {
       Array.isArray(record.handover_docs_checklist) && record.handover_docs_checklist.length > 0
         ? record.handover_docs_checklist
         : [
-            { item: "Project files, repositories & documentation handover", done: false },
-            { item: "Client / internal communication & active contacts handover", done: false },
-            { item: "Pending tasks & deliverables status documentation", done: false },
-            { item: "Access credentials & team physical materials transfer", done: false }
-          ]
+          { item: "Project files, repositories & documentation handover", done: false },
+          { item: "Client / internal communication & active contacts handover", done: false },
+          { item: "Pending tasks & deliverables status documentation", done: false },
+          { item: "Access credentials & team physical materials transfer", done: false }
+        ]
     );
     setShowSubmitHandoverModal(true);
   };
@@ -613,16 +618,16 @@ export default function Separation() {
   const openConfirmHandoverModal = (record) => {
     setSelectedRecordForConfirmHandover(record);
     setConfirmDecision("Confirmed");
-    setConfirmRemarks(record.handover_assignee_remarks || "");
+    setConfirmRemarks(record.handover_assignee_remarks || "Handover files, deliverables, and repositories verified and received in good order.");
     setConfirmChecklist(
       Array.isArray(record.handover_docs_checklist) && record.handover_docs_checklist.length > 0
-        ? record.handover_docs_checklist
+        ? record.handover_docs_checklist.map((c) => ({ ...c, done: c.done !== undefined ? c.done : true }))
         : [
-            { item: "Project files, repositories & documentation handover", done: true },
-            { item: "Client / internal communication & active contacts handover", done: true },
-            { item: "Pending tasks & deliverables status documentation", done: true },
-            { item: "Access credentials & team physical materials transfer", done: true }
-          ]
+          { item: "Project files, repositories & documentation handover", done: true },
+          { item: "Client / internal communication & active contacts handover", done: true },
+          { item: "Pending tasks & deliverables status documentation", done: true },
+          { item: "Access credentials & team physical materials transfer", done: true }
+        ]
     );
     setShowConfirmHandoverModal(true);
   };
@@ -630,6 +635,253 @@ export default function Separation() {
   // -------------------------------------------------------------
   // CLEARANCE FORM HANDLERS (SERIAL ORDER + REORDERING + CUSTOM DEPTS)
   // -------------------------------------------------------------
+  // Helper: Get list of employees from that specific department for clearance assignment (mapped by employee ID)
+  const getEmployeesForDept = (deptKey, record) => {
+    if (!Array.isArray(employees) || employees.length === 0) return [];
+
+    const resigningEmpId = String(record?.employee_id || "").trim().toLowerCase();
+    const targetDeptKey = String(deptKey || "").trim().toLowerCase();
+    const homeDeptKey = String(record?.dept || "").trim().toLowerCase();
+    const hodId = String(record?.hod_id || "").trim().toLowerCase();
+    const mgrId = String(record?.manager_id || record?.reporting_manager_id || "").trim().toLowerCase();
+
+    // 1. Strictly exclude the employee who applied for resignation
+    const eligibleEmployees = employees.filter((emp) => {
+      const code = String(emp.employee_id || emp.employee_code || emp.employeeCode || emp.id || "").trim().toLowerCase();
+      return !resigningEmpId || code !== resigningEmpId;
+    });
+
+    const isMatch = (val, target) => {
+      if (!val || !target) return false;
+      const v = String(val).toLowerCase();
+      const t = String(target).toLowerCase();
+      return v === t || v.includes(t) || t.includes(v);
+    };
+
+    // 2. Department Specific Matching
+    // Home Department (e.g. Engineering / Tech or matching record.dept)
+    if (targetDeptKey === "dept" || isMatch(targetDeptKey, homeDeptKey) || (homeDeptKey && isMatch(targetDeptKey, "home"))) {
+      const homeDeptMatches = eligibleEmployees.filter((emp) => {
+        const empCode = String(emp.employee_id || emp.employee_code || emp.employeeCode || emp.id || "").trim().toLowerCase();
+        const empDept = emp.dept || emp.department || "";
+        const isHod = hodId && empCode === hodId;
+        const isMgr = mgrId && empCode === mgrId;
+        return isHod || isMgr || isMatch(empDept, homeDeptKey);
+      });
+      if (homeDeptMatches.length > 0) {
+        return homeDeptMatches.sort((a, b) => {
+          const aCode = String(a.employee_id || a.employee_code || a.id || "").toLowerCase();
+          const bCode = String(b.employee_id || b.employee_code || b.id || "").toLowerCase();
+          if (aCode === hodId) return -1;
+          if (bCode === hodId) return 1;
+          if (aCode === mgrId) return -1;
+          if (bCode === mgrId) return 1;
+          return 0;
+        });
+      }
+    }
+
+    // Admin / Facilities (physical administration & facilities: desk, badge, parking)
+    // NEVER include Tech / Engineering / Software employees in Admin clearance candidates!
+    if (targetDeptKey.includes("admin") || targetDeptKey.includes("facilit")) {
+      const adminMatches = eligibleEmployees.filter((emp) => {
+        const d = (emp.dept || emp.department || "").toLowerCase();
+        const desig = (emp.designation || "").toLowerCase();
+        if (d.includes("tech") || d.includes("engineer") || d.includes("develop") || d.includes("software")) {
+          return false;
+        }
+        return isMatch(d, "admin") || isMatch(d, "facilities") || isMatch(d, "operations") || isMatch(desig, "admin") || isMatch(desig, "facilities") || isMatch(desig, "front desk") || isMatch(desig, "office");
+      });
+      if (adminMatches.length > 0) return adminMatches;
+    }
+
+    // HR / Human Resources
+    if (targetDeptKey === "hr" || targetDeptKey.includes("human")) {
+      const hrMatches = eligibleEmployees.filter((emp) => {
+        const d = (emp.dept || emp.department || "").toLowerCase();
+        const r = (emp.role || "").toLowerCase();
+        const desig = (emp.designation || "").toLowerCase();
+        if (d.includes("tech") || d.includes("engineer") || d.includes("develop") || d.includes("software")) {
+          return false;
+        }
+        return isMatch(d, "hr") || isMatch(d, "human") || isMatch(r, "hr") || isMatch(r, "hrmanager") || isMatch(r, "chro") || isMatch(desig, "hr") || isMatch(desig, "human") || isMatch(desig, "chro");
+      });
+      if (hrMatches.length > 0) return hrMatches;
+    }
+
+    // Accounts / Finance
+    if (targetDeptKey.includes("account") || targetDeptKey.includes("finance") || targetDeptKey.includes("payroll")) {
+      const accMatches = eligibleEmployees.filter((emp) => {
+        const d = (emp.dept || emp.department || "").toLowerCase();
+        const r = (emp.role || "").toLowerCase();
+        const desig = (emp.designation || "").toLowerCase();
+        if (d.includes("tech") || d.includes("engineer") || d.includes("develop") || d.includes("software")) {
+          return false;
+        }
+        return isMatch(d, "account") || isMatch(d, "finance") || isMatch(d, "payroll") || isMatch(r, "accounts") || isMatch(r, "finance") || isMatch(r, "payroll") || isMatch(desig, "account") || isMatch(desig, "finance") || isMatch(desig, "payroll");
+      });
+      if (accMatches.length > 0) return accMatches;
+    }
+
+    // IT / Technology (hardware/systems/network IT)
+    if (targetDeptKey === "it" || targetDeptKey.includes("information tech")) {
+      const itMatches = eligibleEmployees.filter((emp) => {
+        const d = (emp.dept || emp.department || "").toLowerCase();
+        const r = (emp.role || "").toLowerCase();
+        const desig = (emp.designation || "").toLowerCase();
+        return isMatch(d, "it") || isMatch(d, "information") || isMatch(r, "it") || isMatch(desig, "it ") || isMatch(desig, "network") || isMatch(desig, "system admin");
+      });
+      if (itMatches.length > 0) return itMatches;
+    }
+
+    // Library
+    if (targetDeptKey.includes("librar")) {
+      const libMatches = eligibleEmployees.filter((emp) => {
+        const d = (emp.dept || emp.department || "").toLowerCase();
+        const desig = (emp.designation || "").toLowerCase();
+        return isMatch(d, "librar") || isMatch(desig, "librar");
+      });
+      if (libMatches.length > 0) return libMatches;
+    }
+
+    // Custom Department
+    const customMatches = eligibleEmployees.filter((emp) => {
+      const d = (emp.dept || emp.department || "").toLowerCase();
+      const desig = (emp.designation || "").toLowerCase();
+      return isMatch(d, targetDeptKey) || isMatch(desig, targetDeptKey);
+    });
+    if (customMatches.length > 0) return customMatches;
+
+    // Do NOT fall back to unrelated employees across the whole company
+    return [];
+  };
+
+  // Helper: check if current user belongs to the respective department authorized to clear this step
+  const isUserAuthorizedForDeptStep = (step, record) => {
+    if (!step || !record) return false;
+
+    const currentEmpId = String(userEmpId || "").trim().toLowerCase();
+    const resEmpId = String(record.employee_id || "").trim().toLowerCase();
+    const currentUserName = String(userName || storedUser?.name || "").trim().toLowerCase();
+
+    // 1. Resigning employee can never clear their own steps
+    if (currentEmpId && resEmpId && currentEmpId === resEmpId) {
+      return false;
+    }
+
+    // 2. CRITICAL PREVENT CROSS-CLEARANCE:
+    // A person who already approved a clearance step for another department CANNOT approve subsequent steps!
+    // E.g., if Tech manager cleared Tech clearance, they cannot approve Admin, HR, or Accounts clearance.
+    const steps = Array.isArray(record.clearance_steps) ? record.clearance_steps : [];
+    const hasClearedOtherStep = steps.some(
+      (s) => (s.id !== step.id && s.order !== step.order) && (
+        (s.cleared_by && String(s.cleared_by).trim().toLowerCase() === currentEmpId) ||
+        (s.cleared_by_name && currentUserName && String(s.cleared_by_name).trim().toLowerCase() === currentUserName)
+      )
+    );
+
+    const assignedEmpId = String(step.assigned_emp_id || "").trim().toLowerCase();
+    if (hasClearedOtherStep && (!assignedEmpId || assignedEmpId !== currentEmpId)) {
+      return false;
+    }
+
+    // 3. Specific employee assigned by HR (mapped by employee ID)
+    // If an approver is explicitly assigned, ONLY that employee ID is authorized!
+    if (assignedEmpId) {
+      return currentEmpId === assignedEmpId;
+    }
+
+    // 4. Check if current user is among the eligible candidate approvers for this department
+    const deptCandidates = getEmployeesForDept(step.dept_key, record);
+    if (deptCandidates && deptCandidates.length > 0) {
+      const isCandidate = deptCandidates.some((c) => {
+        const cId = String(c.employee_id || c.employee_code || c.employeeCode || c.id || "").trim().toLowerCase();
+        return cId && cId === currentEmpId;
+      });
+      if (isCandidate) return true;
+    }
+
+    // 5. Fallback: Strict Department membership checks (NO software role 'admin' bypass!)
+    const currentRole = String(storedRole || "").trim().toLowerCase();
+    const currentDept = String(userDept || storedUser.dept || storedUser.department || "").trim().toLowerCase();
+    const currentDesig = String(userDesig || storedUser.designation || "").trim().toLowerCase();
+    const stepId = String(step.id || "").trim().toLowerCase();
+    const stepDeptKey = String(step.dept_key || "").trim().toLowerCase();
+    const stepName = String(step.name || "").trim().toLowerCase();
+    const resDept = String(record.dept || "").trim().toLowerCase();
+    const resMgrId = String(record.manager_id || record.reporting_manager_id || "").trim().toLowerCase();
+    const resHodId = String(record.hod_id || "").trim().toLowerCase();
+
+    const matchDept = (d1, d2) => {
+      if (!d1 || !d2) return false;
+      return d1 === d2 || d1.includes(d2) || d2.includes(d1);
+    };
+
+    // Home Department Step (e.g. "Engineering / Tech Clearance" or step.id === "dept")
+    const isHomeDeptStep = stepId === "dept" ||
+      (resDept && (matchDept(stepDeptKey, resDept) || matchDept(stepName, resDept)));
+    if (isHomeDeptStep) {
+      if (resHodId && currentEmpId === resHodId) return true;
+      if (resMgrId && currentEmpId === resMgrId) return true;
+      if (resDept && matchDept(currentDept, resDept)) return true;
+      return false;
+    }
+
+    // Admin / Facilities Clearance Step:
+    // Physical office administration, facilities, desk keys, access cards.
+    // Tech / Software engineering personnel must NEVER be authorized for Admin clearance!
+    const isAdminStep = stepId === "admin" || stepDeptKey.includes("admin") || stepDeptKey.includes("facilities") || stepName.includes("admin");
+    if (isAdminStep) {
+      if (currentDept.includes("tech") || currentDept.includes("engineer") || currentDept.includes("develop") || currentDept.includes("software")) {
+        return false;
+      }
+      if (currentDept.includes("admin") || currentDept.includes("facilities") || currentDept.includes("operations") || currentDesig.includes("admin") || currentDesig.includes("facilities")) {
+        return true;
+      }
+      return false;
+    }
+
+    // HR / Human Resources Clearance Step:
+    const isHrStep = stepId === "hr" || stepDeptKey === "hr" || stepDeptKey.includes("human") || stepName.includes("hr clearance") || stepName.includes("human resources");
+    if (isHrStep) {
+      if (currentDept.includes("tech") || currentDept.includes("engineer") || currentDept.includes("develop")) {
+        return false;
+      }
+      if (currentRole === "hr" || currentRole === "hrmanager" || currentRole === "chro" || currentDept.includes("hr") || currentDept.includes("human") || currentDesig.includes("hr") || currentDesig.includes("chro")) {
+        return true;
+      }
+      return false;
+    }
+
+    // Accounts / Finance Clearance Step:
+    const isAccountsStep = stepId === "accounts" || stepDeptKey.includes("account") || stepDeptKey.includes("finance") || stepDeptKey.includes("payroll") || stepName.includes("accounts");
+    if (isAccountsStep) {
+      if (currentDept.includes("tech") || currentDept.includes("engineer") || currentDept.includes("develop")) {
+        return false;
+      }
+      if (currentRole === "accounts" || currentRole === "finance" || currentRole === "payroll" || currentDept.includes("account") || currentDept.includes("finance") || currentDept.includes("payroll") || currentDesig.includes("account") || currentDesig.includes("finance") || currentDesig.includes("payroll")) {
+        return true;
+      }
+      return false;
+    }
+
+    // IT Clearance Step:
+    const isItStep = stepId === "it" || stepDeptKey === "it" || stepDeptKey.includes("information tech") || stepName.includes("it clearance");
+    if (isItStep) {
+      if (currentRole === "it" || currentDept.includes("it") || currentDept.includes("information tech") || currentDesig.includes("it ") || currentDesig.includes("network") || currentDesig.includes("system admin")) {
+        return true;
+      }
+      return false;
+    }
+
+    // Custom Department Step:
+    if (stepDeptKey && currentDept && matchDept(currentDept, stepDeptKey)) {
+      return true;
+    }
+
+    return false;
+  };
+
   const getDefaultClearancePipeline = (record) => {
     const deptName = record?.dept || "Department";
     return [
@@ -680,7 +932,23 @@ export default function Separation() {
 
   const openRaiseClearanceModal = (item) => {
     setSelectedRecordForClearance(item);
-    setClearancePipeline(getDefaultClearancePipeline(item));
+    const defaultPipeline = getDefaultClearancePipeline(item);
+    // Pre-populate best matching department officer for each step
+    const pipelineWithApprovers = defaultPipeline.map((step) => {
+      const candidates = getEmployeesForDept(step.dept_key, item);
+      const preselected = candidates[0] || null;
+      const preselectedId = preselected ? (preselected.employee_id || preselected.employee_code || preselected.employeeCode || preselected.id) : "";
+      const preselectedName = preselected ? (preselected.name || `${preselected.first_name || ""} ${preselected.last_name || ""}`.trim() || preselected.employee_name) : "";
+      const preselectedDesig = preselected ? (preselected.designation || preselected.role || "") : "";
+
+      return {
+        ...step,
+        assigned_emp_id: preselectedId,
+        assigned_emp_name: preselectedName,
+        assigned_emp_designation: preselectedDesig
+      };
+    });
+    setClearancePipeline(pipelineWithApprovers);
     setSelectedCustomDeptInput("");
     setCustomDeptTextInput("");
     setShowRaiseClearanceModal(true);
@@ -744,6 +1012,12 @@ export default function Separation() {
       toast.error(`"${trimmed}" is already included in the clearance pipeline`);
       return;
     }
+    const candidates = getEmployeesForDept(trimmed, selectedRecordForClearance);
+    const preselected = candidates[0] || null;
+    const preselectedId = preselected ? (preselected.employee_id || preselected.employee_code || preselected.employeeCode || preselected.id) : "";
+    const preselectedName = preselected ? (preselected.name || `${preselected.first_name || ""} ${preselected.last_name || ""}`.trim() || preselected.employee_name) : "";
+    const preselectedDesig = preselected ? (preselected.designation || preselected.role || "") : "";
+
     setClearancePipeline((prev) => [
       ...prev,
       {
@@ -751,7 +1025,10 @@ export default function Separation() {
         name: `${trimmed} Clearance`,
         dept_key: trimmed,
         desc: `Surrender of assets and no dues verification from ${trimmed}`,
-        is_custom: true
+        is_custom: true,
+        assigned_emp_id: preselectedId,
+        assigned_emp_name: preselectedName,
+        assigned_emp_designation: preselectedDesig
       }
     ]);
     setSelectedCustomDeptInput("");
@@ -771,7 +1048,18 @@ export default function Separation() {
 
   const resetClearancePipeline = () => {
     if (selectedRecordForClearance) {
-      setClearancePipeline(getDefaultClearancePipeline(selectedRecordForClearance));
+      const defaultPipeline = getDefaultClearancePipeline(selectedRecordForClearance);
+      const pipelineWithApprovers = defaultPipeline.map((step) => {
+        const candidates = getEmployeesForDept(step.dept_key, selectedRecordForClearance);
+        const preselected = candidates[0] || null;
+        return {
+          ...step,
+          assigned_emp_id: preselected ? (preselected.employee_id || preselected.employee_code || preselected.employeeCode || preselected.id) : "",
+          assigned_emp_name: preselected ? (preselected.name || `${preselected.first_name || ""} ${preselected.last_name || ""}`.trim() || preselected.employee_name) : "",
+          assigned_emp_designation: preselected ? (preselected.designation || preselected.role || "") : ""
+        };
+      });
+      setClearancePipeline(pipelineWithApprovers);
       toast.success("Reset clearance sequence to standard order");
     }
   };
@@ -818,7 +1106,10 @@ export default function Separation() {
         body: JSON.stringify({
           ordered_departments: clearancePipeline.map((d, index) => ({
             ...d,
-            order: index + 1
+            order: index + 1,
+            assigned_emp_id: d.assigned_emp_id || null,
+            assigned_emp_name: d.assigned_emp_name || null,
+            assigned_emp_designation: d.assigned_emp_designation || null
           }))
         })
       });
@@ -826,14 +1117,68 @@ export default function Separation() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to raise clearance form");
 
-      toast.success("Clearance form raised successfully! Serial department clearances initiated in your configured sequence.");
+      toast.success("Clearance form raised successfully! Serial department clearances initiated with assigned approvers.");
       setShowRaiseClearanceModal(false);
-      setSelectedRecordForClearance(null);
+      const updated = data.data || null;
+      if (updated) {
+        setSelectedRecordForClearance(updated);
+        setResignations((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
+        if (myResignation && myResignation.id === updated.id) {
+          setMyResignation(updated);
+        }
+      }
       fetchResignations();
     } catch (err) {
       toast.error(err.message || "Failed to raise clearance form");
     } finally {
       setClearanceProcessing(false);
+    }
+  };
+
+  const handleReassignStepApprover = async (stepId, newEmpId) => {
+    if (!isHR) {
+      toast.error("Only HR can change the clearance approver");
+      return;
+    }
+    if (!selectedRecordForClearance) return;
+    const targetEmp = employees.find(
+      (emp) => String(emp.employee_id || emp.employee_code || emp.employeeCode || emp.id || "").trim().toLowerCase() === String(newEmpId).trim().toLowerCase()
+    );
+    const empName = targetEmp ? (targetEmp.name || `${targetEmp.first_name || ""} ${targetEmp.last_name || ""}`.trim() || targetEmp.employee_name) : "";
+    const empDesig = targetEmp ? (targetEmp.designation || targetEmp.role || "") : "";
+
+    try {
+      const res = await fetch(`${API}/resignation/${selectedRecordForClearance.id}/reassign-step-approver`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          step_id: stepId,
+          assigned_emp_id: newEmpId,
+          assigned_emp_name: empName,
+          assigned_emp_designation: empDesig
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to reassign clearance approver");
+
+      toast.success(data.message || `Assigned ${empName} (${newEmpId}) as approver!`);
+      const updated = data.data;
+      if (updated) {
+        setSelectedRecordForClearance(updated);
+        setResignations((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
+        if (myResignation && myResignation.id === updated.id) {
+          setMyResignation(updated);
+        }
+      }
+      setReassigningStepId(null);
+      fetchResignations();
+    } catch (err) {
+      console.error("Reassign error:", err);
+      toast.error(err.message || "Failed to reassign approver");
     }
   };
 
@@ -843,6 +1188,12 @@ export default function Separation() {
       return;
     }
     if (!selectedRecordForClearance || !deptName.trim()) return;
+    const candidates = getEmployeesForDept(deptName.trim(), selectedRecordForClearance);
+    const preselected = candidates[0] || null;
+    const preselectedId = preselected ? (preselected.employee_id || preselected.employee_code || preselected.employeeCode || preselected.id) : null;
+    const preselectedName = preselected ? (preselected.name || `${preselected.first_name || ""} ${preselected.last_name || ""}`.trim() || preselected.employee_name) : null;
+    const preselectedDesig = preselected ? (preselected.designation || preselected.role || null) : null;
+
     try {
       const res = await fetch(`${API}/resignation/${selectedRecordForClearance.id}/add-clearance-dept`, {
         method: "POST",
@@ -850,13 +1201,25 @@ export default function Separation() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ department_name: deptName.trim() })
+        body: JSON.stringify({
+          department_name: deptName.trim(),
+          assigned_emp_id: preselectedId,
+          assigned_emp_name: preselectedName,
+          assigned_emp_designation: preselectedDesig
+        })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to add department");
 
       toast.success(data.message || `Department "${deptName}" added to clearance chain!`);
-      setSelectedRecordForClearance(data.data);
+      const updated = data.data;
+      if (updated) {
+        setSelectedRecordForClearance(updated);
+        setResignations((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
+        if (myResignation && myResignation.id === updated.id) {
+          setMyResignation(updated);
+        }
+      }
       fetchResignations();
       setSelectedCustomDeptInput("");
       setCustomDeptTextInput("");
@@ -867,11 +1230,12 @@ export default function Separation() {
 
   const handleClearDeptStep = async (stepId) => {
     if (!selectedRecordForClearance) return;
-    if (selectedRecordForClearance.employee_id === userEmpId && !isHR) {
-      toast.error("You cannot clear your own department clearance steps");
+    if (selectedRecordForClearance.employee_id === userEmpId) {
+      toast.error("Resigning employees cannot clear their own department clearance steps");
       return;
     }
     setClearanceProcessing(true);
+    setClearingStepId(stepId);
     try {
       const res = await fetch(`${API}/resignation/${selectedRecordForClearance.id}/clear-dept`, {
         method: "PATCH",
@@ -889,13 +1253,21 @@ export default function Separation() {
       if (!res.ok) throw new Error(data.error || "Clearance failed");
 
       toast.success(data.message || "Department clearance marked as Cleared (Green Tick)!");
-      setSelectedRecordForClearance(data.data);
+      const updated = data.data;
+      if (updated) {
+        setSelectedRecordForClearance(updated);
+        setResignations((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
+        if (myResignation && myResignation.id === updated.id) {
+          setMyResignation(updated);
+        }
+      }
       setClearanceActiveStepRemarks("");
       fetchResignations();
     } catch (err) {
       toast.error(err.message || "Failed to clear department step");
     } finally {
       setClearanceProcessing(false);
+      setClearingStepId(null);
     }
   };
 
@@ -1055,13 +1427,103 @@ export default function Separation() {
         Array.isArray(record.handover_docs_checklist) && record.handover_docs_checklist.length > 0
           ? record.handover_docs_checklist
           : [
-              { item: "Project files, repositories & documentation handover", done: false },
-              { item: "Client / internal communication & active contacts handover", done: false },
-              { item: "Pending tasks & deliverables status documentation", done: false },
-              { item: "Access credentials & team physical materials transfer", done: false }
-            ]
+            { item: "Project files, repositories & documentation handover", done: false },
+            { item: "Client / internal communication & active contacts handover", done: false },
+            { item: "Pending tasks & deliverables status documentation", done: false },
+            { item: "Access credentials & team physical materials transfer", done: false }
+          ]
       );
     }
+  };
+
+  // Handover candidates generator for HOD Review (TL, Manager, or Employee in department / reporting hierarchy, strictly excluding resigning employee)
+  const getHandoverCandidates = () => {
+    if (!selectedRecordForAction) return [];
+
+    const resigningEmpId = String(selectedRecordForAction.employee_id || selectedRecordForAction.employee_code || "").trim().toLowerCase();
+    const resigningEmpName = String(selectedRecordForAction.name || selectedRecordForAction.employee_name || "").trim().toLowerCase();
+
+    const resigningEmpObj = employees.find((emp) => {
+      const code = String(emp.employee_id || emp.employee_code || emp.employeeCode || "").trim().toLowerCase();
+      const name = String(emp.name || `${emp.first_name || ""} ${emp.last_name || ""}` || emp.employee_name || "").trim().toLowerCase();
+      return (resigningEmpId && code === resigningEmpId) || (resigningEmpName && name === resigningEmpName);
+    });
+
+    const resigningDept = String(selectedRecordForAction.dept || resigningEmpObj?.dept || resigningEmpObj?.department || "").trim().toLowerCase();
+    const resigningMgrId = String(selectedRecordForAction.manager_id || selectedRecordForAction.reporting_manager_id || resigningEmpObj?.reporting_manager_id || "").trim().toLowerCase();
+    const resigningMgrName = String(selectedRecordForAction.manager_name || selectedRecordForAction.reporting_manager || resigningEmpObj?.reporting_manager || "").trim().toLowerCase();
+    const resigningHodId = String(selectedRecordForAction.hod_id || resigningEmpObj?.hod_id || "").trim().toLowerCase();
+
+    const loggedInId = String(userEmpId || storedUser?.employee_id || "").trim().toLowerCase();
+    const loggedInDept = String(storedUser?.dept || storedUser?.department || "").trim().toLowerCase();
+
+    // 1. Strictly exclude the employee who applied for resignation
+    const nonResigningEmployees = employees.filter((emp) => {
+      const code = String(emp.employee_id || emp.employee_code || emp.employeeCode || "").trim().toLowerCase();
+      const name = String(emp.name || `${emp.first_name || ""} ${emp.last_name || ""}` || emp.employee_name || "").trim().toLowerCase();
+      if (resigningEmpId && code === resigningEmpId) return false;
+      if (resigningEmpName && name === resigningEmpName) return false;
+      if (resigningEmpObj && emp.id && resigningEmpObj.id === emp.id) return false;
+      return true;
+    });
+
+    // 2. Filter candidates who are within the department OR within the reporting hierarchy
+    // (covers TL, Manager, or Employee - not restricted to employee role only)
+    const hierarchyOrDeptCandidates = nonResigningEmployees.filter((emp) => {
+      const code = String(emp.employee_id || emp.employee_code || emp.employeeCode || "").trim().toLowerCase();
+      const name = String(emp.name || `${emp.first_name || ""} ${emp.last_name || ""}` || emp.employee_name || "").trim().toLowerCase();
+      const dept = String(emp.dept || emp.department || "").trim().toLowerCase();
+      const mgrId = String(emp.reporting_manager_id || "").trim().toLowerCase();
+      const mgrName = String(emp.reporting_manager || "").trim().toLowerCase();
+      const hodId = String(emp.hod_id || "").trim().toLowerCase();
+
+      // Same department as resigning employee or HOD
+      const isDeptMatch = Boolean(
+        dept && (
+          (resigningDept && (dept === resigningDept || dept.includes(resigningDept) || resigningDept.includes(dept))) ||
+          (loggedInDept && (dept === loggedInDept || dept.includes(loggedInDept) || loggedInDept.includes(dept)))
+        )
+      );
+
+      // In reporting hierarchy:
+      const isReportingManager = Boolean((resigningMgrId && code === resigningMgrId) || (resigningMgrName && name === resigningMgrName));
+      const isPeerUnderManager = Boolean(resigningMgrId && mgrId && mgrId === resigningMgrId);
+      const isUnderHOD = Boolean(
+        (resigningHodId && (hodId === resigningHodId || mgrId === resigningHodId || code === resigningHodId)) ||
+        (loggedInId && (hodId === loggedInId || mgrId === loggedInId || code === loggedInId))
+      );
+      const reportsToResigning = Boolean(resigningEmpId && (mgrId === resigningEmpId || (resigningEmpName && mgrName === resigningEmpName)));
+
+      return isDeptMatch || isReportingManager || isPeerUnderManager || isUnderHOD || reportsToResigning;
+    });
+
+    return hierarchyOrDeptCandidates.length > 0 ? hierarchyOrDeptCandidates : nonResigningEmployees;
+  };
+
+  const getCandidateBadge = (emp) => {
+    if (!selectedRecordForAction) return "";
+    const code = String(emp.employee_id || emp.employee_code || emp.employeeCode || "").trim().toLowerCase();
+    const name = String(emp.name || `${emp.first_name || ""} ${emp.last_name || ""}` || emp.employee_name || "").trim().toLowerCase();
+    const resigningMgrId = String(selectedRecordForAction.manager_id || selectedRecordForAction.reporting_manager_id || "").trim().toLowerCase();
+    const resigningMgrName = String(selectedRecordForAction.manager_name || selectedRecordForAction.reporting_manager || "").trim().toLowerCase();
+    const resigningHodId = String(selectedRecordForAction.hod_id || "").trim().toLowerCase();
+    const loggedInId = String(userEmpId || storedUser?.employee_id || "").trim().toLowerCase();
+    const desig = String(emp.designation || "").toLowerCase();
+    const role = String(emp.job_role || emp.role || "").toLowerCase();
+
+    if ((resigningMgrId && code === resigningMgrId) || (resigningMgrName && name === resigningMgrName)) {
+      return "[Reporting Manager]";
+    }
+    if ((resigningHodId && code === resigningHodId) || (loggedInId && code === loggedInId)) {
+      return "[Dept Head / HOD]";
+    }
+    if (desig.includes("lead") || desig.includes("tl") || role === "tl" || role === "teamlead") {
+      return "[Team Lead]";
+    }
+    if (desig.includes("manager") || role === "manager" || role === "management") {
+      return "[Manager]";
+    }
+    return "[Employee]";
   };
 
   // Filtered resignations list (Active Queue)
@@ -1074,10 +1536,10 @@ export default function Separation() {
       statusFilter === "All"
         ? true
         : statusFilter === "Withdrawn"
-        ? (r.status === "Withdrawn" || r.status === "Cancelled")
-        : statusFilter === "Historical"
-        ? (r.status === "Withdrawn" || r.status === "Cancelled" || r.status === "Separation Completed" || (r.status && r.status.startsWith("Rejected")))
-        : r.status === statusFilter;
+          ? (r.status === "Withdrawn" || r.status === "Cancelled")
+          : statusFilter === "Historical"
+            ? (r.status === "Withdrawn" || r.status === "Cancelled" || r.status === "Separation Completed" || (r.status && r.status.startsWith("Rejected")))
+            : r.status === statusFilter;
     const matchesDept = deptFilter === "All" || (r.dept || "").toLowerCase() === deptFilter.toLowerCase();
     return matchesSearch && matchesStatus && matchesDept;
   });
@@ -1100,12 +1562,12 @@ export default function Separation() {
       historyStatusFilter === "All"
         ? isHistorical
         : historyStatusFilter === "Withdrawn"
-        ? (r.status === "Withdrawn" || r.status === "Cancelled")
-        : historyStatusFilter === "Completed"
-        ? r.status === "Separation Completed"
-        : historyStatusFilter === "Rejected"
-        ? (r.status && r.status.startsWith("Rejected"))
-        : r.status === historyStatusFilter;
+          ? (r.status === "Withdrawn" || r.status === "Cancelled")
+          : historyStatusFilter === "Completed"
+            ? r.status === "Separation Completed"
+            : historyStatusFilter === "Rejected"
+              ? (r.status && r.status.startsWith("Rejected"))
+              : r.status === historyStatusFilter;
 
     const matchesDept =
       historyDeptFilter === "All" || (r.dept || "").toLowerCase() === historyDeptFilter.toLowerCase();
@@ -1194,11 +1656,10 @@ export default function Separation() {
             <button
               type="button"
               onClick={() => setActiveTab("team_queue")}
-              className={`pb-3 px-3 text-xs font-bold relative transition-colors ${
-                activeTab === "team_queue"
-                  ? "text-blue-600 dark:text-blue-400"
-                  : "text-slate-500 hover:text-slate-700 dark:text-slate-400"
-              }`}
+              className={`pb-3 px-3 text-xs font-bold relative transition-colors ${activeTab === "team_queue"
+                ? "text-blue-600 dark:text-blue-400"
+                : "text-slate-500 hover:text-slate-700 dark:text-slate-400"
+                }`}
             >
               {isAdmin ? "Admin Approvals & Clearances" : isHR ? "Organization Separation Hub (Active Queue & Clearances)" : "Department Review Queue"}
               {activeTab === "team_queue" && (
@@ -1210,11 +1671,10 @@ export default function Separation() {
               <button
                 type="button"
                 onClick={() => setActiveTab("resignation_history")}
-                className={`pb-3 px-3 text-xs font-bold relative transition-colors flex items-center gap-1.5 ${
-                  activeTab === "resignation_history"
-                    ? "text-blue-600 dark:text-blue-400"
-                    : "text-slate-500 hover:text-slate-700 dark:text-slate-400"
-                }`}
+                className={`pb-3 px-3 text-xs font-bold relative transition-colors flex items-center gap-1.5 ${activeTab === "resignation_history"
+                  ? "text-blue-600 dark:text-blue-400"
+                  : "text-slate-500 hover:text-slate-700 dark:text-slate-400"
+                  }`}
               >
                 <FiArchive className="w-3.5 h-3.5" />
                 Resignation History & Archives
@@ -1232,11 +1692,10 @@ export default function Separation() {
             <button
               type="button"
               onClick={() => setActiveTab("my_resignation")}
-              className={`pb-3 px-3 text-xs font-bold relative transition-colors ${
-                activeTab === "my_resignation"
-                  ? "text-blue-600 dark:text-blue-400"
-                  : "text-slate-500 hover:text-slate-700 dark:text-slate-400"
-              }`}
+              className={`pb-3 px-3 text-xs font-bold relative transition-colors ${activeTab === "my_resignation"
+                ? "text-blue-600 dark:text-blue-400"
+                : "text-slate-500 hover:text-slate-700 dark:text-slate-400"
+                }`}
             >
               My Resignation Status & Progress
               {activeTab === "my_resignation" && (
@@ -1246,11 +1705,10 @@ export default function Separation() {
             <button
               type="button"
               onClick={() => setActiveTab("fnf_settlement")}
-              className={`pb-3 px-3 text-xs font-bold relative transition-colors flex items-center gap-1.5 ${
-                activeTab === "fnf_settlement"
-                  ? "text-blue-600 dark:text-blue-400"
-                  : "text-slate-500 hover:text-slate-700 dark:text-slate-400"
-              }`}
+              className={`pb-3 px-3 text-xs font-bold relative transition-colors flex items-center gap-1.5 ${activeTab === "fnf_settlement"
+                ? "text-blue-600 dark:text-blue-400"
+                : "text-slate-500 hover:text-slate-700 dark:text-slate-400"
+                }`}
             >
               <LuReceipt className="w-3.5 h-3.5" />
               Exit Settlement &amp; Letters (F&amp;F)
@@ -1271,7 +1729,7 @@ export default function Separation() {
                 </span>
                 <div>
                   <h3 className="text-xs font-black uppercase tracking-wider text-amber-900 dark:text-amber-200">
-                    Colleague Handovers Assigned to You by Department Head ({assignedHandovers.length})
+                    Files & Work Handovers Assigned to You by Department Head ({assignedHandovers.length})
                   </h3>
                   <p className="text-xs text-amber-700 dark:text-amber-300">
                     You have been assigned to receive documents & work handover. The resignation remains held until you confirm completion.
@@ -1293,24 +1751,30 @@ export default function Separation() {
                     <div className="mt-1">{getStatusBadge(item.status)}</div>
                   </div>
 
-                  <div>
-                    {item.handover_status === "SUBMITTED_BY_EMPLOYEE" ? (
-                      <button
-                        type="button"
-                        onClick={() => openConfirmHandoverModal(item)}
-                        className="px-3 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-xs transition-all flex items-center gap-1.5"
-                      >
-                        <FiCheck className="w-3.5 h-3.5" />
-                        Review & Confirm
-                      </button>
-                    ) : item.handover_status === "CONFIRMED_BY_ASSIGNEE" ? (
-                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-200">
+                  <div className="flex items-center gap-2">
+                    {item.handover_status === "CONFIRMED_BY_ASSIGNEE" ? (
+                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 flex items-center gap-1">
+                        <FiCheckCircle className="w-3.5 h-3.5" />
                         ✓ Confirmed Complete
                       </span>
                     ) : (
-                      <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-1 rounded-lg border border-amber-200">
-                        Awaiting Docs from Employee
-                      </span>
+                      <>
+                        <span className={`text-[10px] font-bold px-2 py-1 rounded-lg border ${item.handover_status === "SUBMITTED_BY_EMPLOYEE"
+                          ? "text-blue-700 bg-blue-50 border-blue-200"
+                          : "text-amber-700 bg-amber-50 border-amber-200"
+                          }`}>
+                          {item.handover_status === "SUBMITTED_BY_EMPLOYEE" ? "Docs Submitted" : "Pending Verification"}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => openConfirmHandoverModal(item)}
+                          className="px-3 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer hover:shadow whitespace-nowrap"
+                          title="Open handover checklist, enter verification comments, and confirm to advance flow to Admin sign-off"
+                        >
+                          <FiCheck className="w-3.5 h-3.5" />
+                          Verify & Confirm Handover
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -1371,14 +1835,14 @@ export default function Separation() {
                             myResignation.status === "Awaiting Handover Confirmation" ||
                             myResignation.status === "Pending HR Approval" ||
                             myResignation.status === "Draft") && (
-                            <button
-                              type="button"
-                              onClick={() => handleCancelResignation(myResignation.id)}
-                              className="px-3 py-1.5 text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-xl transition-colors"
-                            >
-                              Withdraw Resignation
-                            </button>
-                          )}
+                              <button
+                                type="button"
+                                onClick={() => handleCancelResignation(myResignation.id)}
+                                className="px-3 py-1.5 text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-xl transition-colors"
+                              >
+                                Withdraw Resignation
+                              </button>
+                            )}
                         </>
                       )}
                     </div>
@@ -1459,474 +1923,524 @@ export default function Separation() {
                     <>
                       {/* 1. HIERARCHICAL APPROVAL TRACKER (TL ➔ Manager ➔ HOD ➔ Handover ➔ HR) */}
                       <div className="p-4 bg-slate-50/70 dark:bg-slate-800/40 rounded-2xl border border-slate-200/80 dark:border-slate-800">
-                    <div className="flex items-center justify-between mb-3.5">
-                      <span className="text-xs font-black uppercase tracking-wider text-slate-600 dark:text-slate-300 flex items-center gap-2">
-                        <FiShield className="w-4 h-4 text-blue-600" />
-                        Multi-Level Approval & Handover Chain
-                      </span>
-                      <span className="text-[11px] font-semibold text-slate-500">
-                        HR live copy active & monitoring
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
-                      {/* Step 1: Team Lead (TL) */}
-                      <div className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col justify-between">
-                        <div>
-                          <div className="flex items-center justify-between mb-1.5">
-                            <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">1. TL Review</span>
-                            <span className={`w-2 h-2 rounded-full ${myResignation.tl_decision === "Approved" ? "bg-emerald-500" : (myResignation.status === "Pending TL Review" ? "bg-cyan-500 animate-ping" : "bg-slate-300")}`} />
-                          </div>
-                          <div className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
-                            {myResignation.tl_name || "Team Lead (Optional)"}
-                          </div>
-                          <div className="text-[10px] mt-1 font-semibold">
-                            {myResignation.tl_decision === "Approved" ? (
-                              <span className="text-emerald-600">✓ Endorsed by TL</span>
-                            ) : myResignation.tl_decision === "Rejected" ? (
-                              <span className="text-rose-600">✕ Rejected by TL</span>
-                            ) : myResignation.status === "Pending TL Review" ? (
-                              <span className="text-cyan-600 font-bold">⏳ Awaiting TL Review</span>
-                            ) : (
-                              <span className="text-slate-400">Direct to Manager/HOD</span>
-                            )}
-                          </div>
-                        </div>
-                        {myResignation.tl_comments && (
-                          <div className="mt-2 text-[10px] text-slate-500 italic bg-slate-50 dark:bg-slate-800 p-1.5 rounded">
-                            "{myResignation.tl_comments}"
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Step 2: Manager */}
-                      <div className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col justify-between">
-                        <div>
-                          <div className="flex items-center justify-between mb-1.5">
-                            <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">2. Manager Review</span>
-                            <span className={`w-2 h-2 rounded-full ${myResignation.manager_decision === "Approved" ? "bg-emerald-500" : (myResignation.status === "Pending Manager Review" ? "bg-amber-500 animate-ping" : "bg-slate-300")}`} />
-                          </div>
-                          <div className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
-                            {myResignation.manager_name || "Reporting Manager"}
-                          </div>
-                          <div className="text-[10px] mt-1 font-semibold">
-                            {myResignation.manager_decision === "Approved" ? (
-                              <span className="text-emerald-600">✓ Endorsed by Manager</span>
-                            ) : myResignation.manager_decision === "Rejected" ? (
-                              <span className="text-rose-600">✕ Rejected by Manager</span>
-                            ) : myResignation.status === "Pending Manager Review" ? (
-                              <span className="text-amber-600 font-bold">⏳ Awaiting Manager Review</span>
-                            ) : (
-                              <span className="text-slate-400">Waiting / Direct</span>
-                            )}
-                          </div>
-                        </div>
-                        {myResignation.manager_comments && (
-                          <div className="mt-2 text-[10px] text-slate-500 italic bg-slate-50 dark:bg-slate-800 p-1.5 rounded">
-                            "{myResignation.manager_comments}"
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Step 3: HOD (Final Departmental Approval & Handover Assignment) */}
-                      <div className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col justify-between">
-                        <div>
-                          <div className="flex items-center justify-between mb-1.5">
-                            <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">3. Dept Head (HOD)</span>
-                            <span className={`w-2 h-2 rounded-full ${myResignation.hod_decision === "Approved" ? "bg-emerald-500" : (myResignation.status === "Pending HOD Approval" ? "bg-indigo-500 animate-ping" : "bg-slate-300")}`} />
-                          </div>
-                          <div className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
-                            {myResignation.hod_name || `${myResignation.dept} HOD`}
-                          </div>
-                          <div className="text-[10px] mt-1 font-semibold">
-                            {myResignation.hod_decision === "Approved" ? (
-                              <span className="text-emerald-600">✓ Approved & Assigned Handover</span>
-                            ) : myResignation.hod_decision === "Rejected" ? (
-                              <span className="text-rose-600">✕ Rejected by HOD</span>
-                            ) : myResignation.status === "Pending HOD Approval" ? (
-                              <span className="text-indigo-600 font-bold">⏳ Awaiting HOD Endorsement</span>
-                            ) : (
-                              <span className="text-slate-400">Waiting for prior steps</span>
-                            )}
-                          </div>
-                        </div>
-                        {myResignation.hod_comments && (
-                          <div className="mt-2 text-[10px] text-slate-500 italic bg-slate-50 dark:bg-slate-800 p-1.5 rounded">
-                            "{myResignation.hod_comments}"
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Step 4: Handover Completion & Colleague Confirmation */}
-                      <div className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col justify-between">
-                        <div>
-                          <div className="flex items-center justify-between mb-1.5">
-                            <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">4. Colleague Handover</span>
-                            <span className={`w-2 h-2 rounded-full ${myResignation.handover_status === "CONFIRMED_BY_ASSIGNEE" ? "bg-emerald-500" : (myResignation.handover_status === "SUBMITTED_BY_EMPLOYEE" ? "bg-blue-500 animate-ping" : (myResignation.handover_status === "ASSIGNED" ? "bg-amber-500 animate-ping" : "bg-slate-300"))}`} />
-                          </div>
-                          <div className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
-                            {myResignation.handover_person_name || "Assignee (by HOD)"}
-                          </div>
-                          <div className="text-[10px] mt-1 font-semibold">
-                            {myResignation.handover_status === "CONFIRMED_BY_ASSIGNEE" ? (
-                              <span className="text-emerald-600">✓ Handover Confirmed</span>
-                            ) : myResignation.handover_status === "SUBMITTED_BY_EMPLOYEE" ? (
-                              <span className="text-blue-600 font-bold">⏳ Held: Awaiting Assignee</span>
-                            ) : myResignation.handover_status === "ASSIGNED" ? (
-                              <span className="text-amber-600 font-bold">⏳ Handover in Progress</span>
-                            ) : (
-                              <span className="text-slate-400">Waiting for HOD</span>
-                            )}
-                          </div>
-                        </div>
-                        {myResignation.handover_target_date && (
-                          <div className="mt-2 text-[10px] text-slate-500 bg-amber-50/60 dark:bg-slate-800 p-1.5 rounded">
-                            Target: {formatDate(myResignation.handover_target_date)}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Step 5: Admin Operations & Facilities Approval */}
-                      <div className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col justify-between">
-                        <div>
-                          <div className="flex items-center justify-between mb-1.5">
-                            <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">5. Admin Sign-off</span>
-                            <span className={`w-2 h-2 rounded-full ${myResignation.admin_decision === "Approved" ? "bg-emerald-500" : (myResignation.status === "Pending Admin Approval" ? "bg-blue-500 animate-ping" : "bg-slate-300")}`} />
-                          </div>
-                          <div className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
-                            {myResignation.admin_name || "Admin Operations"}
-                          </div>
-                          <div className="text-[10px] mt-1 font-semibold">
-                            {myResignation.admin_decision === "Approved" ? (
-                              <span className="text-emerald-600">✓ Admin Sign-off Granted</span>
-                            ) : myResignation.admin_decision === "Rejected" ? (
-                              <span className="text-rose-600">✕ Rejected by Admin</span>
-                            ) : myResignation.status === "Pending Admin Approval" ? (
-                              <span className="text-blue-600 font-bold">⏳ Awaiting Admin Sign-off</span>
-                            ) : (
-                              <span className="text-slate-400">Waiting for Handover</span>
-                            )}
-                          </div>
-                        </div>
-                        {myResignation.admin_comments && (
-                          <div className="mt-2 text-[10px] text-slate-500 italic bg-slate-50 dark:bg-slate-800 p-1.5 rounded">
-                            "{myResignation.admin_comments}"
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Step 6: HR Final Approval */}
-                      <div className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col justify-between">
-                        <div>
-                          <div className="flex items-center justify-between mb-1.5">
-                            <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">6. HR Final Sign-off</span>
-                            <span className={`w-2 h-2 rounded-full ${myResignation.status === "Approved" || myResignation.clearance_raised ? "bg-emerald-500" : (myResignation.status === "Pending HR Approval" ? "bg-purple-500 animate-ping" : "bg-slate-300")}`} />
-                          </div>
-                          <div className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
-                            {myResignation.hr_name || "HR Head / Operations"}
-                          </div>
-                          <div className="text-[10px] mt-1 font-semibold">
-                            {myResignation.status === "Approved" || myResignation.clearance_raised ? (
-                              <span className="text-emerald-600">✓ Final HR Approval Granted</span>
-                            ) : myResignation.status === "Pending HR Approval" ? (
-                              <span className="text-purple-600 font-bold">⏳ Awaiting HR Final Sign-off</span>
-                            ) : (
-                              <span className="text-slate-400">Monitoring Process</span>
-                            )}
-                          </div>
-                        </div>
-                        {myResignation.hr_confirmed_lwd && (
-                          <div className="mt-2 text-[10px] text-slate-600 dark:text-slate-300 font-bold bg-purple-50 dark:bg-purple-950/40 p-1.5 rounded">
-                            Confirmed LWD: {formatDate(myResignation.hr_confirmed_lwd)}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* HANDOVER PROCESS CARD (HOD Assigned Handover) */}
-                  {myResignation.handover_status && myResignation.handover_status !== "NOT_ASSIGNED" && (
-                    <div className="p-5 bg-gradient-to-r from-amber-50/70 to-indigo-50/50 dark:from-amber-950/20 dark:to-indigo-950/20 rounded-2xl border border-amber-200/80 dark:border-amber-900/50 space-y-4">
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-3 border-b border-amber-200/60 dark:border-amber-900/40">
-                        <div className="flex items-center gap-2">
-                          <span className="p-2 rounded-xl bg-amber-500 text-white shadow-xs">
-                            <FiBriefcase className="w-4 h-4" />
+                        <div className="flex items-center justify-between mb-3.5">
+                          <span className="text-xs font-black uppercase tracking-wider text-slate-600 dark:text-slate-300 flex items-center gap-2">
+                            <FiShield className="w-4 h-4 text-blue-600" />
+                            Multi-Level Approval & Handover Chain
                           </span>
-                          <div>
-                            <h3 className="text-sm font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                              Document & Task Handover Stage
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200">
-                                Assigned by HOD
-                              </span>
-                            </h3>
-                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                              Department Head assigned {myResignation.handover_person_name} to take over your documents, projects, and work handover.
-                            </p>
-                          </div>
+                          <span className="text-[11px] font-semibold text-slate-500">
+                            HR live copy active & monitoring
+                          </span>
                         </div>
 
-                        <div>
-                          {myResignation.handover_status === "ASSIGNED" && (
-                            <button
-                              type="button"
-                              onClick={() => openSubmitHandoverModal(myResignation)}
-                              className="px-3.5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-xs transition-all flex items-center gap-1.5"
-                            >
-                              <FiCheckCircle className="w-3.5 h-3.5" />
-                              Complete & Submit Handover
-                            </button>
-                          )}
-                          {myResignation.handover_status === "SUBMITTED_BY_EMPLOYEE" && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+                          {/* Step 1: Team Lead (TL) */}
+                          <div className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col justify-between">
+                            <div>
+                              <div className="flex items-center justify-between mb-1.5">
+                                <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">1. TL Review</span>
+                                <span className={`w-2 h-2 rounded-full ${myResignation.tl_decision === "Approved" ? "bg-emerald-500" : (myResignation.status === "Pending TL Review" ? "bg-cyan-500 animate-ping" : "bg-slate-300")}`} />
+                              </div>
+                              <div className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
+                                {myResignation.tl_name || "Team Lead (Optional)"}
+                              </div>
+                              {myResignation.tl_id && (
+                                <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-900/60 inline-block mt-0.5">
+                                  ID: {myResignation.tl_id}
+                                </span>
+                              )}
+                              <div className="text-[10px] mt-1 font-semibold">
+                                {myResignation.tl_decision === "Approved" ? (
+                                  <span className="text-emerald-600">✓ Endorsed by TL</span>
+                                ) : myResignation.tl_decision === "Rejected" ? (
+                                  <span className="text-rose-600">✕ Rejected by TL</span>
+                                ) : myResignation.status === "Pending TL Review" ? (
+                                  <span className="text-cyan-600 font-bold">⏳ Awaiting TL Review</span>
+                                ) : (
+                                  <span className="text-slate-400">Direct to Manager/HOD</span>
+                                )}
+                              </div>
+                            </div>
+                            {myResignation.tl_comments && (
+                              <div className="mt-2 text-[10px] text-slate-500 italic bg-slate-50 dark:bg-slate-800 p-1.5 rounded">
+                                "{myResignation.tl_comments}"
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Step 2: Manager */}
+                          <div className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col justify-between">
+                            <div>
+                              <div className="flex items-center justify-between mb-1.5">
+                                <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">2. Manager Review</span>
+                                <span className={`w-2 h-2 rounded-full ${myResignation.manager_decision === "Approved" || myResignation.manager_decision === "Bypassed" ? "bg-emerald-500" : (myResignation.status === "Pending Manager Review" ? "bg-amber-500 animate-ping" : "bg-slate-300")}`} />
+                              </div>
+                              <div className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
+                                {myResignation.assigned_manager_name || myResignation.manager_name || "Reporting Manager"}
+                              </div>
+                              {(myResignation.assigned_manager_id || myResignation.manager_id) ? (
+                                <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-900/60 inline-block mt-0.5">
+                                  ID: {myResignation.assigned_manager_id || myResignation.manager_id}
+                                </span>
+                              ) : (
+                                <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700 inline-block mt-0.5">
+                                  Not Assigned (Bypassed)
+                                </span>
+                              )}
+                              <div className="text-[10px] mt-1 font-semibold">
+                                {myResignation.manager_decision === "Approved" ? (
+                                  <span className="text-emerald-600">✓ Endorsed by Manager</span>
+                                ) : myResignation.manager_decision === "Rejected" ? (
+                                  <span className="text-rose-600">✕ Rejected by Manager</span>
+                                ) : myResignation.manager_decision === "Bypassed" || (!myResignation.manager_id && !myResignation.assigned_manager_id) ? (
+                                  <span className="text-indigo-600 font-semibold">✓ Bypassed directly to HOD ➔</span>
+                                ) : myResignation.status === "Pending Manager Review" ? (
+                                  <span className="text-amber-600 font-bold">⏳ Awaiting Manager Review</span>
+                                ) : myResignation.status === "Approved" ? (
+                                  <span className="text-emerald-600">✓ Endorsement Processed</span>
+                                ) : (
+                                  <span className="text-slate-400">Waiting / Direct</span>
+                                )}
+                              </div>
+                            </div>
+                            {myResignation.manager_comments && (
+                              <div className="mt-2 text-[10px] text-slate-500 italic bg-slate-50 dark:bg-slate-800 p-1.5 rounded">
+                                "{myResignation.manager_comments}"
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Step 3: HOD (Final Departmental Approval & Handover Assignment) */}
+                          <div className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col justify-between">
+                            <div>
+                              <div className="flex items-center justify-between mb-1.5">
+                                <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">3. Dept Head (HOD)</span>
+                                <span className={`w-2 h-2 rounded-full ${myResignation.hod_decision === "Approved" || myResignation.hod_decision === "Bypassed" || (myResignation.status === "Approved" && !myResignation.hod_decision) ? "bg-emerald-500" : (myResignation.status === "Pending HOD Approval" ? "bg-indigo-500 animate-ping" : "bg-slate-300")}`} />
+                              </div>
+                              <div className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
+                                {myResignation.assigned_hod_name || myResignation.hod_name || `${myResignation.dept || ""} Department Head`}
+                              </div>
+                              {(myResignation.assigned_hod_id || myResignation.hod_id) ? (
+                                <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-900/60 inline-block mt-0.5">
+                                  ID: {myResignation.assigned_hod_id || myResignation.hod_id}
+                                </span>
+                              ) : (
+                                <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700 inline-block mt-0.5">
+                                  Not Assigned (Bypassed)
+                                </span>
+                              )}
+                              <div className="text-[10px] mt-1 font-semibold">
+                                {myResignation.hod_decision === "Approved" ? (
+                                  <span className="text-emerald-600">✓ Approved & Assigned Handover</span>
+                                ) : myResignation.hod_decision === "Rejected" ? (
+                                  <span className="text-rose-600">✕ Rejected by HOD</span>
+                                ) : myResignation.hod_decision === "Bypassed" || (!myResignation.hod_id && !myResignation.assigned_hod_id) ? (
+                                  <span className="text-purple-600 font-semibold">✓ Bypassed directly to HR ➔</span>
+                                ) : myResignation.status === "Pending HOD Approval" ? (
+                                  <span className="text-indigo-600 font-bold">⏳ Awaiting HOD Endorsement</span>
+                                ) : myResignation.status === "Approved" ? (
+                                  <span className="text-emerald-600">✓ HOD Approval Granted</span>
+                                ) : (
+                                  <span className="text-slate-400">Waiting for prior steps</span>
+                                )}
+                              </div>
+                            </div>
+                            {myResignation.hod_comments && (
+                              <div className="mt-2 text-[10px] text-slate-500 italic bg-slate-50 dark:bg-slate-800 p-1.5 rounded">
+                                "{myResignation.hod_comments}"
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Step 4: Handover Completion & Colleague Confirmation */}
+                          <div className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col justify-between">
+                            <div>
+                              <div className="flex items-center justify-between mb-1.5">
+                                <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">4. Files & Work Handover</span>
+                                <span className={`w-2 h-2 rounded-full ${myResignation.status === "Approved" || myResignation.approval_stage === "HR_APPROVED" || myResignation.handover_status === "CONFIRMED_BY_ASSIGNEE" ? "bg-emerald-500" : (myResignation.handover_status === "SUBMITTED_BY_EMPLOYEE" ? "bg-blue-500 animate-ping" : (myResignation.handover_status === "ASSIGNED" ? "bg-amber-500 animate-ping" : "bg-slate-300"))}`} />
+                              </div>
+                              <div className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
+                                {myResignation.handover_person_name || "Assignee (by HOD)"}
+                              </div>
+                              {myResignation.handover_person_id && (
+                                <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-900/60 inline-block mt-0.5">
+                                  ID: {myResignation.handover_person_id}
+                                </span>
+                              )}
+                              <div className="text-[10px] mt-1 font-semibold">
+                                {myResignation.handover_status === "CONFIRMED_BY_ASSIGNEE" ? (
+                                  <span className="text-emerald-600">✓ Handover Confirmed</span>
+                                ) : (myResignation.status === "Approved" || myResignation.approval_stage === "HR_APPROVED") ? (
+                                  <span className="text-emerald-600">✓ Handover Processed & Cleared</span>
+                                ) : myResignation.handover_status === "SUBMITTED_BY_EMPLOYEE" ? (
+                                  <span className="text-blue-600 font-bold">⏳ Held: Awaiting Assignee</span>
+                                ) : myResignation.handover_status === "ASSIGNED" ? (
+                                  <span className="text-amber-600 font-bold">⏳ Handover in Progress</span>
+                                ) : (
+                                  <span className="text-slate-400">Waiting for HOD</span>
+                                )}
+                              </div>
+                            </div>
+                            {myResignation.handover_target_date && (
+                              <div className="mt-2 text-[10px] text-slate-500 bg-amber-50/60 dark:bg-slate-800 p-1.5 rounded">
+                                Target: {formatDate(myResignation.handover_target_date)}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Step 5: Admin Operations & Facilities Approval */}
+                          <div className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col justify-between">
+                            <div>
+                              <div className="flex items-center justify-between mb-1.5">
+                                <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">5. Admin Sign-off</span>
+                                <span className={`w-2 h-2 rounded-full ${myResignation.admin_decision === "Approved" || myResignation.status === "Approved" || myResignation.approval_stage === "HR_APPROVED" ? "bg-emerald-500" : (myResignation.status === "Pending Admin Approval" ? "bg-blue-500 animate-ping" : "bg-slate-300")}`} />
+                              </div>
+                              <div className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
+                                {myResignation.admin_name || "Admin Operations"}
+                              </div>
+                              <div className="text-[10px] mt-1 font-semibold">
+                                {myResignation.admin_decision === "Approved" ? (
+                                  <span className="text-emerald-600">✓ Admin Sign-off Granted</span>
+                                ) : (myResignation.status === "Approved" || myResignation.approval_stage === "HR_APPROVED") ? (
+                                  <span className="text-emerald-600">✓ Admin Sign-off Granted</span>
+                                ) : myResignation.admin_decision === "Rejected" ? (
+                                  <span className="text-rose-600">✕ Rejected by Admin</span>
+                                ) : myResignation.status === "Pending Admin Approval" ? (
+                                  <span className="text-blue-600 font-bold">⏳ Awaiting Admin Sign-off</span>
+                                ) : (
+                                  <span className="text-slate-400">Waiting for Handover</span>
+                                )}
+                              </div>
+                            </div>
+                            {myResignation.admin_comments && (
+                              <div className="mt-2 text-[10px] text-slate-500 italic bg-slate-50 dark:bg-slate-800 p-1.5 rounded">
+                                "{myResignation.admin_comments}"
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Step 6: HR Final Approval */}
+                          <div className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col justify-between">
+                            <div>
+                              <div className="flex items-center justify-between mb-1.5">
+                                <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">6. HR Final Sign-off</span>
+                                <span className={`w-2 h-2 rounded-full ${myResignation.status === "Approved" || myResignation.clearance_raised ? "bg-emerald-500" : (myResignation.status === "Pending HR Approval" ? "bg-purple-500 animate-ping" : "bg-slate-300")}`} />
+                              </div>
+                              <div className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
+                                {myResignation.hr_name || "HR Head / Operations"}
+                              </div>
+                              <div className="text-[10px] mt-1 font-semibold">
+                                {myResignation.status === "Approved" || myResignation.clearance_raised ? (
+                                  <span className="text-emerald-600">✓ Final HR Approval Granted</span>
+                                ) : myResignation.status === "Pending HR Approval" ? (
+                                  <span className="text-purple-600 font-bold">⏳ Awaiting HR Final Sign-off</span>
+                                ) : (
+                                  <span className="text-slate-400">Monitoring Process</span>
+                                )}
+                              </div>
+                            </div>
+                            {myResignation.hr_confirmed_lwd && (
+                              <div className="mt-2 text-[10px] text-slate-600 dark:text-slate-300 font-bold bg-purple-50 dark:bg-purple-950/40 p-1.5 rounded">
+                                Confirmed LWD: {formatDate(myResignation.hr_confirmed_lwd)}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* HANDOVER PROCESS CARD (HOD Assigned Handover) */}
+                      {myResignation.handover_status && myResignation.handover_status !== "NOT_ASSIGNED" && (
+                        <div className="p-5 bg-gradient-to-r from-amber-50/70 to-indigo-50/50 dark:from-amber-950/20 dark:to-indigo-950/20 rounded-2xl border border-amber-200/80 dark:border-amber-900/50 space-y-4">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-3 border-b border-amber-200/60 dark:border-amber-900/40">
                             <div className="flex items-center gap-2">
-                              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 border border-blue-200">
-                                <FiClock className="w-3.5 h-3.5 animate-spin" />
-                                Held: Awaiting {myResignation.handover_person_name}'s Confirmation
+                              <span className="p-2 rounded-xl bg-amber-500 text-white shadow-xs">
+                                <FiBriefcase className="w-4 h-4" />
                               </span>
+                              <div>
+                                <h3 className="text-sm font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                                  Document & Task Handover Stage
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200">
+                                    Assigned by HOD
+                                  </span>
+                                </h3>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                  Department Head assigned {myResignation.handover_person_name} to take over your documents, projects, and work handover.
+                                </p>
+                              </div>
+                            </div>
+
+                            <div>
+                              {myResignation.handover_status === "ASSIGNED" && (
+                                <button
+                                  type="button"
+                                  onClick={() => openSubmitHandoverModal(myResignation)}
+                                  className="px-3.5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-xs transition-all flex items-center gap-1.5"
+                                >
+                                  <FiCheckCircle className="w-3.5 h-3.5" />
+                                  Complete & Submit Handover
+                                </button>
+                              )}
+                              {myResignation.handover_status === "SUBMITTED_BY_EMPLOYEE" && (
+                                <div className="flex items-center gap-2">
+                                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 border border-blue-200">
+                                    <FiClock className="w-3.5 h-3.5 animate-spin" />
+                                    Held: Awaiting {myResignation.handover_person_name}'s Confirmation
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => openSubmitHandoverModal(myResignation)}
+                                    className="px-2.5 py-1.5 text-xs font-semibold text-slate-600 bg-white hover:bg-slate-100 border border-slate-200 rounded-xl"
+                                  >
+                                    Update Submission
+                                  </button>
+                                </div>
+                              )}
+                              {myResignation.handover_status === "CONFIRMED_BY_ASSIGNEE" && (
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200">
+                                  {/* <FiCheck className="w-4 h-4" /> */}
+                                  <span>✓</span>
+                                  Handover Confirmed
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Handover Details Summary Grid */}
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-white dark:bg-slate-900 p-3.5 rounded-xl border border-amber-200/60 dark:border-slate-800 text-xs">
+                            <div>
+                              <span className="text-slate-400 block text-[10px] uppercase font-bold">Assigned Colleague</span>
+                              <span className="font-bold text-slate-800 dark:text-slate-100">
+                                {myResignation.handover_person_name || "—"} ({myResignation.handover_person_id})
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-slate-400 block text-[10px] uppercase font-bold">Assigned By</span>
+                              <span className="font-semibold text-slate-700 dark:text-slate-200">
+                                {myResignation.handover_assigned_by_name || myResignation.hod_name || "Department Head"}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-slate-400 block text-[10px] uppercase font-bold">Target Handover Date</span>
+                              <span className="font-bold text-blue-600">
+                                {formatDate(myResignation.handover_target_date || myResignation.last_working_date)}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-slate-400 block text-[10px] uppercase font-bold">HR Supervision</span>
+                              <span className="font-semibold text-purple-600">
+                                Actively Monitoring Live
+                              </span>
+                            </div>
+                          </div>
+
+                          {myResignation.handover_note && (
+                            <div className="p-2.5 bg-amber-50/80 dark:bg-slate-800/60 rounded-xl border border-amber-200/50 text-xs text-amber-900 dark:text-amber-200">
+                              <span className="font-bold block text-[10px] uppercase">HOD Instructions:</span>
+                              "{myResignation.handover_note}"
+                            </div>
+                          )}
+
+                          {/* Stage Notification Alert Banner */}
+                          {myResignation.handover_status === "SUBMITTED_BY_EMPLOYEE" && (
+                            <div className="p-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/60 rounded-xl text-xs text-blue-800 dark:text-blue-200 flex items-start gap-2.5">
+                              <FiAlertCircle className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                              <div>
+                                <span className="font-bold block">Handover Completed & Submitted by You</span>
+                                <p className="mt-0.5 text-blue-700 dark:text-blue-300">
+                                  You completed your handover documentation on {formatDate(myResignation.handover_employee_completed_at)}.
+                                  As per company policy, this resignation is <strong>held at this stage</strong> until {myResignation.handover_person_name} confirms the handover process completion. HR is actively monitoring throughout.
+                                </p>
+                                {myResignation.handover_employee_remarks && (
+                                  <div className="mt-2 p-2 bg-white dark:bg-slate-900 rounded-lg border border-blue-100 dark:border-slate-800 text-[11px] text-slate-700 dark:text-slate-300">
+                                    <span className="font-bold text-slate-500">Your Submitted Remarks / Links:</span> {myResignation.handover_employee_remarks}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {myResignation.handover_status === "CONFIRMED_BY_ASSIGNEE" && (
+                            <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/60 rounded-xl text-xs text-emerald-800 dark:text-emerald-200 flex items-start gap-2.5">
+                              <FiCheckCircle className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                              <div>
+                                <span className="font-bold block">Handover Process Verified & Confirmed!</span>
+                                <p className="mt-0.5 text-emerald-700 dark:text-emerald-300">
+                                  {myResignation.handover_person_name} verified and confirmed your handover completion on {formatDate(myResignation.handover_assignee_confirmed_at)}.
+                                  Workflow has unlocked and advanced to HR for final sign-off!
+                                </p>
+                                {myResignation.handover_assignee_remarks && (
+                                  <div className="mt-2 p-2 bg-white dark:bg-slate-900 rounded-lg border border-emerald-100 dark:border-slate-800 text-[11px] text-slate-700 dark:text-slate-300">
+                                    <span className="font-bold text-slate-500">Colleague Confirmation Remarks:</span> {myResignation.handover_assignee_remarks}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* 2. SERIAL DEPARTMENT CLEARANCE TRACKER (RED PENDING -> GREEN CLEARED TICK) */}
+                      {myResignation.clearance_raised ? (
+                        <div className="p-5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-4 mb-4 border-b border-slate-100 dark:border-slate-800">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-black text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                                  <LuCheckCheck className="w-5 h-5 text-emerald-600" />
+                                  Serial Department Clearance Pipeline
+                                </span>
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
+                                  Order Enforced
+                                </span>
+                              </div>
+                              <p className="text-xs text-slate-500 mt-0.5">
+                                Clearances execute in strict serial sequence. Green tick indicates cleared; red indicates pending by default.
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="text-xs font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-xl">
+                                {myResignation.clearance_steps?.filter(s => s.status === "Cleared").length || 0} of {myResignation.clearance_steps?.length || 6} Cleared
+                              </div>
                               <button
                                 type="button"
-                                onClick={() => openSubmitHandoverModal(myResignation)}
-                                className="px-2.5 py-1.5 text-xs font-semibold text-slate-600 bg-white hover:bg-slate-100 border border-slate-200 rounded-xl"
+                                onClick={() => setSelectedRecordForClearance(myResignation)}
+                                className="px-3 py-1.5 text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 rounded-xl border border-blue-200 dark:border-blue-900/50 transition-colors flex items-center gap-1.5 cursor-pointer"
                               >
-                                Update Submission
+                                <FiEye className="w-3.5 h-3.5" />
+                                View Full Pipeline
                               </button>
                             </div>
-                          )}
-                          {myResignation.handover_status === "CONFIRMED_BY_ASSIGNEE" && (
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200">
-                              <FiCheck className="w-4 h-4" />
-                              Handover Confirmed Complete ✓
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Handover Details Summary Grid */}
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-white dark:bg-slate-900 p-3.5 rounded-xl border border-amber-200/60 dark:border-slate-800 text-xs">
-                        <div>
-                          <span className="text-slate-400 block text-[10px] uppercase font-bold">Assigned Colleague</span>
-                          <span className="font-bold text-slate-800 dark:text-slate-100">
-                            {myResignation.handover_person_name || "—"} ({myResignation.handover_person_id})
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-slate-400 block text-[10px] uppercase font-bold">Assigned By</span>
-                          <span className="font-semibold text-slate-700 dark:text-slate-200">
-                            {myResignation.handover_assigned_by_name || myResignation.hod_name || "Department Head"}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-slate-400 block text-[10px] uppercase font-bold">Target Handover Date</span>
-                          <span className="font-bold text-blue-600">
-                            {formatDate(myResignation.handover_target_date || myResignation.last_working_date)}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-slate-400 block text-[10px] uppercase font-bold">HR Supervision</span>
-                          <span className="font-semibold text-purple-600">
-                            Actively Monitoring Live
-                          </span>
-                        </div>
-                      </div>
-
-                      {myResignation.handover_note && (
-                        <div className="p-2.5 bg-amber-50/80 dark:bg-slate-800/60 rounded-xl border border-amber-200/50 text-xs text-amber-900 dark:text-amber-200">
-                          <span className="font-bold block text-[10px] uppercase">HOD Instructions:</span>
-                          "{myResignation.handover_note}"
-                        </div>
-                      )}
-
-                      {/* Stage Notification Alert Banner */}
-                      {myResignation.handover_status === "SUBMITTED_BY_EMPLOYEE" && (
-                        <div className="p-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/60 rounded-xl text-xs text-blue-800 dark:text-blue-200 flex items-start gap-2.5">
-                          <FiAlertCircle className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                          <div>
-                            <span className="font-bold block">Handover Completed & Submitted by You</span>
-                            <p className="mt-0.5 text-blue-700 dark:text-blue-300">
-                              You completed your handover documentation on {formatDate(myResignation.handover_employee_completed_at)}.
-                              As per company policy, this resignation is <strong>held at this stage</strong> until {myResignation.handover_person_name} confirms the handover process completion. HR is actively monitoring throughout.
-                            </p>
-                            {myResignation.handover_employee_remarks && (
-                              <div className="mt-2 p-2 bg-white dark:bg-slate-900 rounded-lg border border-blue-100 dark:border-slate-800 text-[11px] text-slate-700 dark:text-slate-300">
-                                <span className="font-bold text-slate-500">Your Submitted Remarks / Links:</span> {myResignation.handover_employee_remarks}
-                              </div>
-                            )}
                           </div>
-                        </div>
-                      )}
 
-                      {myResignation.handover_status === "CONFIRMED_BY_ASSIGNEE" && (
-                        <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/60 rounded-xl text-xs text-emerald-800 dark:text-emerald-200 flex items-start gap-2.5">
-                          <FiCheckCircle className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                          <div>
-                            <span className="font-bold block">Handover Process Verified & Confirmed!</span>
-                            <p className="mt-0.5 text-emerald-700 dark:text-emerald-300">
-                              {myResignation.handover_person_name} verified and confirmed your handover completion on {formatDate(myResignation.handover_assignee_confirmed_at)}.
-                              Workflow has unlocked and advanced to HR for final sign-off!
-                            </p>
-                            {myResignation.handover_assignee_remarks && (
-                              <div className="mt-2 p-2 bg-white dark:bg-slate-900 rounded-lg border border-emerald-100 dark:border-slate-800 text-[11px] text-slate-700 dark:text-slate-300">
-                                <span className="font-bold text-slate-500">Colleague Confirmation Remarks:</span> {myResignation.handover_assignee_remarks}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                          {/* Clearance Steps Horizontal / Vertical Timeline */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                            {myResignation.clearance_steps?.map((step, idx) => {
+                              const isCleared = step.status === "Cleared";
+                              return (
+                                <div
+                                  key={step.id || idx}
+                                  className={`p-3 rounded-xl border flex flex-col justify-between transition-all ${isCleared
+                                    ? "bg-emerald-50/40 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-900/40"
+                                    : "bg-rose-50/30 border-rose-200/70 dark:bg-rose-950/20 dark:border-rose-900/40"
+                                    }`}
+                                >
+                                  <div>
+                                    <div className="flex items-center justify-between mb-2">
+                                      <span className="text-[10px] font-bold text-slate-400">Step {step.order}</span>
+                                      {isCleared ? (
+                                        <span className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs font-bold shadow-xs" title="Cleared">
+                                          ✓
+                                        </span>
+                                      ) : (
+                                        <span className="w-5 h-5 rounded-full bg-rose-500 text-white flex items-center justify-center text-[10px] font-bold shadow-xs" title="Pending">
+                                          ✕
+                                        </span>
+                                      )}
+                                    </div>
 
-                  {/* 2. SERIAL DEPARTMENT CLEARANCE TRACKER (RED PENDING -> GREEN CLEARED TICK) */}
-                  {myResignation.clearance_raised ? (
-                    <div className="p-5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800">
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-4 mb-4 border-b border-slate-100 dark:border-slate-800">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-black text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                              <LuCheckCheck className="w-5 h-5 text-emerald-600" />
-                              Serial Department Clearance Pipeline
-                            </span>
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
-                              Order Enforced
-                            </span>
-                          </div>
-                          <p className="text-xs text-slate-500 mt-0.5">
-                            Clearances execute in strict serial sequence. Green tick indicates cleared; red indicates pending by default.
-                          </p>
-                        </div>
-                        <div className="text-xs font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-xl">
-                          {myResignation.clearance_steps?.filter(s => s.status === "Cleared").length || 0} of {myResignation.clearance_steps?.length || 6} Cleared
-                        </div>
-                      </div>
+                                    <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 dark:text-slate-100">
+                                      {getDeptIcon(step.id)}
+                                      <span className="truncate">{step.name}</span>
+                                    </div>
 
-                      {/* Clearance Steps Horizontal / Vertical Timeline */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                        {myResignation.clearance_steps?.map((step, idx) => {
-                          const isCleared = step.status === "Cleared";
-                          return (
-                            <div
-                              key={step.id || idx}
-                              className={`p-3 rounded-xl border flex flex-col justify-between transition-all ${
-                                isCleared
-                                  ? "bg-emerald-50/40 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-900/40"
-                                  : "bg-rose-50/30 border-rose-200/70 dark:bg-rose-950/20 dark:border-rose-900/40"
-                              }`}
-                            >
-                              <div>
-                                <div className="flex items-center justify-between mb-2">
-                                  <span className="text-[10px] font-bold text-slate-400">Step {step.order}</span>
-                                  {isCleared ? (
-                                    <span className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs font-bold shadow-xs" title="Cleared">
-                                      ✓
-                                    </span>
-                                  ) : (
-                                    <span className="w-5 h-5 rounded-full bg-rose-500 text-white flex items-center justify-center text-[10px] font-bold shadow-xs" title="Pending">
-                                      ✕
-                                    </span>
+                                    <div className="mt-2 text-[10px]">
+                                      {isCleared ? (
+                                        <span className="font-bold text-emerald-600 block">
+                                          Cleared by {step.cleared_by_name || "Lead"}
+                                        </span>
+                                      ) : (
+                                        <span className="font-bold text-rose-600 block">
+                                          Pending Clearance
+                                        </span>
+                                      )}
+                                      {step.cleared_at && (
+                                        <span className="text-slate-400 block text-[9px]">
+                                          {formatDate(step.cleared_at)}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {step.remarks && (
+                                    <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800 text-[10px] text-slate-500 italic truncate" title={step.remarks}>
+                                      "{step.remarks}"
+                                    </div>
                                   )}
                                 </div>
-
-                                <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 dark:text-slate-100">
-                                  {getDeptIcon(step.id)}
-                                  <span className="truncate">{step.name}</span>
-                                </div>
-
-                                <div className="mt-2 text-[10px]">
-                                  {isCleared ? (
-                                    <span className="font-bold text-emerald-600 block">
-                                      Cleared by {step.cleared_by_name || "Lead"}
-                                    </span>
-                                  ) : (
-                                    <span className="font-bold text-rose-600 block">
-                                      Pending Clearance
-                                    </span>
-                                  )}
-                                  {step.cleared_at && (
-                                    <span className="text-slate-400 block text-[9px]">
-                                      {formatDate(step.cleared_at)}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-
-                              {step.remarks && (
-                                <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800 text-[10px] text-slate-500 italic truncate" title={step.remarks}>
-                                  "{step.remarks}"
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ) : null}
-
-                  {/* 3. EXIT INTERVIEW SECTION (RAISED AFTER ACCOUNTS CLEARANCE) */}
-                  {myResignation.exit_interview_raised ? (
-                    <div className="p-5 bg-gradient-to-r from-violet-50/60 to-purple-50/60 dark:from-violet-950/20 dark:to-purple-950/20 rounded-2xl border border-violet-200 dark:border-violet-900/40 space-y-4">
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-3 border-b border-violet-200/60 dark:border-violet-900/40">
-                        <div className="flex items-center gap-2">
-                          <span className="p-2 rounded-xl bg-violet-600 text-white shadow-xs">
-                            <FiMessageSquare className="w-4 h-4" />
-                          </span>
-                          <div>
-                            <h3 className="text-sm font-black text-violet-900 dark:text-violet-200">
-                              Exit Interview Form (10 Questions Scheduled)
-                            </h3>
-                            <p className="text-xs text-violet-700/80 dark:text-violet-300">
-                              HR has raised your Exit Interview following final accounts clearance.
-                            </p>
+                              );
+                            })}
                           </div>
                         </div>
+                      ) : null}
 
-                        <span className="text-xs font-bold px-3 py-1 rounded-full bg-violet-100 text-violet-800 dark:bg-violet-900/50 dark:text-violet-200">
-                          Status: {myResignation.exit_interview_status}
-                        </span>
-                      </div>
-
-                      {/* Interview Schedule Details */}
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-white dark:bg-slate-900 p-3.5 rounded-xl border border-violet-100 text-xs">
-                        <div>
-                          <span className="text-slate-400 block text-[10px]">Date</span>
-                          <span className="font-bold text-slate-800 dark:text-slate-100">{formatDate(myResignation.exit_interview_date)}</span>
-                        </div>
-                        <div>
-                          <span className="text-slate-400 block text-[10px]">Time</span>
-                          <span className="font-bold text-slate-800 dark:text-slate-100">{myResignation.exit_interview_time || "10:30 AM"}</span>
-                        </div>
-                        <div>
-                          <span className="text-slate-400 block text-[10px]">Interviewer</span>
-                          <span className="font-bold text-slate-800 dark:text-slate-100">{myResignation.exit_interview_interviewer || "HR Manager"}</span>
-                        </div>
-                        <div>
-                          <span className="text-slate-400 block text-[10px]">Mode & Venue</span>
-                          <span className="font-bold text-slate-800 dark:text-slate-100">{myResignation.exit_interview_mode} ({myResignation.exit_interview_location || "HQ"})</span>
-                        </div>
-                      </div>
-
-                      {/* The 10 Questions Preview */}
-                      <div className="space-y-2">
-                        <span className="text-xs font-bold text-violet-900 dark:text-violet-200 uppercase tracking-wide block">
-                          Set of 10 Exit Questions Raised for Interview
-                        </span>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-                          {(myResignation.exit_interview_questions || DEFAULT_EXIT_QUESTIONS).slice(0, 10).map((q, qIdx) => (
-                            <div key={q.id || qIdx} className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-violet-100 dark:border-slate-800">
-                              <span className="font-bold text-violet-700 text-[10px] block">
-                                Question {qIdx + 1} • {q.category}
+                      {/* 3. EXIT INTERVIEW SECTION (RAISED AFTER ACCOUNTS CLEARANCE) */}
+                      {myResignation.exit_interview_raised ? (
+                        <div className="p-5 bg-gradient-to-r from-violet-50/60 to-purple-50/60 dark:from-violet-950/20 dark:to-purple-950/20 rounded-2xl border border-violet-200 dark:border-violet-900/40 space-y-4">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-3 border-b border-violet-200/60 dark:border-violet-900/40">
+                            <div className="flex items-center gap-2">
+                              <span className="p-2 rounded-xl bg-violet-600 text-white shadow-xs">
+                                <FiMessageSquare className="w-4 h-4" />
                               </span>
-                              <p className="text-slate-700 dark:text-slate-300 font-medium text-[11px] mt-0.5">
-                                {q.question}
-                              </p>
-                              {q.answer && (
-                                <p className="text-slate-500 text-[10px] mt-1 italic">
-                                  Response: {q.answer}
+                              <div>
+                                <h3 className="text-sm font-black text-violet-900 dark:text-violet-200">
+                                  Exit Interview Form (10 Questions Scheduled)
+                                </h3>
+                                <p className="text-xs text-violet-700/80 dark:text-violet-300">
+                                  HR has raised your Exit Interview following final accounts clearance.
                                 </p>
-                              )}
+                              </div>
                             </div>
-                          ))}
+
+                            <span className="text-xs font-bold px-3 py-1 rounded-full bg-violet-100 text-violet-800 dark:bg-violet-900/50 dark:text-violet-200">
+                              Status: {myResignation.exit_interview_status}
+                            </span>
+                          </div>
+
+                          {/* Interview Schedule Details */}
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-white dark:bg-slate-900 p-3.5 rounded-xl border border-violet-100 text-xs">
+                            <div>
+                              <span className="text-slate-400 block text-[10px]">Date</span>
+                              <span className="font-bold text-slate-800 dark:text-slate-100">{formatDate(myResignation.exit_interview_date)}</span>
+                            </div>
+                            <div>
+                              <span className="text-slate-400 block text-[10px]">Time</span>
+                              <span className="font-bold text-slate-800 dark:text-slate-100">{myResignation.exit_interview_time || "10:30 AM"}</span>
+                            </div>
+                            <div>
+                              <span className="text-slate-400 block text-[10px]">Interviewer</span>
+                              <span className="font-bold text-slate-800 dark:text-slate-100">{myResignation.exit_interview_interviewer || "HR Manager"}</span>
+                            </div>
+                            <div>
+                              <span className="text-slate-400 block text-[10px]">Mode & Venue</span>
+                              <span className="font-bold text-slate-800 dark:text-slate-100">{myResignation.exit_interview_mode} ({myResignation.exit_interview_location || "HQ"})</span>
+                            </div>
+                          </div>
+
+                          {/* The 10 Questions Preview */}
+                          <div className="space-y-2">
+                            <span className="text-xs font-bold text-violet-900 dark:text-violet-200 uppercase tracking-wide block">
+                              Set of 10 Exit Questions Raised for Interview
+                            </span>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                              {(myResignation.exit_interview_questions || DEFAULT_EXIT_QUESTIONS).slice(0, 10).map((q, qIdx) => (
+                                <div key={q.id || qIdx} className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-violet-100 dark:border-slate-800">
+                                  <span className="font-bold text-violet-700 text-[10px] block">
+                                    Question {qIdx + 1} • {q.category}
+                                  </span>
+                                  <p className="text-slate-700 dark:text-slate-300 font-medium text-[11px] mt-0.5">
+                                    {q.question}
+                                  </p>
+                                  {q.answer && (
+                                    <p className="text-slate-500 text-[10px] mt-1 italic">
+                                      Response: {q.answer}
+                                    </p>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                  ) : null}
+                      ) : null}
                     </>
                   )}
                 </div>
@@ -2216,8 +2730,42 @@ export default function Separation() {
                                 </div>
                               </td>
 
-                              <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300 font-semibold whitespace-nowrap">
-                                {item.dept || "General"}
+                              <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                                <span className="font-semibold text-slate-800 dark:text-slate-200 block">
+                                  {item.dept || "General"}
+                                </span>
+                                <div className="text-[10px] text-slate-500 flex flex-col gap-0.5 mt-1">
+                                  <div className="flex items-center gap-1">
+                                    <span className="font-bold text-slate-600 dark:text-slate-400">Mgr:</span>
+                                    {item.assigned_manager_name || item.manager_name ? (
+                                      <span className="text-slate-700 dark:text-slate-300 font-medium">
+                                        {item.assigned_manager_name || item.manager_name}
+                                        {(item.assigned_manager_id || item.manager_id) && (
+                                          <span className="ml-1 text-[9px] px-1 py-0.2 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 rounded font-mono border border-amber-200 dark:border-amber-900/50">
+                                            {item.assigned_manager_id || item.manager_id}
+                                          </span>
+                                        )}
+                                      </span>
+                                    ) : (
+                                      <span className="italic text-slate-400">Direct to HOD</span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <span className="font-bold text-slate-600 dark:text-slate-400">HOD:</span>
+                                    {item.assigned_hod_name || item.hod_name ? (
+                                      <span className="text-slate-700 dark:text-slate-300 font-medium">
+                                        {item.assigned_hod_name || item.hod_name}
+                                        {(item.assigned_hod_id || item.hod_id) && (
+                                          <span className="ml-1 text-[9px] px-1 py-0.2 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 rounded font-mono border border-indigo-200 dark:border-indigo-900/50">
+                                            {item.hod_id || item.assigned_hod_id}
+                                          </span>
+                                        )}
+                                      </span>
+                                    ) : (
+                                      <span className="italic text-slate-400">Direct to HR</span>
+                                    )}
+                                  </div>
+                                </div>
                               </td>
 
                               <td className="py-3.5 px-4 text-slate-700 dark:text-slate-200 font-medium whitespace-nowrap">
@@ -2251,7 +2799,7 @@ export default function Separation() {
                               <td className="py-3.5 px-4 text-right whitespace-nowrap">
                                 <div className="flex items-center justify-end gap-1.5 flex-nowrap whitespace-nowrap">
                                   {/* 1. Team Lead Review */}
-                                  {(isTeamLead || isHR) && item.status === "Pending TL Review" && (
+                                  {(isTeamLead || isManager || isHOD || isHR || isAdmin) && item.status === "Pending TL Review" && (
                                     <button
                                       type="button"
                                       onClick={() => openActionModal(item, "tl_action")}
@@ -2262,7 +2810,7 @@ export default function Separation() {
                                   )}
 
                                   {/* 2. Manager Review */}
-                                  {(isManager || isHR) && item.status === "Pending Manager Review" && (
+                                  {(isManager || isHOD || isHR || isAdmin) && item.status === "Pending Manager Review" && (
                                     <button
                                       type="button"
                                       onClick={() => openActionModal(item, "manager_action")}
@@ -2273,7 +2821,7 @@ export default function Separation() {
                                   )}
 
                                   {/* 3. Department Head (HOD) Approval */}
-                                  {(isHOD || isHR) && item.status === "Pending HOD Approval" && (
+                                  {(isHOD || isHR || isAdmin) && item.status === "Pending HOD Approval" && (
                                     <button
                                       type="button"
                                       onClick={() => openActionModal(item, "hod_action")}
@@ -2283,16 +2831,43 @@ export default function Separation() {
                                     </button>
                                   )}
 
-                                  {/* Handover Confirmation by Assigned Colleague, HOD, or HR */}
-                                  {(item.handover_person_id === userEmpId || isHOD || isHR) && item.handover_status === "SUBMITTED_BY_EMPLOYEE" && (
-                                    <button
-                                      type="button"
-                                      onClick={() => openConfirmHandoverModal(item)}
-                                      className="px-2.5 py-1 text-xs font-bold rounded-lg bg-blue-600 text-white hover:bg-blue-700 shadow-xs transition-all flex items-center gap-1 whitespace-nowrap shrink-0"
-                                    >
-                                      <FiCheck className="w-3.5 h-3.5" />
-                                      Confirm Handover
-                                    </button>
+                                  {/* Handover Verification by Assigned TL, Manager, Colleague, HOD, HR, or Admin */}
+                                  {(item.status === "Pending Handover Completion" || item.status === "Awaiting Handover Confirmation" || item.approval_stage === "HANDOVER_IN_PROGRESS" || item.approval_stage === "HANDOVER_SUBMITTED" || (item.handover_status && item.handover_status !== "CONFIRMED_BY_ASSIGNEE" && item.handover_status !== "NOT_ASSIGNED")) && (
+                                    <>
+                                      {/* If current user is Assigned Handover Person, HOD, Reporting Manager, HR, or Admin: show Verify Handover button */}
+                                      {((item.handover_person_id && userEmpId && item.handover_person_id.trim().toLowerCase() === userEmpId.trim().toLowerCase()) ||
+                                        (item.hod_id && userEmpId && item.hod_id.trim().toLowerCase() === userEmpId.trim().toLowerCase()) ||
+                                        (item.manager_id && userEmpId && item.manager_id.trim().toLowerCase() === userEmpId.trim().toLowerCase()) ||
+                                        isHOD || isHR || isAdmin || isManager) ? (
+                                        <button
+                                          type="button"
+                                          onClick={() => openConfirmHandoverModal(item)}
+                                          className="px-2.5 py-1 text-xs font-bold rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer hover:shadow"
+                                          title="Verify doc & files handover checklist with comments to advance flow to next stage (Admin Sign-off)"
+                                        >
+                                          <FiCheck className="w-3.5 h-3.5" />
+                                          Verify Handover
+                                        </button>
+                                      ) : (item.employee_id && userEmpId && item.employee_id.trim().toLowerCase() === userEmpId.trim().toLowerCase()) ? (
+                                        <button
+                                          type="button"
+                                          onClick={() => openSubmitHandoverModal(item)}
+                                          className="px-2.5 py-1 text-xs font-bold rounded-lg bg-blue-600 text-white hover:bg-blue-700 shadow-xs transition-all flex items-center gap-1 whitespace-nowrap shrink-0 cursor-pointer hover:shadow"
+                                          title="Submit handover documentation and links"
+                                        >
+                                          <FiUpload className="w-3.5 h-3.5" />
+                                          Submit Handover
+                                        </button>
+                                      ) : (
+                                        <span
+                                          className="px-2 py-1 text-[11px] font-semibold rounded-lg bg-amber-50 text-amber-700 border border-amber-200 inline-flex items-center gap-1 whitespace-nowrap shrink-0"
+                                          title={`Handover assigned to ${item.handover_person_name || "Assignee"}. Pending completion.`}
+                                        >
+                                          <FiClock className="w-3 h-3 text-amber-500" />
+                                          Handover Pending
+                                        </span>
+                                      )}
+                                    </>
                                   )}
 
                                   {/* 4. Admin Operations & Facilities Approval */}
@@ -2307,7 +2882,7 @@ export default function Separation() {
                                   )}
 
                                   {/* 5. HR Final Approval */}
-                                  {isHR && item.status === "Pending HR Approval" && (
+                                  {(isHR || isAdmin) && item.status === "Pending HR Approval" && (
                                     <button
                                       type="button"
                                       onClick={() => openActionModal(item, "hr_action")}
@@ -2315,17 +2890,6 @@ export default function Separation() {
                                     >
                                       HR Approval
                                     </button>
-                                  )}
-
-                                  {/* HR Monitoring Handover Stage Indicator */}
-                                  {isHR && (item.status === "Pending Handover Completion" || item.status === "Awaiting Handover Confirmation") && (
-                                    <span
-                                      className="px-2 py-1 text-[11px] font-semibold rounded-lg bg-slate-100 text-slate-500 border border-slate-200 inline-flex items-center gap-1 whitespace-nowrap shrink-0"
-                                      title={`Handover assigned to ${item.handover_person_name || "colleague"}. HR is monitoring until completion confirmation.`}
-                                    >
-                                      <FiClock className="w-3 h-3 text-amber-500" />
-                                      Handover Pending
-                                    </span>
                                   )}
 
                                   {/* 5. Raise Clearance Form Button (for HR upon approval) */}
@@ -2635,7 +3199,7 @@ export default function Separation() {
       {/* ------------------------------------------------------------- */}
       {selectedRecordForAction && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full h-[90vh] overflow-y-auto p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
               <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
                 <FiShield className="w-4 h-4 text-blue-600" />
@@ -2687,11 +3251,10 @@ export default function Separation() {
                 <button
                   type="button"
                   onClick={() => setActionDecision("Approved")}
-                  className={`py-2 px-3 text-xs font-bold rounded-xl border transition-all flex items-center justify-center gap-1.5 ${
-                    actionDecision === "Approved"
-                      ? "bg-emerald-50 border-emerald-500 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
-                      : "bg-slate-50 dark:bg-slate-800 border-slate-200 text-slate-600"
-                  }`}
+                  className={`py-2 px-3 text-xs font-bold rounded-xl border transition-all flex items-center justify-center gap-1.5 ${actionDecision === "Approved"
+                    ? "bg-emerald-50 border-emerald-500 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                    : "bg-slate-50 dark:bg-slate-800 border-slate-200 text-slate-600"
+                    }`}
                 >
                   <FiCheck className="w-4 h-4 text-emerald-600" />
                   {actionType === "hr_action" ? "Grant Final Approval" : actionType === "admin_action" ? "Approve Admin Sign-off" : "Recommend & Endorse"}
@@ -2699,11 +3262,10 @@ export default function Separation() {
                 <button
                   type="button"
                   onClick={() => setActionDecision("Rejected")}
-                  className={`py-2 px-3 text-xs font-bold rounded-xl border transition-all flex items-center justify-center gap-1.5 ${
-                    actionDecision === "Rejected"
-                      ? "bg-rose-50 border-rose-500 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"
-                      : "bg-slate-50 dark:bg-slate-800 border-slate-200 text-slate-600"
-                  }`}
+                  className={`py-2 px-3 text-xs font-bold rounded-xl border transition-all flex items-center justify-center gap-1.5 ${actionDecision === "Rejected"
+                    ? "bg-rose-50 border-rose-500 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"
+                    : "bg-slate-50 dark:bg-slate-800 border-slate-200 text-slate-600"
+                    }`}
                 >
                   <FiX className="w-4 h-4 text-rose-600" />
                   Reject Request
@@ -2717,24 +3279,25 @@ export default function Separation() {
                 <div>
                   <span className="text-xs font-black text-indigo-900 dark:text-indigo-200 block uppercase tracking-wide flex items-center gap-1.5">
                     <FiBriefcase className="w-4 h-4 text-indigo-600" />
-                    Assign Colleague for Handover (Required)
+                    Assign Handover to TL / Manager / Colleague (Required)
                   </span>
                   <p className="text-[11px] text-indigo-700/80 dark:text-indigo-300 mt-0.5">
-                    Select an employee who will receive {selectedRecordForAction.name}'s documents and work handover. Both will be notified and the resignation process will be held until the assigned colleague confirms completion.
+                    Select a Team Lead, Manager, or Colleague within {selectedRecordForAction.name}'s department or reporting hierarchy to receive documents & work handover. Both will be notified and the resignation process will be held until the assigned person confirms completion.
                   </p>
                 </div>
 
                 <div>
                   <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    Select Handover Colleague *
+                    Select Handover Assignee (TL / Manager / Colleague) *
                   </label>
                   <select
                     value={hodHandoverPersonId}
                     onChange={(e) => {
+                      const val = e.target.value;
+                      setHodHandoverPersonId(val);
                       const selectedEmp = employees.find(
-                        (emp) => (emp.employee_id || emp.employeeCode || emp.id) === e.target.value
+                        (emp) => String(emp.employee_id || emp.employee_code || emp.employeeCode || emp.id || "").trim().toLowerCase() === String(val).trim().toLowerCase()
                       );
-                      setHodHandoverPersonId(e.target.value);
                       if (selectedEmp) {
                         const name = selectedEmp.name || `${selectedEmp.first_name || ""} ${selectedEmp.last_name || ""}`.trim() || selectedEmp.employee_name;
                         setHodHandoverPersonName(name);
@@ -2744,18 +3307,17 @@ export default function Separation() {
                     }}
                     className="w-full h-9 px-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-800 dark:text-slate-100"
                   >
-                    <option value="">-- Choose employee to take over docs & tasks --</option>
-                    {employees
-                      .filter((emp) => (emp.employee_id || emp.employeeCode || emp.id) !== selectedRecordForAction.employee_id)
-                      .map((emp) => {
-                        const empId = emp.employee_id || emp.employeeCode || emp.id;
-                        const empName = emp.name || `${emp.first_name || ""} ${emp.last_name || ""}`.trim() || emp.employee_name;
-                        return (
-                          <option key={empId} value={empId}>
-                            {empName} ({empId}) {emp.dept || emp.department ? `• ${emp.dept || emp.department}` : ""}
-                          </option>
-                        );
-                      })}
+                    <option value="">-- Choose TL, Manager, or Colleague to take over docs & tasks --</option>
+                    {getHandoverCandidates().map((emp) => {
+                      const empCode = emp.employee_id || emp.employee_code || emp.employeeCode || String(emp.id);
+                      const empName = emp.name || `${emp.first_name || ""} ${emp.last_name || ""}`.trim() || emp.employee_name;
+                      const badge = getCandidateBadge(emp);
+                      return (
+                        <option key={empCode} value={empCode}>
+                          {empName} ({empCode}) {badge} — {emp.designation || emp.job_role || "Colleague"} {emp.dept || emp.department ? `• ${emp.dept || emp.department}` : ""}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
 
@@ -2898,6 +3460,7 @@ export default function Separation() {
                   const isFirst = idx === 0;
                   const isLast = idx === clearancePipeline.length - 1;
                   const isDragging = draggedDeptIndex === idx;
+                  const deptCandidates = getEmployeesForDept(dept.dept_key, selectedRecordForClearance);
 
                   return (
                     <div
@@ -2907,88 +3470,136 @@ export default function Separation() {
                       onDragOver={(e) => handleDragOver(e, idx)}
                       onDrop={(e) => handleDrop(e, idx)}
                       onDragEnd={handleDragEnd}
-                      className={`flex items-center justify-between p-2.5 rounded-xl border text-xs transition-all ${
-                        isDragging
-                          ? "bg-blue-100/70 border-blue-400 shadow-md scale-[0.99] dark:bg-blue-950/60"
-                          : "bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700/80 hover:border-blue-300 dark:hover:border-slate-600"
-                      }`}
+                      className={`p-3 rounded-xl border text-xs transition-all space-y-2.5 ${isDragging
+                        ? "bg-blue-100/70 border-blue-400 shadow-md scale-[0.99] dark:bg-blue-950/60"
+                        : "bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700/80 hover:border-blue-300 dark:hover:border-slate-600"
+                        }`}
                     >
-                      {/* Left: Drag Handle + Step Indicator + Dept Info */}
-                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                        <div
-                          className="cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 p-0.5 rounded touch-none"
-                          title="Click & drag to reorder"
-                        >
-                          <LuGripVertical className="w-4 h-4" />
-                        </div>
+                      {/* Top Row: Handle + Step Indicator + Dept Name + Controls */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                          <div
+                            className="cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 p-0.5 rounded touch-none"
+                            title="Click & drag to reorder"
+                          >
+                            <LuGripVertical className="w-4 h-4" />
+                          </div>
 
-                        <span
-                          className={`w-6 h-6 rounded-full font-black text-[11px] flex items-center justify-center shrink-0 shadow-xs ${
-                            isFirst
+                          <span
+                            className={`w-6 h-6 rounded-full font-black text-[11px] flex items-center justify-center shrink-0 shadow-xs ${isFirst
                               ? "bg-emerald-600 text-white"
                               : isLast
-                              ? "bg-purple-600 text-white"
-                              : "bg-blue-600 text-white"
-                          }`}
-                        >
-                          {idx + 1}
-                        </span>
-
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-bold text-slate-800 dark:text-slate-100 truncate">
-                              {dept.name}
-                            </span>
-                            {dept.is_custom && (
-                              <span className="px-1.5 py-0.2 rounded text-[9px] font-black bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300 shrink-0">
-                                Custom
-                              </span>
-                            )}
-                            {isFirst && (
-                              <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 shrink-0">
-                                1st Step
-                              </span>
-                            )}
-                            {isLast && (
-                              <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300 shrink-0">
-                                Final Step
-                              </span>
-                            )}
-                          </div>
-                          <span className="text-[10px] text-slate-400 truncate block">
-                            {dept.desc || `Serial verification and dues clearance for ${dept.dept_key}`}
+                                ? "bg-purple-600 text-white"
+                                : "bg-blue-600 text-white"
+                              }`}
+                          >
+                            {idx + 1}
                           </span>
+
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-bold text-slate-800 dark:text-slate-100 truncate">
+                                {dept.name}
+                              </span>
+                              {dept.is_custom && (
+                                <span className="px-1.5 py-0.2 rounded text-[9px] font-black bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300 shrink-0">
+                                  Custom
+                                </span>
+                              )}
+                              {isFirst && (
+                                <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 shrink-0">
+                                  1st Step (Unlocked on launch)
+                                </span>
+                              )}
+                              {isLast && (
+                                <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300 shrink-0">
+                                  Final Step
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-[10px] text-slate-400 truncate block mt-0.5">
+                              {dept.desc || `Serial verification and dues clearance for ${dept.dept_key}`}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Right: Up / Down Position Switchers & Remove */}
+                        <div className="flex items-center gap-1 shrink-0 ml-2">
+                          <button
+                            type="button"
+                            onClick={() => moveDeptUp(idx)}
+                            disabled={isFirst}
+                            className="p-1.5 text-slate-600 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
+                            title="Move step up (earlier in sequence)"
+                          >
+                            <FiArrowUp className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => moveDeptDown(idx)}
+                            disabled={isLast}
+                            className="p-1.5 text-slate-600 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
+                            title="Move step down (later in sequence)"
+                          >
+                            <FiArrowDown className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => removeDeptFromPipeline(idx)}
+                            className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
+                            title="Remove from clearance chain"
+                          >
+                            <FiTrash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       </div>
 
-                      {/* Right: Up / Down Position Switchers & Remove */}
-                      <div className="flex items-center gap-1 shrink-0 ml-2">
-                        <button
-                          type="button"
-                          onClick={() => moveDeptUp(idx)}
-                          disabled={isFirst}
-                          className="p-1.5 text-slate-600 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
-                          title="Move step up (earlier in sequence)"
+                      {/* Bottom Row: Assign Specific Department Employee (mapped by employee ID) */}
+                      <div className="pt-2 border-t border-slate-200/70 dark:border-slate-700/60 bg-white/70 dark:bg-slate-900/40 p-2.5 rounded-lg space-y-1">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                          <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5 shrink-0">
+                            <FiUser className="w-3.5 h-3.5 text-indigo-600" />
+                            Assign Clearance Approver ({dept.dept_key || dept.name}):
+                          </label>
+                          {dept.assigned_emp_id && (
+                            <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-900/50 flex items-center gap-1">
+                              <FiCheck className="w-3 h-3 text-emerald-600" />
+                              Mapped ID: <span className="font-mono">{dept.assigned_emp_id}</span>
+                            </span>
+                          )}
+                        </div>
+
+                        <select
+                          value={dept.assigned_emp_id || ""}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            const selectedEmp = employees.find(
+                              (emp) => String(emp.employee_id || emp.employee_code || emp.employeeCode || emp.id || "").trim().toLowerCase() === String(val).trim().toLowerCase()
+                            );
+                            const name = selectedEmp ? (selectedEmp.name || `${selectedEmp.first_name || ""} ${selectedEmp.last_name || ""}`.trim() || selectedEmp.employee_name) : "";
+                            const desig = selectedEmp ? (selectedEmp.designation || selectedEmp.role || "") : "";
+                            setClearancePipeline(prev => prev.map((item, i) => i === idx ? {
+                              ...item,
+                              assigned_emp_id: val,
+                              assigned_emp_name: name,
+                              assigned_emp_designation: desig
+                            } : item));
+                          }}
+                          className="w-full h-8 px-2.5 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-100 font-medium cursor-pointer"
                         >
-                          <FiArrowUp className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => moveDeptDown(idx)}
-                          disabled={isLast}
-                          className="p-1.5 text-slate-600 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
-                          title="Move step down (later in sequence)"
-                        >
-                          <FiArrowDown className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => removeDeptFromPipeline(idx)}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
-                          title="Remove from clearance chain"
-                        >
-                          <FiTrash2 className="w-3.5 h-3.5" />
-                        </button>
+                          <option value="">-- Choose employee from {dept.dept_key || dept.name} --</option>
+                          {deptCandidates.map((emp) => {
+                            const empId = emp.employee_id || emp.employee_code || emp.employeeCode || emp.id;
+                            const empName = emp.name || `${emp.first_name || ""} ${emp.last_name || ""}`.trim() || emp.employee_name;
+                            const empDept = emp.dept || emp.department || "";
+                            const empDesig = emp.designation || emp.role || "";
+                            return (
+                              <option key={empId} value={empId}>
+                                {empName} ({empId}) {empDesig ? `• ${empDesig}` : ""} {empDept ? `[${empDept}]` : ""}
+                              </option>
+                            );
+                          })}
+                        </select>
                       </div>
                     </div>
                   );
@@ -3115,17 +3726,29 @@ export default function Separation() {
                 const isPriorCleared = selectedRecordForClearance.clearance_steps.slice(0, idx).every(s => s.status === "Cleared");
                 const isActive = !isCleared && isPriorCleared;
                 const isLocked = !isCleared && !isPriorCleared;
+                const isAuthorizedForThisStep = isUserAuthorizedForDeptStep(step, selectedRecordForClearance);
+                const isResigningSelf = Boolean(
+                  userEmpId &&
+                  selectedRecordForClearance.employee_id &&
+                  userEmpId.trim().toLowerCase() === selectedRecordForClearance.employee_id.trim().toLowerCase()
+                );
+
+                const deptCandidatesList = getEmployeesForDept(step.dept_key, selectedRecordForClearance);
+                const fallbackCandidate = deptCandidatesList[0] || null;
+                const assignedOfficerName = step.assigned_emp_name || (fallbackCandidate ? (fallbackCandidate.name || `${fallbackCandidate.first_name || ""} ${fallbackCandidate.last_name || ""}`.trim() || fallbackCandidate.employee_name) : null);
+                const assignedOfficerId = step.assigned_emp_id || (fallbackCandidate ? (fallbackCandidate.employee_id || fallbackCandidate.employee_code || fallbackCandidate.id) : null);
+                const assignedOfficerDesig = step.assigned_emp_designation || (fallbackCandidate ? (fallbackCandidate.designation || fallbackCandidate.role) : null);
+                const officerDisplay = assignedOfficerName ? `${assignedOfficerName} (${assignedOfficerId})` : (step.dept_key || step.name);
 
                 return (
                   <div
                     key={step.id || idx}
-                    className={`p-4 rounded-xl border transition-all ${
-                      isCleared
-                        ? "bg-emerald-50/40 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-900/40"
-                        : isActive
+                    className={`p-4 rounded-xl border transition-all ${isCleared
+                      ? "bg-emerald-50/40 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-900/40"
+                      : isActive
                         ? "bg-blue-50/60 border-blue-400 ring-2 ring-blue-500/20 dark:bg-blue-950/30"
                         : "bg-slate-50/50 border-slate-200 dark:bg-slate-800/40 opacity-75"
-                    }`}
+                      }`}
                   >
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                       <div className="flex items-center gap-3">
@@ -3166,27 +3789,95 @@ export default function Separation() {
 
                           <div className="text-[11px] text-slate-500 mt-0.5">
                             {isCleared ? (
-                              <span>Cleared by <span className="font-semibold text-slate-700 dark:text-slate-300">{step.cleared_by_name || "Lead"}</span> on {formatDate(step.cleared_at)}</span>
+                              <span>Cleared by <span className="font-semibold text-slate-700 dark:text-slate-300">{step.cleared_by_name || "Lead"}</span> ({step.cleared_by_dept || step.dept_key || "Dept"}) on {formatDate(step.cleared_at)}</span>
                             ) : isLocked ? (
                               <span className="text-slate-400">Waiting for Step {step.order - 1} clearance first</span>
                             ) : (
-                              <span className="text-blue-700 dark:text-blue-400 font-semibold">Active in serial sequence — Awaiting department approval</span>
+                              <span className="text-blue-700 dark:text-blue-400 font-semibold">Active in serial sequence — Awaiting {step.dept_key || step.name} approval</span>
                             )}
                           </div>
+
+                          {/* Assigned Department Approver Badge & HR Reassign Control */}
+                          <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                            <div className="text-[11px] text-slate-600 dark:text-slate-300 flex flex-col items-start gap-1.5">
+                              <span className="font-semibold text-slate-400 text-[10px] uppercase tracking-wide">Assigned Approver:</span>
+                              {assignedOfficerName ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-bold text-[11px] bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-900/50">
+                                  <FiUser className="w-3 h-3 text-indigo-600" />
+                                  {assignedOfficerName} <span className="font-mono text-[10px] text-indigo-500 font-semibold">({assignedOfficerId})</span>
+                                  {assignedOfficerDesig ? <span className="text-[10px] text-indigo-400 font-normal"> • {assignedOfficerDesig}</span> : null}
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-medium text-[11px] text-slate-500 bg-slate-100 dark:bg-slate-800">
+                                  Authorized officer from {step.dept_key || step.name}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* HR Reassign Capability (only allowed if step is pending/not cleared) */}
+                            {isHR && !isCleared && (
+                              <button
+                                type="button"
+                                onClick={() => setReassigningStepId(reassigningStepId === step.id ? null : step.id)}
+                                className="text-[10px] font-bold text-blue-600 hover:text-blue-800 dark:text-blue-400 underline cursor-pointer ml-1"
+                              >
+                                {reassigningStepId === step.id ? "Cancel Reassign" : "Change Approver"}
+                              </button>
+                            )}
+                          </div>
+
+                          {/* HR Inline Approver Reassignment Form */}
+                          {isHR && !isCleared && reassigningStepId === step.id && (
+                            <div className="mt-2.5 p-2.5 bg-blue-50/80 dark:bg-blue-950/40 rounded-xl border border-blue-200 dark:border-blue-900/50 flex flex-col sm:items-center gap-2">
+                              <span className="text-[11px] font-bold text-blue-900 dark:text-blue-200 shrink-0">
+                                Reassign to {step.dept_key || step.name} employee:
+                              </span>
+                              <select
+                                onChange={(e) => {
+                                  if (e.target.value) {
+                                    handleReassignStepApprover(step.id, e.target.value);
+                                  }
+                                }}
+                                defaultValue={step.assigned_emp_id || assignedOfficerId || ""}
+                                className="flex-1 h-7 py-1 px-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg cursor-pointer"
+                              >
+                                <option value="">-- Choose employee from {step.dept_key || step.name} --</option>
+                                {deptCandidatesList.map((emp) => {
+                                  const empId = emp.employee_id || emp.employee_code || emp.employeeCode || emp.id;
+                                  const empName = emp.name || `${emp.first_name || ""} ${emp.last_name || ""}`.trim() || emp.employee_name;
+                                  const empDesig = emp.designation || emp.role || "";
+                                  return (
+                                    <option key={empId} value={empId}>
+                                      {empName} {empDesig ? `• ${empDesig}` : ""}
+                                    </option>
+                                  );
+                                })}
+                              </select>
+                            </div>
+                          )}
                         </div>
                       </div>
 
-                      {/* Action for Active Step */}
-                      {isActive && (isHR || ((isAccounts || isHOD || isManager) && selectedRecordForClearance.employee_id !== userEmpId)) && (
+                      {/* Action for Active Step: ONLY designated department approver can mark cleared */}
+                      {isActive && isAuthorizedForThisStep && (
                         <div className="flex items-center gap-2 pt-2 sm:pt-0">
                           <button
                             type="button"
                             onClick={() => handleClearDeptStep(step.id)}
                             disabled={clearanceProcessing}
-                            className="px-3.5 py-1.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-xs transition-all flex items-center gap-1"
+                            className="px-3.5 py-1.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer hover:shadow disabled:opacity-60 disabled:cursor-not-allowed"
                           >
-                            <FiCheck className="w-3.5 h-3.5" />
-                            Mark Cleared (Green Tick)
+                            {clearingStepId === step.id ? (
+                              <>
+                                <FiLoader className="w-3.5 h-3.5 animate-spin" />
+                                <span>Clearing...</span>
+                              </>
+                            ) : (
+                              <>
+                                <FiCheck className="w-3.5 h-3.5" />
+                                <span>Mark Cleared</span>
+                              </>
+                            )}
                           </button>
                         </div>
                       )}
@@ -3199,16 +3890,48 @@ export default function Separation() {
                       </div>
                     )}
 
-                    {/* Active Step Remarks Input */}
+                    {/* Active Step: Remarks Input for Authorized Officer, or Live Status Update for HR, Resigned Employee & Others */}
                     {isActive && (
                       <div className="mt-3 pt-3 border-t border-blue-200/60 dark:border-blue-900/50">
-                        <input
-                          type="text"
-                          placeholder="Optional remarks (e.g. All assets returned, no dues pending)..."
-                          value={clearanceActiveStepRemarks}
-                          onChange={(e) => setClearanceActiveStepRemarks(e.target.value)}
-                          className="w-full h-8 px-3 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl"
-                        />
+                        {isAuthorizedForThisStep ? (
+                          <div>
+                            <div className="mb-2 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50/70 dark:bg-emerald-950/30 p-2 rounded-lg border border-emerald-200 dark:border-emerald-900/40 flex items-center gap-1.5">
+                              <FiCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                              <span>You are the authorized clearance officer for <strong>{step.dept_key || step.name}</strong> ({assignedOfficerName || userEmpId}). Enter optional remarks and click <strong>Mark Cleared</strong>.</span>
+                            </div>
+                            <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                              Clearance Sign-off Remarks ({step.dept_key || step.name}):
+                            </label>
+                            <input
+                              type="text"
+                              placeholder={`Remarks from ${step.dept_key || step.name} (e.g. All assets surrendered, no dues pending)...`}
+                              value={clearanceActiveStepRemarks}
+                              onChange={(e) => setClearanceActiveStepRemarks(e.target.value)}
+                              className="w-full h-8 px-3 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl"
+                            />
+                          </div>
+                        ) : isResigningSelf ? (
+                          <div className="p-2.5 rounded-xl bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/50 text-[11px] text-blue-800 dark:text-blue-300 flex items-center gap-2">
+                            <FiClock className="w-4 h-4 text-blue-600 shrink-0" />
+                            <span>
+                              <strong>Status Update:</strong> Awaiting clearance sign-off from <strong>{officerDisplay}</strong>. Resigning employee cannot self-clear; pipeline will advance upon department permission.
+                            </span>
+                          </div>
+                        ) : isHR ? (
+                          <div className="p-2.5 rounded-xl bg-purple-50/80 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-900/50 text-[11px] text-purple-800 dark:text-purple-300 flex items-center gap-2">
+                            <FiEye className="w-4 h-4 text-purple-600 shrink-0" />
+                            <span>
+                              <strong>HR Live Monitoring:</strong> Clearance permission is held exclusively by assigned officer <strong>{officerDisplay}</strong> from {step.dept_key || step.name} department. HR cannot give clearance on behalf of other departments.
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-[11px] text-slate-600 dark:text-slate-400 flex items-center gap-2">
+                            <FiLock className="w-4 h-4 text-slate-400 shrink-0" />
+                            <span>
+                              <strong>Permission Restricted:</strong> Only <strong>{officerDisplay}</strong> from {step.dept_key || step.name} department can give clearance for Step {step.order}. Other departments cannot approve.
+                            </span>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -3623,9 +4346,21 @@ export default function Separation() {
 
             {/* Checklist Verification */}
             <div className="space-y-2">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide block">
-                Verify Handover Checklist Items
-              </span>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide block">
+                  Verify Handover Checklist Items
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const allDone = confirmChecklist.every((c) => c.done);
+                    setConfirmChecklist(confirmChecklist.map((c) => ({ ...c, done: !allDone })));
+                  }}
+                  className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                >
+                  {confirmChecklist.every((c) => c.done) ? "Uncheck All" : "Check All Items ✓"}
+                </button>
+              </div>
               <div className="space-y-2">
                 {confirmChecklist.map((item, idx) => (
                   <label
@@ -3641,7 +4376,7 @@ export default function Separation() {
                         );
                         setConfirmChecklist(updated);
                       }}
-                      className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 mt-0.5"
+                      className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 mt-0.5 cursor-pointer"
                     />
                     <span className="font-semibold text-slate-800 dark:text-slate-100">
                       {item.item}
@@ -3660,11 +4395,10 @@ export default function Separation() {
                 <button
                   type="button"
                   onClick={() => setConfirmDecision("Confirmed")}
-                  className={`py-2 px-3 text-xs font-bold rounded-xl border transition-all flex items-center justify-center gap-1.5 ${
-                    confirmDecision === "Confirmed"
-                      ? "bg-emerald-50 border-emerald-500 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
-                      : "bg-slate-50 dark:bg-slate-800 border-slate-200 text-slate-600"
-                  }`}
+                  className={`py-2 px-3 text-xs font-bold rounded-xl border transition-all flex items-center justify-center gap-1.5 ${confirmDecision === "Confirmed"
+                    ? "bg-emerald-50 border-emerald-500 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                    : "bg-slate-50 dark:bg-slate-800 border-slate-200 text-slate-600"
+                    }`}
                 >
                   <FiCheck className="w-4 h-4 text-emerald-600" />
                   Confirm Handover Completed
@@ -3672,11 +4406,10 @@ export default function Separation() {
                 <button
                   type="button"
                   onClick={() => setConfirmDecision("Revision_Requested")}
-                  className={`py-2 px-3 text-xs font-bold rounded-xl border transition-all flex items-center justify-center gap-1.5 ${
-                    confirmDecision === "Revision_Requested"
-                      ? "bg-rose-50 border-rose-500 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"
-                      : "bg-slate-50 dark:bg-slate-800 border-slate-200 text-slate-600"
-                  }`}
+                  className={`py-2 px-3 text-xs font-bold rounded-xl border transition-all flex items-center justify-center gap-1.5 ${confirmDecision === "Revision_Requested"
+                    ? "bg-rose-50 border-rose-500 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"
+                    : "bg-slate-50 dark:bg-slate-800 border-slate-200 text-slate-600"
+                    }`}
                 >
                   <FiX className="w-4 h-4 text-rose-600" />
                   Request Revisions
@@ -3687,13 +4420,13 @@ export default function Separation() {
             {/* Assignee Confirmation Remarks */}
             <div>
               <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
-                Your Confirmation Feedback / Notes
+                Verification Comments & Feedback *
               </label>
               <textarea
                 rows={3}
                 placeholder={
                   confirmDecision === "Confirmed"
-                    ? "Enter confirmation notes (e.g. Received all repository rights, client contacts, and team assets in good order)..."
+                    ? "Enter handover verification comments (e.g. Received all repository rights, client contacts, and team assets in good order)..."
                     : "Specify what items or documents are missing or require revision before handover can be completed..."
                 }
                 value={confirmRemarks}
@@ -3703,16 +4436,15 @@ export default function Separation() {
             </div>
 
             {/* Consequence Notification */}
-            <div className={`p-3 rounded-xl border text-xs flex items-start gap-2 ${
-              confirmDecision === "Confirmed"
-                ? "bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-200"
-                : "bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/40 dark:text-amber-200"
-            }`}>
+            <div className={`p-3 rounded-xl border text-xs flex items-start gap-2 ${confirmDecision === "Confirmed"
+              ? "bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-200"
+              : "bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/40 dark:text-amber-200"
+              }`}>
               {confirmDecision === "Confirmed" ? (
                 <>
                   <FiCheckCircle className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                   <p>
-                    <strong>Advancement:</strong> Confirming completion will mark the handover verified, unlock the resignation, and advance it to <strong>HR for final sign-off</strong>.
+                    <strong>Workflow Advancement:</strong> Confirming completion marks the document & files handover verified, unlocks the resignation request, and automatically advances it to <strong>Admin Operations & Facilities Sign-off</strong>.
                   </p>
                 </>
               ) : (
@@ -3741,18 +4473,17 @@ export default function Separation() {
                 type="button"
                 onClick={handleConfirmHandover}
                 disabled={confirmProcessing}
-                className={`px-5 py-2 text-xs font-bold text-white rounded-xl shadow-xs transition-all disabled:opacity-50 flex items-center gap-1.5 ${
-                  confirmDecision === "Confirmed"
-                    ? "bg-emerald-600 hover:bg-emerald-700"
-                    : "bg-amber-600 hover:bg-amber-700"
-                }`}
+                className={`px-5 py-2 text-xs font-bold text-white rounded-xl shadow-xs transition-all disabled:opacity-50 flex items-center gap-1.5 ${confirmDecision === "Confirmed"
+                  ? "bg-emerald-600 hover:bg-emerald-700"
+                  : "bg-amber-600 hover:bg-amber-700"
+                  }`}
               >
                 <FiCheck className="w-3.5 h-3.5" />
                 {confirmProcessing
                   ? "Processing..."
                   : confirmDecision === "Confirmed"
-                  ? "Confirm Handover Completed ✓"
-                  : "Send Revision Request"}
+                    ? "Confirm Handover Completed ✓"
+                    : "Send Revision Request"}
               </button>
             </div>
           </div>
@@ -3799,7 +4530,7 @@ export default function Separation() {
                 </div>
               )}
 
-              <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl space-y-1.5">
+              <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl space-y-1.5 text-xs">
                 <div className="flex justify-between">
                   <span className="text-slate-500">Employee:</span>
                   <span className="font-bold">{selectedRecordForDetail.name} ({selectedRecordForDetail.employee_id})</span>
@@ -3807,6 +4538,40 @@ export default function Separation() {
                 <div className="flex justify-between">
                   <span className="text-slate-500">Department:</span>
                   <span className="font-semibold">{selectedRecordForDetail.dept}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Reporting Manager:</span>
+                  <span className="font-semibold">
+                    {selectedRecordForDetail.assigned_manager_name || selectedRecordForDetail.manager_name ? (
+                      <>
+                        {selectedRecordForDetail.assigned_manager_name || selectedRecordForDetail.manager_name}
+                        {(selectedRecordForDetail.assigned_manager_id || selectedRecordForDetail.manager_id) && (
+                          <span className="ml-1 text-[10px] font-mono px-1 py-0.2 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 rounded border border-amber-200">
+                            ID: {selectedRecordForDetail.assigned_manager_id || selectedRecordForDetail.manager_id}
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      <span className="text-slate-400 italic">Not Assigned (Bypassed directly to HOD)</span>
+                    )}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Department Head (HOD):</span>
+                  <span className="font-semibold">
+                    {selectedRecordForDetail.assigned_hod_name || selectedRecordForDetail.hod_name ? (
+                      <>
+                        {selectedRecordForDetail.assigned_hod_name || selectedRecordForDetail.hod_name}
+                        {(selectedRecordForDetail.assigned_hod_id || selectedRecordForDetail.hod_id) && (
+                          <span className="ml-1 text-[10px] font-mono px-1 py-0.2 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 rounded border border-indigo-200">
+                            ID: {selectedRecordForDetail.assigned_hod_id || selectedRecordForDetail.hod_id}
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      <span className="text-slate-400 italic">Not Assigned (Bypassed directly to HR)</span>
+                    )}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">Notice Period:</span>
@@ -3861,20 +4626,30 @@ export default function Separation() {
                 </span>
                 {selectedRecordForDetail.tl_name && (
                   <div className="text-slate-600 dark:text-slate-300">
-                    <span className="font-bold">Team Lead:</span> {selectedRecordForDetail.tl_name} ({selectedRecordForDetail.tl_decision})
-                    {selectedRecordForDetail.tl_comments && <p className="italic text-[11px]">"{selectedRecordForDetail.tl_comments}"</p>}
+                    <span className="font-bold">Team Lead:</span> {selectedRecordForDetail.tl_name}
+                    {selectedRecordForDetail.tl_id && <span className="ml-1 text-[10px] font-mono text-slate-400">[{selectedRecordForDetail.tl_id}]</span>}
+                    {" "}— <span className="font-semibold text-slate-700 dark:text-slate-200">{selectedRecordForDetail.tl_decision || "Pending"}</span>
+                    {selectedRecordForDetail.tl_comments && <p className="italic text-[11px] mt-0.5">"{selectedRecordForDetail.tl_comments}"</p>}
                   </div>
                 )}
-                {selectedRecordForDetail.manager_name && (
+                {(selectedRecordForDetail.assigned_manager_name || selectedRecordForDetail.manager_name || selectedRecordForDetail.manager_decision) && (
                   <div className="text-slate-600 dark:text-slate-300">
-                    <span className="font-bold">Manager:</span> {selectedRecordForDetail.manager_name} ({selectedRecordForDetail.manager_decision})
-                    {selectedRecordForDetail.manager_comments && <p className="italic text-[11px]">"{selectedRecordForDetail.manager_comments}"</p>}
+                    <span className="font-bold">Reporting Manager:</span> {selectedRecordForDetail.assigned_manager_name || selectedRecordForDetail.manager_name || "Manager"}
+                    {(selectedRecordForDetail.assigned_manager_id || selectedRecordForDetail.manager_id) && (
+                      <span className="ml-1 text-[10px] font-mono text-slate-400">[{selectedRecordForDetail.assigned_manager_id || selectedRecordForDetail.manager_id}]</span>
+                    )}
+                    {" "}— <span className={`font-semibold ${selectedRecordForDetail.manager_decision === "Approved" ? "text-emerald-600" : selectedRecordForDetail.manager_decision === "Bypassed" ? "text-indigo-600" : "text-slate-700"}`}>{selectedRecordForDetail.manager_decision || "Pending"}</span>
+                    {selectedRecordForDetail.manager_comments && <p className="italic text-[11px] mt-0.5">"{selectedRecordForDetail.manager_comments}"</p>}
                   </div>
                 )}
-                {selectedRecordForDetail.hod_name && (
+                {(selectedRecordForDetail.assigned_hod_name || selectedRecordForDetail.hod_name || selectedRecordForDetail.hod_decision) && (
                   <div className="text-slate-600 dark:text-slate-300">
-                    <span className="font-bold">Department Head (HOD):</span> {selectedRecordForDetail.hod_name} ({selectedRecordForDetail.hod_decision})
-                    {selectedRecordForDetail.hod_comments && <p className="italic text-[11px]">"{selectedRecordForDetail.hod_comments}"</p>}
+                    <span className="font-bold">Department Head (HOD):</span> {selectedRecordForDetail.assigned_hod_name || selectedRecordForDetail.hod_name || "Department Head"}
+                    {(selectedRecordForDetail.assigned_hod_id || selectedRecordForDetail.hod_id) && (
+                      <span className="ml-1 text-[10px] font-mono text-slate-400">[{selectedRecordForDetail.assigned_hod_id || selectedRecordForDetail.hod_id}]</span>
+                    )}
+                    {" "}— <span className={`font-semibold ${selectedRecordForDetail.hod_decision === "Approved" ? "text-emerald-600" : selectedRecordForDetail.hod_decision === "Bypassed" ? "text-purple-600" : "text-slate-700"}`}>{selectedRecordForDetail.hod_decision || "Pending"}</span>
+                    {selectedRecordForDetail.hod_comments && <p className="italic text-[11px] mt-0.5">"{selectedRecordForDetail.hod_comments}"</p>}
                   </div>
                 )}
                 {selectedRecordForDetail.admin_name && (
@@ -3979,13 +4754,12 @@ export default function Separation() {
                     return (
                       <div
                         key={record.id || index}
-                        className={`p-4 rounded-xl border transition-all space-y-3 ${
-                          isWithdrawn
-                            ? "bg-amber-50/40 border-amber-200/80 dark:bg-amber-950/20 dark:border-amber-900/40"
-                            : record.status === "Separation Completed"
+                        className={`p-4 rounded-xl border transition-all space-y-3 ${isWithdrawn
+                          ? "bg-amber-50/40 border-amber-200/80 dark:bg-amber-950/20 dark:border-amber-900/40"
+                          : record.status === "Separation Completed"
                             ? "bg-emerald-50/30 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-900/40"
                             : "bg-slate-50/70 border-slate-200 dark:bg-slate-800/40 dark:border-slate-700/80"
-                        }`}
+                          }`}
                       >
                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-2.5 border-b border-slate-200/70 dark:border-slate-700/60">
                           <div className="flex items-center gap-2">

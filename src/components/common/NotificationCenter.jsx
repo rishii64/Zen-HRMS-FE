@@ -127,6 +127,10 @@ const getNotificationBg = (type, category) => {
   return "bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800/60";
 };
 
+// Module-level deduplication cache to prevent duplicate toasts & sound across multiple mounted instances (desktop + mobile navbar)
+// and prevent rapid duplicate emissions
+const recentlyHandledNotifIds = new Map(); // notifKey -> timestamp
+
 export default function NotificationCenter({ className = "" }) {
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
@@ -174,8 +178,24 @@ export default function NotificationCenter({ className = "" }) {
     // Subscribe to real-time notification socket events
     const unsubscribe = subscribeToNotifications((notif) => {
       if (!notif) return;
+      const notifKey = String(
+        notif.id || `${notif.title}_${notif.recipient_id || ""}_${notif.created_at || ""}`
+      );
 
-      // Deduplicate & prepend to state
+      const now = Date.now();
+      const lastHandled = recentlyHandledNotifIds.get(notifKey);
+
+      // Clean up older entries in cache (> 30s)
+      for (const [k, timestamp] of recentlyHandledNotifIds.entries()) {
+        if (now - timestamp > 30000) {
+          recentlyHandledNotifIds.delete(k);
+        }
+      }
+
+      const isRecentDuplicate = Boolean(lastHandled && now - lastHandled < 8000);
+      recentlyHandledNotifIds.set(notifKey, now);
+
+      // Deduplicate & prepend to state in this instance
       setNotifications((prev) => {
         if (prev.some((n) => n.id === notif.id)) {
           return prev;
@@ -183,12 +203,17 @@ export default function NotificationCenter({ className = "" }) {
         return [notif, ...prev];
       });
 
+      // If it's a recent duplicate across instances or rapid socket fire, skip chime, toast, and unread increment
+      if (isRecentDuplicate) {
+        return;
+      }
+
       setUnreadCount((c) => c + 1);
 
       // Play audio chime
       playNotificationSound();
 
-      // Show desktop toast with quick-navigate action
+      // Show desktop toast with quick-navigate action and explicit unique id to prevent stacking
       toast.custom(
         (t) => (
           <div
@@ -249,7 +274,11 @@ export default function NotificationCenter({ className = "" }) {
             </div>
           </div>
         ),
-        { duration: 6000, position: "top-right" }
+        {
+          id: `live-notif-${notifKey}`,
+          duration: 6000,
+          position: "top-right",
+        }
       );
     });
 
@@ -419,7 +448,7 @@ export default function NotificationCenter({ className = "" }) {
 
       {/* NOTIFICATION CENTER FLYOUT PANEL */}
       {isOpen && (
-        <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 md:w-[440px] origin-top-right rounded-2xl border border-slate-200 bg-white shadow-2xl transition-all duration-200 dark:border-slate-800 dark:!bg-slate-900 z-50 overflow-hidden animate-fade-in">
+        <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 md:w-[400px] origin-top-right rounded-2xl border border-slate-200 bg-white shadow-2xl transition-all duration-200 dark:border-slate-800 dark:!bg-slate-900 z-50 overflow-hidden animate-fade-in">
           {/* HEADER */}
           <div className="flex items-center justify-between p-3.5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/90">
             <div className="flex items-center gap-2">

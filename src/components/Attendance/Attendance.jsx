@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { Container, Row, Col, Card, Button, Table, Badge, Spinner, Form, Modal } from "react-bootstrap";
 import toast from "react-hot-toast";
 import {
@@ -26,7 +27,8 @@ import {
   LuUser,
   LuArrowUp,
   LuArrowDown,
-  LuFingerprint
+  LuFingerprint,
+  LuRotateCcw
 } from "react-icons/lu";
 import { MdEdit } from "react-icons/md";
 import { getApiBaseUrl, getUploadUrl } from "../../api/axios";
@@ -847,6 +849,16 @@ const MyAttendance = () => {
           >
             <LuFileText className="h-4 w-4 text-slate-500 dark:text-slate-400" /> Attendance Report
           </button>
+
+          {/* Regularization & Reversal Desk Button */}
+          <Link
+            to="/attendance-regularization"
+            className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-xs transition-all cursor-pointer no-underline"
+            title="Attendance Regularization & Missed Punch Correction Desk"
+          >
+            <LuRotateCcw className="h-4 w-4" />
+            <span>Regularization & Reversal</span>
+          </Link>
 
           {/* Biometric Sync Console Button */}
           {(canMarkAttendance || isHR) && (

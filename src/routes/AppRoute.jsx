@@ -67,6 +67,16 @@ import OrgChart from "../pages/Apps/OrgChart";
 import Transfers from "../pages/Apps/Transfers";
 import Promotions from "../pages/Apps/Promotions";
 import Overtime from "../pages/Apps/Overtime";
+import ApprovalsDesk from "../pages/Apps/ApprovalsDesk";
+import LoanAdvanceDesk from "../pages/Apps/LoanAdvanceDesk";
+import StatutoryReports from "../pages/Apps/StatutoryReports";
+import InfoSec from "../pages/Apps/InfoSec";
+import Feedback360 from "../pages/Apps/Feedback360";
+import CustomReportBuilder from "../pages/Apps/CustomReportBuilder";
+import PredictiveAnalytics from "../pages/Apps/PredictiveAnalytics";
+import PreJoiningCandidatePortal from "../pages/Apps/PreJoiningCandidatePortal";
+import PreJoiningManagement from "../pages/Apps/PreJoiningManagement";
+import AttendanceRegularization from "../pages/Apps/Attendance_Reversal";
 
 // ✅ ProtectedRoute — checks token presence, expiry validity, role authorization & designation RBAC
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -162,6 +172,8 @@ export default function AppRoute() {
       <Route path="/profile/:employeeid" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager", "ceo", "coo", "management"]}><Profile /></ProtectedRoute>} />
       <Route path="/kpi" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager", "ceo", "coo", "management"]}> <PerformanceKPI /> </ProtectedRoute>} />
       <Route path="/appraisal" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager", "ceo", "coo", "management"]}> <Appraisal /> </ProtectedRoute>} />
+      <Route path="/feedback360" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager", "ceo", "coo", "management"]}> <Feedback360 /> </ProtectedRoute>} />
+      <Route path="/360-feedback" element={<Navigate to="/feedback360" replace />} />
       <Route path="/resignation" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager", "ceo", "coo", "management"]}> <Separation /> </ProtectedRoute>} />
       <Route path="/it-declaration" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager", "ceo", "coo", "management"]}> <IT_Declaration /> </ProtectedRoute>} />
       <Route path="/id-card" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "hod", "manager", "teamlead", "accounts", "payroll", "hrmanager", "ceo", "coo", "management"]}> <ID_Card /> </ProtectedRoute>} />
@@ -198,6 +210,52 @@ export default function AppRoute() {
       {/* Overtime (OT) Tracking & Approval Engine */}
       <Route path="/overtime" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "accounts", "payroll", "hod", "manager", "teamlead", "ceo", "coo", "cto", "cfo", "vp", "secretary", "management", "hrmanager"]}><Overtime /></ProtectedRoute>} />
       <Route path="/ot" element={<Navigate to="/overtime" replace />} />
+
+      {/* Sequential Multi-Level Approvals Hub */}
+      <Route path="/approvals" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "accounts", "payroll", "hod", "manager", "teamlead", "ceo", "coo", "cto", "cfo", "vp", "secretary", "management", "hrmanager"]}><ApprovalsDesk /></ProtectedRoute>} />
+      <Route path="/sequential-approvals" element={<Navigate to="/approvals" replace />} />
+      <Route path="/approval-workflows" element={<Navigate to="/approvals" replace />} />
+
+      {/* Loan & Salary Advance Management */}
+      <Route path="/loans" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "accounts", "payroll", "hod", "manager", "teamlead", "ceo", "coo", "cto", "cfo", "vp", "secretary", "management", "hrmanager"]}><LoanAdvanceDesk /></ProtectedRoute>} />
+      <Route path="/loan" element={<Navigate to="/loans" replace />} />
+      <Route path="/salary-advance" element={<Navigate to="/loans" replace />} />
+      <Route path="/advances" element={<Navigate to="/loans" replace />} />
+
+      {/* Statutory Compliance-Ready Reports Hub */}
+      <Route path="/statutory-reports" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "accounts", "payroll", "hod", "manager", "teamlead", "ceo", "coo", "cto", "cfo", "vp", "secretary", "management", "hrmanager"]}><StatutoryReports /></ProtectedRoute>} />
+      <Route path="/statutory" element={<Navigate to="/statutory-reports" replace />} />
+      <Route path="/ecr" element={<Navigate to="/statutory-reports" replace />} />
+      <Route path="/form16" element={<Navigate to="/statutory-reports" replace />} />
+      <Route path="/form24q" element={<Navigate to="/statutory-reports" replace />} /> 
+
+      {/* Information Security (InfoSec) Awareness Campaigns & Phishing Compliance */}
+      <Route path="/infosec" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "accounts", "payroll", "hod", "manager", "teamlead", "ceo", "coo", "cto", "cfo", "vp", "secretary", "management", "hrmanager"]}><InfoSec /></ProtectedRoute>} />
+      <Route path="/infosec-awareness" element={<Navigate to="/infosec" replace />} />
+      <Route path="/cybersecurity" element={<Navigate to="/infosec" replace />} />
+      <Route path="/phishing-awareness" element={<Navigate to="/infosec" replace />} />
+
+      {/* Custom Report Builder */}
+      <Route path="/custom-reports" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "accounts", "payroll", "hod", "manager", "teamlead", "ceo", "coo", "cto", "cfo", "vp", "secretary", "management", "hrmanager"]}><CustomReportBuilder /></ProtectedRoute>} />
+      <Route path="/custom-report-builder" element={<Navigate to="/custom-reports" replace />} />
+      <Route path="/reports" element={<Navigate to="/custom-reports" replace />} />
+      <Route path="/miscellaneous-reports" element={<Navigate to="/custom-reports" replace />} />
+
+      {/* Predictive & Advanced HR Analytics */}
+      <Route path="/predictive-analytics" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "accounts", "payroll", "hod", "manager", "teamlead", "ceo", "coo", "cto", "cfo", "vp", "secretary", "management", "hrmanager"]}><PredictiveAnalytics /></ProtectedRoute>} />
+      <Route path="/analytics/predictive" element={<Navigate to="/predictive-analytics" replace />} />
+      <Route path="/predictive" element={<Navigate to="/predictive-analytics" replace />} />
+
+      {/* Pre-Joining Candidate Self-Upload Portal (7-Day Validity) */}
+      <Route path="/pre-joining-portal/:token" element={<PreJoiningCandidatePortal />} />
+      <Route path="/pre-joining" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "accounts", "payroll", "hod", "manager", "teamlead", "ceo", "coo", "cto", "cfo", "vp", "secretary", "management", "hrmanager"]}><PreJoiningManagement /></ProtectedRoute>} />
+      <Route path="/pre-joining-management" element={<Navigate to="/pre-joining" replace />} />
+      <Route path="/pre-joining-portal" element={<Navigate to="/pre-joining" replace />} />
+
+      {/* Attendance Regularization & Reversal Desk */}
+      <Route path="/attendance-regularization" element={<ProtectedRoute allowedRoles={["employee", "hr", "admin", "accounts", "payroll", "hod", "manager", "teamlead", "ceo", "coo", "cto", "cfo", "vp", "secretary", "management", "hrmanager"]}><AttendanceRegularization /></ProtectedRoute>} />
+      <Route path="/attendance-reversal" element={<Navigate to="/attendance-regularization" replace />} />
+      <Route path="/regularization" element={<Navigate to="/attendance-regularization" replace />} />
 
       {/* 404 Page */}
       <Route path="*" element={<h2 className="text-center mt-4">Page Not Found</h2>} />

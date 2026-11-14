@@ -1,6 +1,7 @@
 import React from "react";
 import { Container } from "react-bootstrap";
-import { LuAward, LuSparkles } from "react-icons/lu";
+import { Link } from "react-router-dom";
+import { LuAward, LuSparkles, LuUsers } from "react-icons/lu";
 import ProbationAppraisalReviews from "./ProbationAppraisalReviews";
 
 export default function AppraisalPage() {
@@ -21,6 +22,15 @@ export default function AppraisalPage() {
             <p className="text-xs text-slate-500 m-0">
               Multi-tier evaluation lifecycle: <strong>Employee Self-Rating → Team Lead (if avail) → Reporting Manager → HOD Approval → HR Final Sign-Off</strong>
             </p>
+          </div>
+
+          <div>
+            <Link
+              to="/feedback360"
+              className="btn btn-outline-primary rounded-pill text-xs font-bold px-3 py-1.5 d-inline-flex align-items-center gap-1.5 shadow-2xs text-decoration-none"
+            >
+              <LuUsers size={14} /> 360° Multi-Rater Feedback Desk
+            </Link>
           </div>
         </div>
 

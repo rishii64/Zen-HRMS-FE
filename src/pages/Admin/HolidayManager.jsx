@@ -1,17 +1,70 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Container, Row, Col, Card, Form, Button, Table, Badge } from 'react-bootstrap';
 import { getApiBaseUrl } from '../../api/axios';
-import { LuCalendarCheck, LuBriefcase, LuTrash2, LuCalendar, LuSparkles } from 'react-icons/lu';
+import {
+  LuCalendarCheck,
+  LuBriefcase,
+  LuTrash2,
+  LuCalendar,
+  LuMapPin,
+  LuSearch,
+  LuLayers,
+  LuSparkles
+} from 'react-icons/lu';
 import toast from 'react-hot-toast';
+
+const BRANCH_OPTIONS = [
+  { value: "All", label: "All Branches (Company-wide Universal)" },
+  { value: "Kolkata", label: "Kolkata (HQ / Salt Lake)" },
+  { value: "Mumbai", label: "Mumbai (Maharashtra Branch)" },
+  { value: "Bengaluru", label: "Bengaluru (Karnataka Branch)" },
+  { value: "Delhi NCR", label: "Delhi NCR Branch" },
+  { value: "Odisha", label: "Odisha (Bhubaneswar Branch)" },
+  { value: "International - Dubai", label: "International - Dubai (UAE)" },
+  { value: "International - London", label: "International - London (UK)" }
+];
+
+const getBranchBadge = (loc) => {
+  const b = (loc || "All").toLowerCase();
+  if (b === "all" || b === "all branches") {
+    return <span className="badge rounded-pill bg-slate-100 text-slate-700 border border-slate-300 text-[10px] font-semibold">🏢 Universal</span>;
+  }
+  if (b.includes("mumbai")) {
+    return <span className="badge rounded-pill bg-amber-50 text-amber-800 border border-amber-300 text-[10px] font-semibold">📍 Mumbai</span>;
+  }
+  if (b.includes("bengaluru") || b.includes("bangalore")) {
+    return <span className="badge rounded-pill bg-emerald-50 text-emerald-800 border border-emerald-300 text-[10px] font-semibold">📍 Bengaluru</span>;
+  }
+  if (b.includes("kolkata")) {
+    return <span className="badge rounded-pill bg-blue-50 text-blue-800 border border-blue-300 text-[10px] font-semibold">📍 Kolkata</span>;
+  }
+  if (b.includes("odisha")) {
+    return <span className="badge rounded-pill bg-cyan-50 text-cyan-800 border border-cyan-300 text-[10px] font-semibold">📍 Odisha</span>;
+  }
+  if (b.includes("delhi")) {
+    return <span className="badge rounded-pill bg-rose-50 text-rose-800 border border-rose-300 text-[10px] font-semibold">📍 Delhi NCR</span>;
+  }
+  if (b.includes("dubai")) {
+    return <span className="badge rounded-pill bg-purple-50 text-purple-800 border border-purple-300 text-[10px] font-semibold">🌐 Dubai (UAE)</span>;
+  }
+  if (b.includes("london")) {
+    return <span className="badge rounded-pill bg-indigo-50 text-indigo-800 border border-indigo-300 text-[10px] font-semibold">🌐 London (UK)</span>;
+  }
+  return <span className="badge rounded-pill bg-secondary-subtle text-secondary border text-[10px]">📍 {loc}</span>;
+};
 
 const HolidayManager = () => {
   const [holidays, setHolidays] = useState([]);
+  const [branchFilter, setBranchFilter] = useState('All');
+  const [searchQuery, setSearchQuery] = useState('');
   const [newHoliday, setNewHoliday] = useState({
     name: '',
     date: '',
     type: 'Public',
     dept: 'All',
-    is_working_day: false
+    branch_location: 'All',
+    is_working_day: false,
+    notes: ''
   });
   const [togglingId, setTogglingId] = useState(null);
 
@@ -37,6 +90,28 @@ const HolidayManager = () => {
     fetchHolidays();
   }, []);
 
+  // Filtered holidays by Branch & Search Query
+  const filteredHolidays = useMemo(() => {
+    return holidays.filter(h => {
+      // Branch filter
+      if (branchFilter !== 'All') {
+        const hLoc = (h.branch_location || "All").toLowerCase();
+        const target = branchFilter.toLowerCase();
+        const matchesBranch = hLoc === target || hLoc.includes(target) || target.includes(hLoc);
+        if (!matchesBranch) return false;
+      }
+      // Search query
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const nameMatch = (h.name || "").toLowerCase().includes(q);
+        const notesMatch = (h.notes || "").toLowerCase().includes(q);
+        const locMatch = (h.branch_location || "").toLowerCase().includes(q);
+        if (!nameMatch && !notesMatch && !locMatch) return false;
+      }
+      return true;
+    });
+  }, [holidays, branchFilter, searchQuery]);
+
   // Function to add / assign a holiday
   const handleAddHoliday = async (e) => {
     e.preventDefault();
@@ -48,7 +123,12 @@ const HolidayManager = () => {
 
     const isWorkingDay = Boolean(newHoliday.is_working_day || newHoliday.type === 'Working Day');
     const holidayName = newHoliday.name.trim();
-    const loadingToast = toast.loading(isWorkingDay ? `Assigning "${holidayName}" as working day...` : `Publishing "${holidayName}"...`);
+    const branchLabel = newHoliday.branch_location === "All" ? "All Branches" : newHoliday.branch_location;
+    const loadingToast = toast.loading(
+      isWorkingDay
+        ? `Assigning "${holidayName}" as working day for ${branchLabel}...`
+        : `Publishing "${holidayName}" for ${branchLabel}...`
+    );
 
     try {
       const token = localStorage.getItem("token");
@@ -72,12 +152,19 @@ const HolidayManager = () => {
         toast.dismiss(loadingToast);
         toast.success(
           isWorkingDay
-            ? `Assigned "${holidayName}" as an active working day!`
-            : `Holiday "${holidayName}" published successfully!`
+            ? `Assigned "${holidayName}" as an active working day for ${branchLabel}!`
+            : `Holiday "${holidayName}" published for ${branchLabel}!`
         );
-        setNewHoliday({ name: '', date: '', type: 'Public', dept: 'All', is_working_day: false });
-        fetchHolidays(); // Refresh table after saving
-        // Broadcast live update event
+        setNewHoliday({
+          name: '',
+          date: '',
+          type: 'Public',
+          dept: 'All',
+          branch_location: 'All',
+          is_working_day: false,
+          notes: ''
+        });
+        fetchHolidays();
         window.dispatchEvent(new Event("holiday-updated"));
         localStorage.setItem("holiday_last_updated", String(Date.now()));
       } else {
@@ -119,8 +206,8 @@ const HolidayManager = () => {
         toast.dismiss(loadingToast);
         toast.success(
           willBeWorkingDay
-            ? `Reassigned "${h.name}" as Assigned Working Day (Company Open)!`
-            : `Reassigned "${h.name}" as Holiday Off-Day (Company Closed)!`
+            ? `Reassigned "${h.name}" as Assigned Working Day!`
+            : `Reassigned "${h.name}" as Holiday Off-Day!`
         );
         await fetchHolidays();
         window.dispatchEvent(new Event("holiday-updated"));
@@ -138,7 +225,7 @@ const HolidayManager = () => {
     }
   };
 
-  // Function to prompt delete via interactive Toast (replaces native alert/confirm dialog)
+  // Prompt delete via interactive Toast
   const handleDeleteClick = (h) => {
     toast(
       (t) => (
@@ -146,9 +233,9 @@ const HolidayManager = () => {
           <div className="fw-bold text-slate-800">
             Delete {h.name || "this holiday"}?
           </div>
-          {/* <div className="text-[11px] text-slate-500">
-            {h.dateStr ? new Date(`${h.dateStr}T12:00:00`).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : h.date}
-          </div> */}
+          <div className="text-[11px] text-slate-500">
+            Branch: {h.branch_location || "All Branches"}
+          </div>
           <div className="d-flex align-items-center gap-2 mt-1">
             <button
               onClick={() => {
@@ -172,7 +259,7 @@ const HolidayManager = () => {
     );
   };
 
-  // Function to execute deletion
+  // Execute deletion
   const executeDeleteHoliday = async (id, holidayName) => {
     const loadingToast = toast.loading(`Deleting "${holidayName || 'holiday'}"...`);
     try {
@@ -188,7 +275,6 @@ const HolidayManager = () => {
         toast.dismiss(loadingToast);
         toast.success(`"${holidayName || 'Holiday'}" deleted successfully!`);
         fetchHolidays();
-        // Broadcast live update event
         window.dispatchEvent(new Event("holiday-updated"));
         localStorage.setItem("holiday_last_updated", String(Date.now()));
       } else {
@@ -203,29 +289,30 @@ const HolidayManager = () => {
   };
 
   return (
-    <Container className="py-3 px-4 max-w-7xl" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>
+    <Container className="py-4 px-3 px-md-4 max-w-7xl" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>
       <Row className="g-4">
         {/* Left Side: Form */}
-        <Col lg={3}>
+        <Col lg={4}>
           <Card className="shadow-sm p-4 border-0 rounded-4 bg-white">
-            <h5 className="fw-bold mb-3 text-dark d-flex align-items-center gap-2">
+            <h5 className="fw-bold mb-2 text-dark d-flex align-items-center gap-2">
               <LuCalendar className="text-primary" /> Add / Assign Holiday
             </h5>
             <p className="text-muted text-xs mb-4">
-              Prelist company holidays or assign working days. Changes instantly sync to Holiday Calendar and Attendance.
+              Publish branch-specific holidays or company-wide observances. Changes automatically synchronize to attendance and schedules.
             </p>
             <Form onSubmit={handleAddHoliday}>
               <Form.Group className="mb-3">
                 <Form.Label className="small fw-bold">Holiday / Event Name</Form.Label>
                 <Form.Control
                   type="text"
-                  placeholder="e.g. Gandhi Jayanti or Special Working Day"
+                  placeholder="e.g. Ganesh Chaturthi, Gudi Padwa, Durga Puja"
                   value={newHoliday.name}
                   className='text-xs'
                   onChange={(e) => setNewHoliday({ ...newHoliday, name: e.target.value })}
                   required
                 />
               </Form.Group>
+
               <Form.Group className="mb-3">
                 <Form.Label className="small fw-bold">Date</Form.Label>
                 <Form.Control
@@ -236,13 +323,36 @@ const HolidayManager = () => {
                   required
                 />
               </Form.Group>
+
+              {/* Branch / Location Picker */}
+              <Form.Group className="mb-3">
+                <Form.Label className="small fw-bold d-flex align-items-center gap-1">
+                  <LuMapPin className="text-primary" size={13} /> Branch / Location Schedule
+                </Form.Label>
+                <Form.Select
+                  value={newHoliday.branch_location}
+                  className='text-xs'
+                  onChange={(e) => setNewHoliday({ ...newHoliday, branch_location: e.target.value })}
+                >
+                  {BRANCH_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </Form.Select>
+                <Form.Text className="text-muted text-[10px]">
+                  Select "All Branches" for national/universal holidays, or pin to a specific regional office.
+                </Form.Text>
+              </Form.Group>
+
               <Form.Group className="mb-3">
                 <Form.Label className="small fw-bold">Applicable Department</Form.Label>
                 <Form.Select
-                  value={newHoliday.dept} className='text-xs'
+                  value={newHoliday.dept}
+                  className='text-xs'
                   onChange={(e) => setNewHoliday({ ...newHoliday, dept: e.target.value })}
                 >
-                  <option value="All">All Departments (Company-wide)</option>
+                  <option value="All">All Departments (Branch-wide)</option>
                   <option value="Human Resources (HR)">Human Resources (HR)</option>
                   <option value="Engineering / Tech">Engineering / Tech</option>
                   <option value="Accounts & Finance">Accounts & Finance</option>
@@ -251,10 +361,12 @@ const HolidayManager = () => {
                   <option value="Administration & Facilities">Administration & Facilities</option>
                 </Form.Select>
               </Form.Group>
+
               <Form.Group className="mb-3">
                 <Form.Label className="small fw-bold">Category / Type</Form.Label>
                 <Form.Select
-                  value={newHoliday.type} className='text-xs'
+                  value={newHoliday.type}
+                  className='text-xs'
                   onChange={(e) => {
                     const isW = e.target.value === "Working Day";
                     setNewHoliday({
@@ -268,16 +380,30 @@ const HolidayManager = () => {
                   <option value="National">National Holiday</option>
                   <option value="Festival">Festival Holiday</option>
                   <option value="Company">Company Holiday</option>
-                  <option value="Gazetted">Gazetted</option>
-                  <option value="Optional">Optional</option>
+                  <option value="Gazetted">Gazetted Holiday</option>
+                  <option value="Optional">Optional / Restricted</option>
                   <option value="Working Day">Assigned Working Day (Office Open)</option>
                 </Form.Select>
               </Form.Group>
+
+              <Form.Group className="mb-3">
+                <Form.Label className="small fw-bold">Notes / Description (Optional)</Form.Label>
+                <Form.Control
+                  as="textarea"
+                  rows={2}
+                  placeholder="e.g. State-level holiday, regional festivity observance"
+                  value={newHoliday.notes}
+                  className="text-xs"
+                  onChange={(e) => setNewHoliday({ ...newHoliday, notes: e.target.value })}
+                />
+              </Form.Group>
+
               <Form.Group className="mb-4">
                 <Form.Check
-                  type="switch" className='text-[11px]'
+                  type="switch"
+                  className='text-[11px]'
                   id="custom-switch-working-day"
-                  label="Assign as Working Day (Company Open)"
+                  label="Assign as Working Day (Office Open)"
                   checked={Boolean(newHoliday.is_working_day || newHoliday.type === "Working Day")}
                   onChange={(e) => setNewHoliday({
                     ...newHoliday,
@@ -286,44 +412,92 @@ const HolidayManager = () => {
                   })}
                 />
                 <Form.Text className="text-muted text-[10px]">
-                  When enabled, this day is counted as a working day and employees receive presence credit.
+                  When active, staff report for shift duty and punch-ins receive standard presence credit.
                 </Form.Text>
               </Form.Group>
+
               <Button type="submit" variant="primary" className="w-100 rounded-pill fw-bold text-sm shadow-sm py-2">
-                Publish Holiday
+                Publish Branch Holiday
               </Button>
             </Form>
           </Card>
         </Col>
 
-        {/* Right Side: Table */}
-        <Col lg={9}>
+        {/* Right Side: Table & Branch Filters */}
+        <Col lg={8}>
           <Card className="shadow-sm border-0 rounded-4 overflow-hidden bg-white">
-            <Card.Header className="bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
-              <div>
-                <h5 className="fw-bold m-0 text-dark">Holidays & Assigned Working Days</h5>
-                <small className="text-muted text-xs">Manage office off-days and working days</small>
+            <Card.Header className="bg-white py-3 border-bottom">
+              <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                <div>
+                  <h5 className="fw-bold m-0 text-dark">Branch Holiday Schedules</h5>
+                  <small className="text-muted text-xs">Manage location-specific and universal holiday rosters</small>
+                </div>
+                <div className="d-flex items-center gap-2">
+                  <Badge bg="primary" className="rounded-pill px-3 py-2 text-xs">
+                    {filteredHolidays.length} of {holidays.length} Holidays
+                  </Badge>
+                </div>
               </div>
-              <Badge bg="primary" className="rounded-pill px-3 py-2">{holidays.length} Records</Badge>
+
+              {/* Branch Filter Tabs & Search Bar */}
+              <div className="mt-3 pt-3 border-top d-flex flex-column flex-md-row gap-2.5 align-items-md-center justify-content-between">
+                {/* Branch Select */}
+                <div className="d-flex items-center gap-2 flex-grow-1 max-w-sm">
+                  <LuMapPin className="text-muted flex-shrink-0" size={14} />
+                  <Form.Select
+                    size="sm"
+                    className="text-xs rounded-pill"
+                    value={branchFilter}
+                    onChange={(e) => setBranchFilter(e.target.value)}
+                  >
+                    <option value="All">All Locations (Universal + Regional)</option>
+                    <option value="Kolkata">Kolkata (HQ)</option>
+                    <option value="Mumbai">Mumbai</option>
+                    <option value="Bengaluru">Bengaluru</option>
+                    <option value="Delhi NCR">Delhi NCR</option>
+                    <option value="Odisha">Odisha</option>
+                    <option value="International - Dubai">International - Dubai (UAE)</option>
+                    <option value="International - London">International - London (UK)</option>
+                  </Form.Select>
+                </div>
+
+                {/* Search */}
+                <div className="relative" style={{ minWidth: "220px" }}>
+                  <Form.Control
+                    size="sm"
+                    type="text"
+                    placeholder="Search holiday name..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="text-xs rounded-pill ps-4"
+                  />
+                  <LuSearch size={12} className="text-muted position-absolute" style={{ left: "10px", top: "50%", transform: "translateY(-50%)" }} />
+                </div>
+              </div>
             </Card.Header>
+
             <Table responsive hover className="mb-0">
               <thead className="table-light text-uppercase text-[11px] font-bold text-slate-500">
                 <tr>
-                  <th className="px-4 py-3">Holiday / Day</th>
-                  <th className="py-3">Date</th>
+                  <th className="px-4 py-3">Holiday / Description</th>
+                  <th className="py-3">Branch Location</th>
+                  <th className="py-3">Date & Day</th>
                   <th className="py-3">Dept</th>
                   <th className="py-3">Status / Type</th>
                   <th className="text-center py-3">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {holidays.length > 0 ? holidays.map((h) => {
+                {filteredHolidays.length > 0 ? filteredHolidays.map((h) => {
                   const isWorkingDay = Boolean(h.is_working_day || h.type === 'Working Day');
                   return (
                     <tr key={h.id} className="align-middle">
                       <td className="px-4">
                         <div className="fw-bold text-dark text-sm">{h.name}</div>
-                        {h.notes && <div className="text-[11px] text-muted">{h.notes}</div>}
+                        {h.notes && <div className="text-[11px] text-muted line-clamp-1">{h.notes}</div>}
+                      </td>
+                      <td>
+                        {getBranchBadge(h.branch_location)}
                       </td>
                       <td className="text-slate-600 text-xs font-medium">
                         {h.dateStr ? new Date(`${h.dateStr}T12:00:00`).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : h.date}
@@ -337,7 +511,7 @@ const HolidayManager = () => {
                       <td>
                         {isWorkingDay ? (
                           <span className="badge bg-success-subtle text-success border border-success-subtle px-2 py-1 rounded-pill text-[11px] font-bold d-inline-flex align-items-center gap-1">
-                            <LuBriefcase size={11} /> Assigned Working Day
+                            <LuBriefcase size={11} /> Working Day
                           </span>
                         ) : (
                           <Badge bg={h.type === 'Public' ? 'success' : h.type === 'National' ? 'primary' : h.type === 'Festival' ? 'warning' : 'info'} className="text-[11px]">
@@ -355,7 +529,7 @@ const HolidayManager = () => {
                             onClick={() => toggleWorkingDay(h)}
                             title={isWorkingDay ? "Revert to Holiday (Off-day)" : "Assign as Working Day"}
                           >
-                            {isWorkingDay ? "Revert to Holiday" : "Assign Working Day"}
+                            {isWorkingDay ? "Revert" : "Assign Working"}
                           </Button>
                           <Button
                             variant="outline-danger"
@@ -372,8 +546,8 @@ const HolidayManager = () => {
                   );
                 }) : (
                   <tr>
-                    <td colSpan="5" className="text-center py-5 text-muted fst-italic">
-                      No holidays found in the list.
+                    <td colSpan="6" className="text-center py-5 text-muted fst-italic">
+                      No holidays match the selected location or search query.
                     </td>
                   </tr>
                 )}

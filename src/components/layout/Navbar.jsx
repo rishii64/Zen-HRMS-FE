@@ -3,7 +3,7 @@ import logo from '../../assets/zentelex-logo.png';
 import { Link, NavLink, useNavigate, useLocation } from "react-router-dom";
 import toast from "react-hot-toast";
 import { CiCircleAlert } from "react-icons/ci";
-import { FiMenu, FiX, FiMail, FiLogOut, FiHash, FiGrid, FiChevronDown, FiSearch, FiClock } from "react-icons/fi";
+import { FiMenu, FiX, FiMail, FiLogOut, FiHash, FiGrid, FiChevronDown, FiChevronLeft, FiChevronRight, FiSearch, FiClock } from "react-icons/fi";
 import {
   LuUser,
   LuTrendingUp,
@@ -14,6 +14,7 @@ import {
   LuUsers,
   LuLogOut,
   LuShieldCheck,
+  LuShieldAlert,
   LuClock,
   LuActivity,
   LuGraduationCap,
@@ -34,6 +35,12 @@ import {
   LuNetwork,
   LuCalendarCheck,
   LuArrowLeftRight,
+  LuLayers,
+  LuLandmark,
+  LuFileSpreadsheet,
+  LuTableProperties,
+  LuBrainCircuit,
+  LuRotateCcw,
 } from "react-icons/lu";
 import { SiGoogledocs } from "react-icons/si";
 import { FaListCheck } from "react-icons/fa6";
@@ -124,6 +131,15 @@ const ALL_APPS = [
     keywords: ["appraisal", "performance", "performance appraisal", "review", "scorecard", "evaluation", "rating"],
   },
   {
+    id: "app_feedback_360",
+    title: "360° Feedback System",
+    tabId: 35,
+    icon: <LuUsers className="text-purple-600" />,
+    route: "/feedback360",
+    roles: ALL_STAFF_ROLES,
+    keywords: ["360", "feedback", "360 feedback", "peer review", "upward review", "stakeholder review", "multi-rater", "evaluation", "ratings"],
+  },
+  {
     id: "app_training",
     title: "Training Modules",
     tabId: 7,
@@ -152,7 +168,7 @@ const ALL_APPS = [
   },
   {
     id: "app_mediclaim",
-    title: "Mediclaim & Health Insurance",
+    title: "Mediclaim & Insurance",
     tabId: 10,
     icon: <LuStethoscope className="text-rose-600" />,
     route: "/mediclaim",
@@ -179,7 +195,7 @@ const ALL_APPS = [
   },
   {
     id: "app_resignation",
-    title: "Separation & Resignation",
+    title: "Resignation",
     tabId: 13,
     icon: <LuLogOut className="text-red-500" />,
     route: "/resignation",
@@ -206,7 +222,7 @@ const ALL_APPS = [
   },
   {
     id: "app_schedule",
-    title: "Work Schedule & Roster",
+    title: "Work Schedule",
     tabId: 16,
     icon: <LuClock className="text-orange-500" />,
     route: "/schedule",
@@ -233,7 +249,7 @@ const ALL_APPS = [
   },
   {
     id: "app_hr_events",
-    title: "HR Events & Townhalls",
+    title: "HR Events",
     tabId: 19,
     icon: <LuPartyPopper className="text-pink-600" />,
     route: "/hr-events",
@@ -320,6 +336,87 @@ const ALL_APPS = [
     route: "/overtime",
     roles: ALL_STAFF_ROLES,
     keywords: ["overtime", "ot", "hours", "shifts", "extra hours", "approval", "payout", "timesheet"],
+  },
+  {
+    id: "app_approvals",
+    title: "Multi-Level Approvals Hub",
+    tabId: 29,
+    icon: <LuLayers className="text-blue-600" />,
+    route: "/approvals",
+    roles: ALL_STAFF_ROLES,
+    keywords: ["approval", "approvals", "workflow", "sequential", "multi-level", "manager approval", "hod approval", "hr approval", "routing", "pipeline"],
+  },
+  {
+    id: "app_loans",
+    title: "Loans & Salary Advance",
+    tabId: 30,
+    icon: <LuLandmark className="text-emerald-600" />,
+    route: "/loans",
+    roles: ALL_STAFF_ROLES,
+    keywords: ["loan", "loans", "advance", "salary advance", "emi", "personal loan", "loan application", "repayment", "interest"],
+  },
+  {
+    id: "app_statutory_reports",
+    title: "Statutory Compliance & Returns",
+    tabId: 31,
+    icon: <LuFileSpreadsheet className="text-indigo-600" />,
+    route: "/statutory-reports",
+    roles: ALL_STAFF_ROLES,
+    keywords: ["statutory", "pf", "ecr", "epfo", "esic", "esi return", "form 16", "form 24q", "tds", "compliance", "tax return", "challan"],
+  },
+  {
+    id: "app_infosec",
+    title: "InfoSec Awareness & Compliance",
+    tabId: 32,
+    icon: <LuShieldAlert className="text-sky-600" />,
+    route: "/infosec",
+    roles: ALL_STAFF_ROLES,
+    keywords: ["infosec", "security", "cybersecurity", "phishing", "awareness", "campaign", "acknowledgment", "compliance", "iso 27001", "soc2", "data security"],
+  },
+  {
+    id: "app_custom_reports",
+    title: "Custom Report",
+    tabId: 33,
+    icon: <LuTableProperties className="text-blue-600" />,
+    route: "/custom-reports",
+    roles: ALL_STAFF_ROLES,
+    keywords: ["report", "custom report", "report builder", "export excel", "csv", "pdf", "payroll report", "attendance report", "leave report", "employee report", "ad hoc"],
+  },
+  {
+    id: "app_predictive_analytics",
+    title: "Predictive & Advanced Analytics",
+    tabId: 34,
+    icon: <LuBrainCircuit className="text-purple-600" />,
+    route: "/predictive-analytics",
+    roles: ALL_STAFF_ROLES,
+    keywords: ["predictive", "analytics", "attrition", "flight risk", "absenteeism", "sandwich leave", "recruitment bottleneck", "pipeline", "forecast", "turnover"],
+  },
+  {
+    id: "app_pre_joining",
+    title: "Pre-Joining Candidate Portal",
+    tabId: 35,
+    icon: <LuUserCheck className="text-emerald-600" />,
+    route: "/pre-joining",
+    roles: ALL_STAFF_ROLES,
+    keywords: ["pre-joining", "candidate portal", "kyc upload", "relieving letter", "bank details", "onboarding link", "7-day validity", "self-upload"],
+  },
+  {
+    id: "app_hr_leaves",
+    title: "Leave Administration Desk",
+    tabId: 36,
+    icon: <LuFileText className="text-teal-600" />,
+    route: "/hr/leaves",
+    roles: ["hr", "admin", "accounts", "payroll", "management", "ceo", "coo", "hrmanager"],
+    keywords: ["leave admin", "leaves", "leave approval", "leave balance", "hr leaves", "leave desk", "leave ledger"],
+  },
+  {
+    id: "app_attendance_regularization",
+    title: "Attendance Reversal",
+    tabId: 38,
+    icon: <LuRotateCcw className="text-blue-600" />,
+    route: "/attendance-regularization",
+    roles: ALL_STAFF_ROLES,
+    keywords: ["regularization", "reversal", "missed punch", "punch correction", "attendance discrepancy", "outdoor duty", "punch in", "punch out"],
   },
 ];
 
@@ -492,6 +589,7 @@ const AppNavbar = () => {
   const [isAppsOpen, setIsAppsOpen] = useState(false);
   const [isMobileAppsOpen, setIsMobileAppsOpen] = useState(false);
   const [appSearch, setAppSearch] = useState("");
+  const [appCurrentPage, setAppCurrentPage] = useState(1);
   const [isDailyNoticeOpen, setIsDailyNoticeOpen] = useState(false);
 
   // Synced employee tabs state
@@ -698,6 +796,8 @@ const AppNavbar = () => {
       }
       if (!e.target.closest(".all-apps-container")) {
         setIsAppsOpen(false);
+        setAppSearch("");
+        setAppCurrentPage(1);
       }
     };
 
@@ -815,7 +915,7 @@ const AppNavbar = () => {
           { to: "/management/dashboard", label: "Executive Dashboard" },
           { to: "/attendance", label: "Attendance" },
           { to: "/claims", label: "Claims Oversight" },
-          { to: "/requisition", label: "Requisitions" },
+          { to: "/approvals", label: "Approvals Desk" },
           { to: "/payroll", label: "Payroll Overview" },
         ];
       case "admin":
@@ -832,7 +932,7 @@ const AppNavbar = () => {
           { to: "/attendance", label: "Attendance" },
           { to: "/hr/manage-employees", label: "Manage Staff" },
           { to: "/requisition", label: "Requisition" },
-          // { to: "/hr-events", label: "HR Events" },
+          { to: "/approvals", label: "Approvals" },
           // { to: "/claims", label: "Claims Oversight" },
           // { to: "/onboarding", label: "Onboarding" },
         ];
@@ -881,7 +981,7 @@ const AppNavbar = () => {
           { to: "/attendance", label: "Attendance" },
           { to: "/claims", label: "Team Claims" },
           { to: "/requisition", label: "Requisition" },
-          { to: "/schedule", label: "Department Shifts" },
+          { to: "/approvals", label: "Approvals" },
           { to: profRoute, label: "My Profile" },
         ];
       default:
@@ -890,7 +990,7 @@ const AppNavbar = () => {
             { to: "/hod/dashboard", label: "Dashboard" },
             { to: "/attendance", label: "Attendance" },
             { to: "/requisition", label: "Requisition" },
-            { to: "/schedule", label: "Department Shifts" },
+            { to: "/approvals", label: "Approvals" },
             { to: profRoute, label: "My Profile" },
           ];
         }
@@ -913,10 +1013,11 @@ const AppNavbar = () => {
 
   // Retrieve the configured tab IDs set by HR (via enabled_tabs / tabs_enabled)
   const configuredTabIds = (() => {
-    // 1. If tabs_enabled is true, full access to all 20 modules
+    // 1. If tabs_enabled is true or administrative role, full access to all modules
     const isFullAccess =
       tabsEnabledState === true ||
       tabsEnabledState === "true" ||
+      ["hr", "admin", "management", "ceo", "coo", "hrmanager"].includes(userRole) ||
       (() => {
         const raw = localStorage.getItem("tabs_enabled");
         if (raw !== null && raw !== undefined) return raw === "true";
@@ -961,6 +1062,11 @@ const AppNavbar = () => {
   })();
 
   const filteredApps = ALL_APPS.filter((app) => {
+    // Check role authorization if specified
+    if (app.roles && !app.roles.includes(userRole)) {
+      return false;
+    }
+
     // Only display the exact modules configured by HR (matching individual dashboard)
     if (app.tabId && !configuredTabIds.has(app.tabId)) {
       return false;
@@ -972,10 +1078,35 @@ const AppNavbar = () => {
     return matchesTitle || matchesKeywords;
   });
 
+  const APPS_PER_PAGE = 20;
+  const totalAppPages = Math.max(1, Math.ceil(filteredApps.length / APPS_PER_PAGE));
+  const safeAppPage = Math.min(appCurrentPage, totalAppPages);
+  const startAppIndex = (safeAppPage - 1) * APPS_PER_PAGE;
+  const paginatedApps = filteredApps.slice(startAppIndex, startAppIndex + APPS_PER_PAGE);
+
+  // Keyboard navigation for All Apps dropdown (Escape to close, Left/Right arrows for pagination)
+  useEffect(() => {
+    if (!isAppsOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") {
+        setIsAppsOpen(false);
+        setAppSearch("");
+        setAppCurrentPage(1);
+      } else if (e.key === "ArrowLeft" && document.activeElement?.tagName !== "INPUT") {
+        setAppCurrentPage((p) => Math.max(1, p - 1));
+      } else if (e.key === "ArrowRight" && document.activeElement?.tagName !== "INPUT") {
+        setAppCurrentPage((p) => Math.min(totalAppPages, p + 1));
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isAppsOpen, totalAppPages]);
+
   const handleAppClick = (app) => {
     setIsAppsOpen(false);
     setIsMobileAppsOpen(false);
     setAppSearch("");
+    setAppCurrentPage(1);
 
     let route = app.route;
 
@@ -1036,7 +1167,10 @@ const AppNavbar = () => {
                   onClick={() => {
                     const next = !isAppsOpen;
                     setIsAppsOpen(next);
-                    if (next) refreshEmployeeTabs();
+                    if (next) {
+                      setAppCurrentPage(1);
+                      refreshEmployeeTabs();
+                    }
                   }}
                   className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold rounded-md transition-all duration-200 border ${isAppsOpen
                     ? "bg-slate-100 text-blue-600 border-blue-300 dark:bg-slate-800 dark:text-blue-400 dark:border-blue-800 shadow-sm"
@@ -1247,33 +1381,60 @@ const AppNavbar = () => {
         </div>
       </div>
 
-      {/* ALL APPS MEGA PANEL (Desktop Only) */}
+      {/* ALL APPS MEGA PANEL (Desktop Only) - Compact & 2-Page Paginated */}
       {isAppsOpen && (
-        <div className="hidden md:flex all-apps-container fixed top-[70px] left-1/2 -translate-x-1/2 w-[min(780px,94vw)] origin-top rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-2xl transition-all duration-300 dark:border-slate-800 dark:bg-slate-900 z-50 flex-col">
-          {/* Header Bar: Search Input, Role Badge & Close button */}
-          <div className="flex items-center justify-between gap-3 mb-3 pb-2 border-b border-slate-100 dark:border-slate-800">
-            <div className="relative flex-grow max-w-sm">
-              <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+        <div className="hidden md:flex all-apps-container fixed top-[66px] left-1/2 -translate-x-1/2 w-[min(780px,94vw)] origin-top rounded-2xl border border-slate-200/90 bg-white px-4 py-3.5 shadow-2xl transition-all duration-300 dark:border-slate-800 dark:bg-slate-900 z-50 flex-col">
+          {/* Header Bar: Search Input, Page Switcher, Role Badge & Close button */}
+          <div className="flex items-center justify-between gap-3 mb-2.5 pb-2 border-b border-slate-100 dark:border-slate-800">
+            <div className="relative flex-grow max-w-xs">
+              <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
               <input
                 type="text"
                 placeholder="Search App or Module..."
                 value={appSearch}
-                onChange={(e) => setAppSearch(e.target.value)}
-                className="w-full rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-8 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500"
+                onChange={(e) => {
+                  setAppSearch(e.target.value);
+                  setAppCurrentPage(1);
+                }}
+                className="w-full rounded-lg border border-slate-200 bg-slate-50 pl-8 pr-7 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500"
                 autoFocus
               />
               {appSearch && (
                 <button
                   type="button"
-                  onClick={() => setAppSearch("")}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-0.5"
+                  onClick={() => {
+                    setAppSearch("");
+                    setAppCurrentPage(1);
+                  }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-0.5"
                   title="Clear search"
                 >
                   <FiX className="h-3.5 w-3.5" />
                 </button>
               )}
             </div>
+
             <div className="flex items-center gap-2">
+              {/* Header Quick Page Switcher */}
+              {/* {totalAppPages > 1 && (
+                <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700">
+                  {Array.from({ length: totalAppPages }, (_, i) => i + 1).map((pg) => (
+                    <button
+                      key={pg}
+                      type="button"
+                      onClick={() => setAppCurrentPage(pg)}
+                      className={`px-2 py-0.5 text-[11px] font-bold rounded-md transition-all ${
+                        safeAppPage === pg
+                          ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-2xs"
+                          : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
+                      }`}
+                    >
+                      Page {pg}
+                    </button>
+                  ))}
+                </div>
+              )} */}
+
               <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-full border border-slate-200 dark:border-slate-700">
                 {getRoleLabel(role)} ({filteredApps.length})
               </span>
@@ -1281,11 +1442,12 @@ const AppNavbar = () => {
                 onClick={() => {
                   setIsAppsOpen(false);
                   setAppSearch("");
+                  setAppCurrentPage(1);
                 }}
-                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300 transition-colors"
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300 transition-colors"
                 title="Close"
               >
-                <FiX className="h-5 w-5" />
+                <FiX className="h-4 w-4" />
               </button>
             </div>
           </div>
@@ -1296,21 +1458,76 @@ const AppNavbar = () => {
               No modules found matching "{appSearch}"
             </div>
           ) : (
-            <div className="grid grid-cols-4 gap-y-2.5 gap-x-3 max-h-[380px] overflow-y-auto pr-1">
-              {filteredApps.map((app) => (
+            <div className="grid grid-cols-4 gap-2 min-h-[196px]">
+              {paginatedApps.map((app) => (
                 <div
-                  key={app.id} title={app.title}
+                  key={app.id}
+                  title={app.title}
                   onClick={() => handleAppClick(app)}
-                  className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl cursor-pointer transition-all duration-150 bg-white hover:bg-slate-50 border border-slate-200/90 hover:border-blue-400 dark:bg-slate-800/80 dark:hover:bg-slate-800 dark:border-slate-700/80 dark:hover:border-blue-500 group shadow-xs"
+                  className="flex items-center gap-2 px-2.5 py-2 rounded-xl cursor-pointer transition-all duration-150 bg-white hover:bg-blue-50/70 border border-slate-200/80 hover:border-blue-400 dark:bg-slate-800/80 dark:hover:bg-slate-800 dark:border-slate-700/80 dark:hover:border-blue-500 group shadow-2xs hover:shadow-xs"
                 >
-                  <span className="text-lg flex-shrink-0 group-hover:scale-110 transition-transform">
+                  <span className="text-[17px] flex-shrink-0 group-hover:scale-110 transition-transform">
                     {app.icon}
                   </span>
-                  <span className="text-xs font-semibold text-slate-700 group-hover:text-blue-600 dark:text-slate-200 dark:group-hover:text-blue-400 truncate">
+                  <span className="text-[11.5px] font-semibold text-slate-700 group-hover:text-blue-600 dark:text-slate-200 dark:group-hover:text-blue-400 truncate">
                     {app.title}
                   </span>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Footer Bar: Pagination Controls */}
+          {totalAppPages > 1 && (
+            <div className="flex items-center justify-between pt-2.5 mt-2.5 border-t border-slate-100 dark:border-slate-800 text-xs">
+              <div className="flex items-center gap-2 text-[11px] font-medium text-slate-400 dark:text-slate-500">
+                <span>
+                  Showing {startAppIndex + 1}–{Math.min(startAppIndex + APPS_PER_PAGE, filteredApps.length)} of {filteredApps.length} modules
+                </span>
+                <span className="text-slate-300 dark:text-slate-700">•</span>
+                <span className="text-slate-500 dark:text-slate-400 font-semibold">
+                  Page {safeAppPage} of {totalAppPages}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-1.5 text-[10px]">
+                <button
+                  type="button"
+                  disabled={safeAppPage === 1}
+                  onClick={() => setAppCurrentPage((p) => Math.max(1, p - 1))}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-semibold text-slate-600 dark:text-slate-300 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700/80 border border-slate-200 dark:border-slate-700 disabled:opacity-35 disabled:cursor-not-allowed transition-colors"
+                >
+                  <FiChevronLeft className="w-3.5 h-3.5" />
+                  <span>Prev</span>
+                </button>
+
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalAppPages }, (_, i) => i + 1).map((pg) => (
+                    <button
+                      key={pg}
+                      type="button"
+                      onClick={() => setAppCurrentPage(pg)}
+                      className={`w-7 h-7 rounded-lg font-bold transition-all flex items-center justify-center ${
+                        safeAppPage === pg
+                          ? "bg-blue-600 text-white shadow-xs"
+                          : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700"
+                      }`}
+                    >
+                      {pg}
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  disabled={safeAppPage === totalAppPages}
+                  onClick={() => setAppCurrentPage((p) => Math.min(totalAppPages, p + 1))}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-semibold text-slate-600 dark:text-slate-300 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700/80 border border-slate-200 dark:border-slate-700 disabled:opacity-35 disabled:cursor-not-allowed transition-colors"
+                >
+                  <span>Next</span>
+                  <FiChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
           )}
         </div>

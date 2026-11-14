@@ -43,9 +43,11 @@ import {
   LuWallet,
   LuGripVertical,
   LuArrowUpDown,
-  LuReceipt
+  LuReceipt,
+  LuClipboardCheck
 } from "react-icons/lu";
 import FnfSettlementDesk from "./components/FnfSettlementDesk";
+import KnowledgeTransferDesk from "./components/KnowledgeTransferDesk";
 import toast from "react-hot-toast";
 import ResignationModal from "../../components/Resignation/ResignationModal";
 import { getApiBaseUrl } from "../../api/axios";
@@ -154,6 +156,7 @@ export default function Separation() {
   const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
   const userEmpId = localStorage.getItem("employeeCode") || localStorage.getItem("empId") || storedUser.employee_id || "";
   const userName = localStorage.getItem("userName") || storedUser.name || "User";
+  const userRole = storedRole;
 
   // RBAC checks
   const userDesig = (storedUser.designation || "").toLowerCase().trim();
@@ -270,6 +273,10 @@ export default function Separation() {
   const [confirmRemarks, setConfirmRemarks] = useState("");
   const [confirmChecklist, setConfirmChecklist] = useState([]);
   const [confirmProcessing, setConfirmProcessing] = useState(false);
+
+  // Knowledge Transfer (KT) Module States
+  const [showKtModal, setShowKtModal] = useState(false);
+  const [selectedRecordForKt, setSelectedRecordForKt] = useState(null);
 
   // Calculate Tenure
   const calculateTenure = (joiningDate, endDate) => {
@@ -1234,6 +1241,21 @@ export default function Separation() {
       toast.error("Resigning employees cannot clear their own department clearance steps");
       return;
     }
+
+    // Knowledge Transfer (KT) Gating on Department Clearance
+    if (stepId === "dept" || stepId === 1 || String(stepId).toLowerCase().includes("dept")) {
+      const isKtVerified = selectedRecordForClearance.kt_status === "VERIFIED" || selectedRecordForClearance.handover_status === "CONFIRMED_BY_ASSIGNEE";
+      if (!isKtVerified) {
+        toast.error("Department Clearance Blocked: Knowledge Transfer (KT) tasks must be completed, signed off by recipient, and verified before clearance can be granted!", {
+          duration: 5000,
+          icon: "⚠️"
+        });
+        setSelectedRecordForKt(selectedRecordForClearance);
+        setShowKtModal(true);
+        return;
+      }
+    }
+
     setClearanceProcessing(true);
     setClearingStepId(stepId);
     try {
@@ -1716,6 +1738,20 @@ export default function Separation() {
                 <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400 rounded-full" />
               )}
             </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("kt_tracking")}
+              className={`pb-3 px-3 text-xs font-bold relative transition-colors flex items-center gap-1.5 ${activeTab === "kt_tracking"
+                ? "text-blue-600 dark:text-blue-400"
+                : "text-slate-500 hover:text-slate-700 dark:text-slate-400"
+                }`}
+            >
+              <LuClipboardCheck className="w-3.5 h-3.5" />
+              Knowledge Transfer (KT) Tracking
+              {activeTab === "kt_tracking" && (
+                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400 rounded-full" />
+              )}
+            </button>
           </div>
         )}
 
@@ -1752,6 +1788,18 @@ export default function Separation() {
                   </div>
 
                   <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedRecordForKt(item);
+                        setShowKtModal(true);
+                      }}
+                      className="px-3 py-1.5 text-xs font-bold text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                      title="Open formal Knowledge Transfer task checklist, documentation deliverables, and recipient sign-off form"
+                    >
+                      <LuClipboardCheck className="w-3.5 h-3.5 text-teal-600" />
+                      KT Desk &amp; Sign-off
+                    </button>
                     {item.handover_status === "CONFIRMED_BY_ASSIGNEE" ? (
                       <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 flex items-center gap-1">
                         <FiCheckCircle className="w-3.5 h-3.5" />
@@ -2278,6 +2326,76 @@ export default function Separation() {
                           )}
                         </div>
                       )}
+
+                      {/* 1.5 KNOWLEDGE TRANSFER (KT) TRACKING DESK CARD */}
+                      <div className="p-5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-3">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+                          <div className="flex items-center gap-3">
+                            <span className="p-2 rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/40 shrink-0">
+                              <LuClipboardCheck className="w-5 h-5" />
+                            </span>
+                            <div>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-sm font-black text-slate-900 dark:text-slate-100">
+                                  Knowledge Transfer (KT) Task Tracking
+                                </span>
+                                {myResignation.kt_status === "VERIFIED" ? (
+                                  <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
+                                    <LuShieldCheck className="w-3.5 h-3.5" />
+                                    Handover Verified &amp; Certified ✓
+                                  </span>
+                                ) : myResignation.kt_status === "RECIPIENT_ACCEPTED" ? (
+                                  <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-teal-100 text-teal-800 border border-teal-300">
+                                    Recipient Signed Off (Pending Verification)
+                                  </span>
+                                ) : myResignation.kt_status === "SUBMITTED" ? (
+                                  <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800 border border-purple-300">
+                                    Awaiting Recipient Sign-off
+                                  </span>
+                                ) : myResignation.kt_status === "REVISION_REQUESTED" ? (
+                                  <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300">
+                                    Revision Requested
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-300">
+                                    In Progress
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-slate-500 mt-0.5">
+                                Formal task checklist, documentation deliverables, and recipient comprehension evaluation.
+                              </p>
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedRecordForKt(myResignation);
+                              setShowKtModal(true);
+                            }}
+                            className="px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-xs transition flex items-center gap-1.5 shrink-0"
+                          >
+                            <LuBookOpen className="w-4 h-4" />
+                            Open KT Tracking Desk
+                          </button>
+                        </div>
+
+                        {/* Handover verified status banner */}
+                        {myResignation.kt_status === "VERIFIED" && (
+                          <div className="p-3 bg-emerald-50 dark:bg-emerald-950/30 rounded-xl border border-emerald-200 text-xs text-emerald-800 dark:text-emerald-200 flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2">
+                              <LuShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                              <span>
+                                Handover Verified by <strong>{myResignation.kt_manager_verified_by_name || "Manager"}</strong> on {formatDate(myResignation.kt_manager_verified_at)}
+                              </span>
+                            </div>
+                            <span className="text-[10px] font-black uppercase text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded border border-emerald-200">
+                              Dept Clearance Unlocked
+                            </span>
+                          </div>
+                        )}
+                      </div>
 
                       {/* 2. SERIAL DEPARTMENT CLEARANCE TRACKER (RED PENDING -> GREEN CLEARED TICK) */}
                       {myResignation.clearance_raised ? (
@@ -2831,6 +2949,20 @@ export default function Separation() {
                                     </button>
                                   )}
 
+                                  {/* Knowledge Transfer (KT) Quick Desk */}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedRecordForKt(item);
+                                      setShowKtModal(true);
+                                    }}
+                                    className="px-2.5 py-1 text-xs font-bold rounded-lg bg-teal-50 text-teal-700 hover:bg-teal-100 border border-teal-200 transition-colors whitespace-nowrap shrink-0 flex items-center gap-1"
+                                    title="Open Knowledge Transfer task checklist, recipient sign-off, and handover verification desk"
+                                  >
+                                    <LuClipboardCheck className="w-3.5 h-3.5 text-teal-600" />
+                                    KT Desk
+                                  </button>
+
                                   {/* Handover Verification by Assigned TL, Manager, Colleague, HOD, HR, or Admin */}
                                   {(item.status === "Pending Handover Completion" || item.status === "Awaiting Handover Confirmation" || item.approval_stage === "HANDOVER_IN_PROGRESS" || item.approval_stage === "HANDOVER_SUBMITTED" || (item.handover_status && item.handover_status !== "CONFIRMED_BY_ASSIGNEE" && item.handover_status !== "NOT_ASSIGNED")) && (
                                     <>
@@ -3189,6 +3321,24 @@ export default function Separation() {
           {activeTab === "fnf_settlement" && (
             <div className="space-y-6">
               <FnfSettlementDesk token={token} isEmployeeOnly={isEmployeeOnly} />
+            </div>
+          )}
+
+          {/* TAB 5: KNOWLEDGE TRANSFER (KT) TRACKING DESK */}
+          {activeTab === "kt_tracking" && (
+            <div className="space-y-6">
+              <KnowledgeTransferDesk
+                token={token}
+                currentUser={{ employee_id: userEmpId, role: storedRole, name: userName }}
+                resignations={resignations}
+                myResignation={myResignation}
+                assignedHandovers={assignedHandovers}
+                onRefresh={() => {
+                  fetchResignations();
+                  fetchMyResignation();
+                }}
+                selectedResignationId={selectedRecordForKt?.id}
+              />
             </div>
           )}
         </div>
@@ -3784,6 +3934,33 @@ export default function Separation() {
                               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 animate-pulse">
                                 ✕ Red (Pending Active)
                               </span>
+                            )}
+                            {Boolean(step.id === "dept" || step.dept_key?.toLowerCase() === "department") && (
+                              <div className="flex items-center gap-1.5 ml-1">
+                                {selectedRecordForClearance.kt_status === "VERIFIED" || selectedRecordForClearance.handover_status === "CONFIRMED_BY_ASSIGNEE" ? (
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
+                                    <LuShieldCheck className="w-3 h-3 text-emerald-600" />
+                                    KT Verified ✓
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1">
+                                    <FiAlertCircle className="w-3 h-3 text-amber-600" />
+                                    KT Incomplete
+                                  </span>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedRecordForKt(selectedRecordForClearance);
+                                    setShowKtModal(true);
+                                  }}
+                                  className="text-[10px] font-bold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded-md border border-blue-200 transition flex items-center gap-1 cursor-pointer"
+                                  title="Open Knowledge Transfer tracking desk"
+                                >
+                                  <LuBookOpen className="w-3 h-3" />
+                                  KT Desk
+                                </button>
+                              </div>
                             )}
                           </div>
 
@@ -4854,6 +5031,48 @@ export default function Separation() {
                 Close
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------- */}
+      {/* MODAL 6: KNOWLEDGE TRANSFER (KT) TRACKING DESK MODAL */}
+      {/* ------------------------------------------------------------- */}
+      {showKtModal && selectedRecordForKt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-5xl w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4 max-h-[92vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                Resignation #{selectedRecordForKt.id} • {selectedRecordForKt.name} ({selectedRecordForKt.employee_id})
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowKtModal(false);
+                  setSelectedRecordForKt(null);
+                }}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <FiX className="w-5 h-5" />
+              </button>
+            </div>
+            <KnowledgeTransferDesk
+              token={token}
+              currentUser={{ employee_id: userEmpId, role: storedRole, name: userName }}
+              resignations={resignations}
+              myResignation={myResignation}
+              assignedHandovers={assignedHandovers}
+              onRefresh={() => {
+                fetchResignations();
+                fetchMyResignation();
+              }}
+              selectedResignationId={selectedRecordForKt.id}
+              isModalView={true}
+              onCloseModal={() => {
+                setShowKtModal(false);
+                setSelectedRecordForKt(null);
+              }}
+            />
           </div>
         </div>
       )}

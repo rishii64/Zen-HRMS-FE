@@ -63,6 +63,12 @@ import { getApiBaseUrl, getBackendBaseUrl, getUploadUrl, UPLOADS_BASE } from "..
 import OrganizationStructureModal from "../../components/Admin/OrganizationStructureModal";
 import { LuNetwork,
   LuArrowLeftRight,
+  LuLayers,
+  LuLandmark,
+  LuFileSpreadsheet,
+  LuShieldAlert,
+  LuTableProperties,
+  LuBrainCircuit,
 } from "react-icons/lu";
 
 const API = getApiBaseUrl();
@@ -165,6 +171,16 @@ const ALL_TABS = [
   { id: 26, name: "Transfers & Deputation", desc: "Manage inter-departmental transfers, branch deputation, role reassignment, and transfer letters", badge: "Transfers", category: "Operations", icon: "arrowleftright" },
   { id: 27, name: "Promotions & Progression", desc: "Automate promotion workflows, grade progression, salary increment revision, and promotion letters", badge: "Promotions", category: "Growth", icon: "trendingup" },
   { id: 28, name: "Overtime (OT) Engine", desc: "Automatic overtime tracking beyond shift hours, approval tickets, and payroll payout sync", badge: "Overtime", category: "Operations", icon: "clock" },
+  { id: 29, name: "Multi-Level Approvals Hub", desc: "Sequential approval pipelines for manager, HOD, and HR decision workflows", badge: "Approvals", category: "Operations", icon: "layers" },
+  { id: 30, name: "Loans & Salary Advance", desc: "Employee emergency loans, salary advance requests, and EMI repayment ledger", badge: "Loans", category: "Finance", icon: "landmark" },
+  { id: 31, name: "Statutory Compliance & Returns", desc: "EPFO ECR electronic challan files, monthly ESIC returns, Form 16, and Form 24Q", badge: "Statutory", category: "Finance", icon: "filespreadsheet" },
+  { id: 32, name: "InfoSec Awareness & Compliance", desc: "Cybersecurity training campaigns, phishing awareness drills, and compliance sign-offs", badge: "InfoSec", category: "Operations", icon: "shieldalert" },
+  { id: 33, name: "Custom Report Builder", desc: "Drag-and-drop ad-hoc reports combining Employee, Attendance, Leave, and Payroll with Excel/PDF export", badge: "Reports", category: "Core", icon: "tableproperties" },
+  { id: 34, name: "Predictive & Advanced Analytics", desc: "AI flight risk attrition scoring, predictive absenteeism modeling, and recruitment pipeline bottleneck diagnostics", badge: "Analytics", category: "Operations", icon: "braincircuit" },
+  { id: 35, name: "360° Feedback System", desc: "Multi-rater peer reviews, upward subordinate reviews of managers, and stakeholder evaluations", badge: "360 Feedback", category: "Growth", icon: "feedback360" },
+  { id: 36, name: "Leave Administration Desk", desc: "Company-wide leave balances, team absence calendar, and leave approvals", badge: "Leaves", category: "Operations", icon: "calendar" },
+  { id: 37, name: "Pre-Joining Candidate Portal", desc: "Issue 7-day secure links for newly hired candidates to self-upload KYC, prior relieving letters, and bank details before Day 1", badge: "Pre-Joining", category: "Operations", icon: "usercheck" },
+  { id: 38, name: "Attendance Regularization & Reversal", desc: "Request missed punch corrections, client on-duty hours, or discrepancy reversals with HR approval", badge: "Regularization", category: "Core", icon: "clock" },
 ];
 
 const renderTabIcon = (iconName) => {
@@ -192,6 +208,13 @@ const renderTabIcon = (iconName) => {
     case "network": return <LuNetwork size={16} className="text-indigo-600" />;
     case "calendarcheck": return <LuCalendarCheck size={16} className="text-emerald-600" />;
     case "arrowleftright": return <LuArrowLeftRight size={16} className="text-blue-600" />;
+    case "layers": return <LuLayers size={16} className="text-blue-600" />;
+    case "landmark": return <LuLandmark size={16} className="text-emerald-600" />;
+    case "filespreadsheet": return <LuFileSpreadsheet size={16} className="text-indigo-600" />;
+    case "shieldalert": return <LuShieldAlert size={16} className="text-sky-600" />;
+    case "tableproperties": return <LuTableProperties size={16} className="text-blue-600" />;
+    case "braincircuit": return <LuBrainCircuit size={16} className="text-purple-600" />;
+    case "feedback360": return <LuUsers size={16} className="text-purple-600" />;
     default: return <LuLayoutGrid size={16} className="text-primary" />;
   }
 };

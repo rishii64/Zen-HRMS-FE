@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, Link } from "react-router-dom";
 import toast, { Toaster } from "react-hot-toast";
 import {
   LuUserCheck,
@@ -3255,6 +3255,13 @@ export default function Onboarding() {
 
           {/* Action buttons on top right */}
           <div className="flex items-center gap-2 whitespace-nowrap flex-shrink-0 self-start sm:self-center">
+            <Link
+              to="/pre-joining"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-full border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-semibold shadow-xs transition-all whitespace-nowrap cursor-pointer active:scale-95"
+            >
+              <LuUserCheck size={14} className="text-emerald-600" />
+              <span>Pre-Joining Portal (7-Day)</span>
+            </Link>
             <button
               onClick={() => {
                 setRefreshing(true);

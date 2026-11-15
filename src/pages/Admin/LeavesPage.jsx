@@ -42,6 +42,7 @@ import {
 
 import { getApiBaseUrl, getBackendBaseUrl } from "../../api";
 import toast from "react-hot-toast";
+import LeaveAllocationDesk from "../Apps/components/LeaveAllocationDesk";
 
 const API_BASE = getApiBaseUrl();
 const UPLOAD_API = `${API_BASE}/leave/apply`;
@@ -55,11 +56,12 @@ const FILE_BASE = getBackendBaseUrl();
 const LEAVE_POLICY = [
   { code: "CL", name: "Casual Leave", maxDays: 5, isPaid: true, requiresDoc: false, docThreshold: 0, gender: "All", color: "#10b981", bg: "#ecfdf5", border: "#a7f3d0", permOnly: false, desc: "Annual Quota • Accessible to all staff (Permanent & Non-Permanent)" },
   { code: "SL", name: "Sick Leave", maxDays: 5, isPaid: true, requiresDoc: true, docThreshold: 3, gender: "All", color: "#3b82f6", bg: "#eff6ff", border: "#bfdbfe", permOnly: true, desc: "Annual Quota • Available only after permanent confirmation" },
-  { code: "EL", name: "Earned Leave", maxDays: 12, isPaid: true, requiresDoc: false, docThreshold: 0, gender: "All", color: "#8b5cf6", bg: "#f5f3ff", border: "#ddd6fe", permOnly: true, desc: "Annual Quota • Available only after permanent confirmation" },
+  { code: "EL", name: "Earned Leave", maxDays: 12, isPaid: true, requiresDoc: false, docThreshold: 0, gender: "All", color: "#8b5cf6", bg: "#f5f3ff", border: "#ddd6fe", permOnly: true, desc: "Annual Quota • Carry-forward up to 3 years, stacking up to 45 leaves beyond which will be lapsed." },
+  { code: "PL", name: "Privilege Leave", maxDays: 15, isPaid: true, requiresDoc: false, docThreshold: 0, gender: "All", color: "#6366f1", bg: "#eef2ff", border: "#c7d2fe", permOnly: true, desc: "Annual Quota • Carry-forward up to 3 years, stacking up to 45 leaves beyond which will be lapsed." },
   { code: "HL", name: "Holidays", maxDays: 10, isPaid: true, requiresDoc: false, docThreshold: 0, gender: "All", color: "#f59e0b", bg: "#fffbeb", border: "#fde68a", permOnly: true, desc: "Annual Quota • Available only after permanent confirmation" },
   { code: "LOP", name: "Loss of Pay", maxDays: 0, isPaid: false, requiresDoc: false, docThreshold: 0, gender: "All", color: "#ef4444", bg: "#fef2f2", border: "#fecaca", permOnly: false, desc: "Salary deduction applies as per India 26 working days standard" },
   { code: "ML", name: "Maternity Leave", maxDays: 90, isPaid: true, requiresDoc: false, docThreshold: 0, gender: "Female", color: "#ec4899", bg: "#fdf2f8", border: "#fbcfe8", permOnly: true, desc: "Annual Quota • Female permanent staff only" },
-  { code: "PL", name: "Paternity Leave", maxDays: 5, isPaid: true, requiresDoc: false, docThreshold: 0, gender: "Male", color: "#06b6d4", bg: "#ecfeff", border: "#a5f3fc", permOnly: true, desc: "Annual Quota • Male permanent staff only" },
+  { code: "PAT", name: "Paternity Leave", maxDays: 5, isPaid: true, requiresDoc: false, docThreshold: 0, gender: "Male", color: "#06b6d4", bg: "#ecfeff", border: "#a5f3fc", permOnly: true, desc: "Annual Quota • Male permanent staff only" },
   { code: "CO", name: "Comp Off", maxDays: 0, isPaid: true, requiresDoc: false, docThreshold: 0, gender: "All", color: "#f97316", bg: "#fff7ed", border: "#fed7aa", permOnly: false, desc: "Credited for approved weekend or holiday overtime duty" },
   { code: "BL", name: "Bereavement Leave", maxDays: 5, isPaid: true, requiresDoc: false, docThreshold: 0, gender: "All", color: "#64748b", bg: "#f8fafc", border: "#e2e8f0", permOnly: true, desc: "Annual Quota • Compassionate leave for permanent staff" },
 ];
@@ -308,6 +310,7 @@ const LeavesPage = () => {
   // Tab State
   const [activeTab, setActiveTab] = useState("approvals"); // Default to pending approvals for HR
   const [allLeaves, setAllLeaves] = useState([]);
+  const [employees, setEmployees] = useState([]);
   const [balanceList, setBalanceList] = useState([]);
   const [balanceLoad, setBalanceLoad] = useState(true);
   const [leavesLoad, setLeavesLoad] = useState(true);
@@ -322,6 +325,20 @@ const LeavesPage = () => {
   // Approval comment state
   const [approvalComments, setApprovalComments] = useState({});
   const [processingId, setProcessingId] = useState(null);
+
+  // Fetch Employees
+  const fetchEmployees = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/employees`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      const list = data.data || data.employees || [];
+      setEmployees(list);
+    } catch (e) {
+      console.error("Error fetching employees:", e);
+    }
+  }, [token]);
 
   // Fetch Leaves
   const fetchLeaves = useCallback(async () => {
@@ -374,7 +391,8 @@ const LeavesPage = () => {
   useEffect(() => {
     fetchLeaves();
     fetchBalance();
-  }, [fetchLeaves, fetchBalance]);
+    fetchEmployees();
+  }, [fetchLeaves, fetchBalance, fetchEmployees]);
 
   // Handle Cancel Record
   const handleDelete = async (id) => {
@@ -717,6 +735,7 @@ const LeavesPage = () => {
             { id: "apply", label: "Apply Leave", icon: LuCalendarPlus },
             { id: "approvals", label: "Approvals Queue", icon: LuCheckCheck, badge: pendingLeaves.length, badgeVariant: "amber" },
             { id: "history", label: "Leave History", icon: LuHistory, badge: allLeaves.length, badgeVariant: "slate" },
+            { id: "allocations", label: "Quotas & Carry-Forward", icon: LuSparkles },
             { id: "balances", label: "Policy & Balances", icon: LuShieldCheck },
             { id: "reports", label: "Admin Reports", icon: LuTrendingUp },
           ].map((tab) => {
@@ -1207,6 +1226,19 @@ const LeavesPage = () => {
                 <span>Showing {filteredHistory.length} of {allLeaves.length} total applications</span>
                 <span className="font-semibold text-slate-700">Official HRMS Record Log</span>
               </div>
+            </div>
+          )}
+
+          {/* ════════════════════════════════════════════════════════
+              TAB: QUOTAS & CARRY-FORWARD DESK
+             ════════════════════════════════════════════════════════ */}
+          {activeTab === "allocations" && (
+            <div className="space-y-6">
+              <LeaveAllocationDesk
+                token={localStorage.getItem("token")}
+                employees={employees}
+                onAllocationChanged={() => { fetchLeaves(); fetchBalance(); }}
+              />
             </div>
           )}
 

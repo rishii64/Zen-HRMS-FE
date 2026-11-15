@@ -160,6 +160,24 @@ const getHighlightColorClasses = (colorName) => {
   }
 };
 
+
+const getPolicyRenewalDetails = (endDateStr) => {
+  if (!endDateStr) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const end = new Date(endDateStr);
+  end.setHours(0, 0, 0, 0);
+  const diffDays = Math.ceil((end - today) / (1000 * 60 * 60 * 24));
+  return {
+    diffDays,
+    isExpired: diffDays < 0,
+    isCritical7d: diffDays >= 0 && diffDays <= 7,
+    isWarning15d: diffDays > 7 && diffDays <= 15,
+    isNotice30d: diffDays > 15 && diffDays <= 30,
+    isHealthy: diffDays > 30,
+  };
+};
+
 export default function Mediclaim() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("card");
@@ -285,6 +303,132 @@ export default function Mediclaim() {
     policy_number: "",
   });
   const [savingCoverage, setSavingCoverage] = useState(false);
+
+  // --- Feature: Automated Policy Renewal Reminders (30, 15, 7 Days) ---
+  const [renewalStatus, setRenewalStatus] = useState(null);
+  const [loadingRenewalStatus, setLoadingRenewalStatus] = useState(false);
+  const [triggeringRenewalCheck, setTriggeringRenewalCheck] = useState(false);
+  const [renewalSearch, setRenewalSearch] = useState("");
+  const [renewalUrgencyFilter, setRenewalUrgencyFilter] = useState("All");
+  const [companyDeskView, setCompanyDeskView] = useState("claims"); // 'claims' | 'renewals'
+
+  // Renew Policy Modal State
+  const [showRenewModal, setShowRenewModal] = useState(false);
+  const [selectedPolicyToRenew, setSelectedPolicyToRenew] = useState(null);
+  const [renewForm, setRenewForm] = useState({
+    new_end_date: "",
+    extend_months: "12",
+    sum_insured: 500000,
+    notes: "",
+  });
+  const [savingRenewal, setSavingRenewal] = useState(false);
+
+  const fetchRenewalStatus = async () => {
+    if (!isHRorAdmin) return;
+    try {
+      setLoadingRenewalStatus(true);
+      const res = await api.get("/mediclaim/renewal-status");
+      if (res.data?.success) {
+        setRenewalStatus(res.data);
+      }
+    } catch (err) {
+      console.error("Error fetching policy renewal status:", err);
+    } finally {
+      setLoadingRenewalStatus(false);
+    }
+  };
+
+  const handleTriggerRenewalCheck = async () => {
+    try {
+      setTriggeringRenewalCheck(true);
+      const res = await api.post("/mediclaim/trigger-renewal-reminders");
+      if (res.data?.success) {
+        const stats = res.data.stats || {};
+        toast.success(
+          `Automated check complete! Alerts sent: ${stats.reminders30dSent || 0} (30d), ${stats.reminders15dSent || 0} (15d), ${stats.reminders7dSent || 0} (7d).`,
+          { duration: 5000 }
+        );
+        fetchRenewalStatus();
+        fetchCompanyClaims();
+      }
+    } catch (err) {
+      console.error("Error triggering renewal reminders:", err);
+      toast.error("Failed to run automated renewal check.");
+    } finally {
+      setTriggeringRenewalCheck(false);
+    }
+  };
+
+  const handleOpenRenewModal = (pol) => {
+    setSelectedPolicyToRenew(pol);
+    let nextYearEnd = "";
+    if (pol.policy_end_date) {
+      const d = new Date(pol.policy_end_date);
+      d.setFullYear(d.getFullYear() + 1);
+      nextYearEnd = d.toISOString().split("T")[0];
+    } else {
+      const d = new Date();
+      d.setFullYear(d.getFullYear() + 1);
+      nextYearEnd = d.toISOString().split("T")[0];
+    }
+    setRenewForm({
+      new_end_date: nextYearEnd,
+      extend_months: "12",
+      sum_insured: pol.sum_insured || 500000,
+      notes: "Annual corporate group policy renewal",
+    });
+    setShowRenewModal(true);
+  };
+
+  const handleQuickExtend = (months) => {
+    let baseDate = new Date();
+    if (selectedPolicyToRenew?.policy_end_date) {
+      baseDate = new Date(selectedPolicyToRenew.policy_end_date);
+    }
+    baseDate.setMonth(baseDate.getMonth() + parseInt(months, 10));
+    setRenewForm((prev) => ({
+      ...prev,
+      extend_months: String(months),
+      new_end_date: baseDate.toISOString().split("T")[0],
+    }));
+  };
+
+  const handleSavePolicyRenewal = async (e) => {
+    e.preventDefault();
+    if (!selectedPolicyToRenew) return;
+    try {
+      setSavingRenewal(true);
+      const res = await api.patch(`/mediclaim/policy/${selectedPolicyToRenew.id}/renew`, renewForm);
+      if (res.data?.success) {
+        toast.success(res.data.message || "Policy renewed successfully!");
+        setShowRenewModal(false);
+        fetchRenewalStatus();
+        fetchMyMediclaim();
+        if (companyDeskView === "claims") fetchCompanyClaims();
+      }
+    } catch (err) {
+      console.error("Error renewing policy:", err);
+      toast.error(err.response?.data?.error || "Failed to renew policy");
+    } finally {
+      setSavingRenewal(false);
+    }
+  };
+
+  const filteredRenewalPolicies = (renewalStatus?.policies || []).filter((pol) => {
+    const matchesUrgency =
+      renewalUrgencyFilter === "All" || pol.urgency === renewalUrgencyFilter;
+
+    const term = renewalSearch.toLowerCase().trim();
+    const matchesSearch =
+      !term ||
+      (pol.employee_name && pol.employee_name.toLowerCase().includes(term)) ||
+      (pol.employee_id && pol.employee_id.toLowerCase().includes(term)) ||
+      (pol.policy_number && pol.policy_number.toLowerCase().includes(term)) ||
+      (pol.department && pol.department.toLowerCase().includes(term));
+
+    return matchesUrgency && matchesSearch;
+  });
+
 
   // --- Handlers for Coverage Highlights (Feature 1) ---
   const fetchHighlights = async () => {
@@ -3502,6 +3646,119 @@ export default function Mediclaim() {
           box-shadow: 0 2px 8px rgba(15, 23, 42, 0.35);
         }
       `}</style>
+    
+      {/* RENEW POLICY MODAL */}
+      <Modal show={showRenewModal} onHide={() => setShowRenewModal(false)} centered backdrop="static">
+        <Modal.Header closeButton className="border-b border-slate-200">
+          <Modal.Title className="text-sm font-bold d-flex align-items-center gap-2">
+            <LuClock className="text-indigo-600" /> Renew / Extend Corporate Group Policy
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="p-4">
+          {selectedPolicyToRenew && (
+            <Form onSubmit={handleSavePolicyRenewal}>
+              {/* Selected Policy Details summary */}
+              <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200 mb-3 text-xs">
+                <div className="d-flex justify-content-between mb-1">
+                  <span className="text-slate-500">Employee:</span>
+                  <strong className="text-slate-800">{selectedPolicyToRenew.employee_name || selectedPolicyToRenew.employee_id}</strong>
+                </div>
+                <div className="d-flex justify-content-between mb-1">
+                  <span className="text-slate-500">Policy Number:</span>
+                  <span className="font-mono font-bold text-slate-800">{selectedPolicyToRenew.policy_number}</span>
+                </div>
+                <div className="d-flex justify-content-between">
+                  <span className="text-slate-500">Current Expiry Date:</span>
+                  <span className="text-rose-600 font-bold">{selectedPolicyToRenew.policy_end_date || "—"}</span>
+                </div>
+              </div>
+
+              {/* Quick extension shortcuts */}
+              <Form.Group className="mb-3">
+                <Form.Label className="text-xs fw-bold text-slate-700">Quick Extension Period</Form.Label>
+                <div className="d-flex gap-2">
+                  <Button
+                    type="button"
+                    variant={renewForm.extend_months === "6" ? "primary" : "outline-secondary"}
+                    size="sm"
+                    onClick={() => handleQuickExtend(6)}
+                    className="flex-fill rounded-xl text-xs py-1.5"
+                  >
+                    + 6 Months
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={renewForm.extend_months === "12" ? "primary" : "outline-secondary"}
+                    size="sm"
+                    onClick={() => handleQuickExtend(12)}
+                    className="flex-fill rounded-xl text-xs py-1.5"
+                  >
+                    + 1 Year (Standard)
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={renewForm.extend_months === "24" ? "primary" : "outline-secondary"}
+                    size="sm"
+                    onClick={() => handleQuickExtend(24)}
+                    className="flex-fill rounded-xl text-xs py-1.5"
+                  >
+                    + 2 Years
+                  </Button>
+                </div>
+              </Form.Group>
+
+              {/* New Policy End Date */}
+              <Form.Group className="mb-3">
+                <Form.Label className="text-xs fw-bold text-slate-700">New Policy Expiry Date *</Form.Label>
+                <Form.Control
+                  type="date"
+                  value={renewForm.new_end_date}
+                  onChange={(e) => setRenewForm({ ...renewForm, new_end_date: e.target.value, extend_months: "" })}
+                  className="rounded-xl !text-sm py-2"
+                  required
+                />
+              </Form.Group>
+
+              {/* Sum Insured */}
+              <Form.Group className="mb-3">
+                <Form.Label className="text-xs fw-bold text-slate-700">Sum Insured Coverage (₹)</Form.Label>
+                <Form.Control
+                  type="number"
+                  min="50000"
+                  step="25000"
+                  value={renewForm.sum_insured}
+                  onChange={(e) => setRenewForm({ ...renewForm, sum_insured: e.target.value })}
+                  className="rounded-xl !text-sm py-2 font-bold text-emerald-700"
+                  required
+                />
+              </Form.Group>
+
+              {/* Endorsement Notes */}
+              <Form.Group className="mb-3">
+                <Form.Label className="text-xs fw-bold text-slate-700">Renewal Notes / Underwriter Endorsement Ref</Form.Label>
+                <Form.Control
+                  as="textarea"
+                  rows={2}
+                  value={renewForm.notes}
+                  onChange={(e) => setRenewForm({ ...renewForm, notes: e.target.value })}
+                  placeholder="e.g. Annual renewal endorsed by ICICI Lombard GIC Ltd, broker endorsement ref #..."
+                  className="rounded-xl !text-xs"
+                />
+              </Form.Group>
+
+              <div className="d-flex justify-content-end gap-2 mt-4">
+                <Button variant="light" size="sm" onClick={() => setShowRenewModal(false)} className="rounded-xl text-xs px-3">
+                  Cancel
+                </Button>
+                <Button type="submit" variant="primary" size="sm" disabled={savingRenewal} className="rounded-xl text-xs px-4 bg-indigo-600 border-indigo-600">
+                  {savingRenewal ? "Renewing Policy..." : "Confirm & Renew Policy"}
+                </Button>
+              </div>
+            </Form>
+          )}
+        </Modal.Body>
+      </Modal>
+
     </Container>
   );
 }

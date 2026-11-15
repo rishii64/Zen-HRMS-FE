@@ -329,8 +329,9 @@ export default function Attendance_Reversal() {
   };
 
   return (
-    <div className="px-4 space-y-6 max-w-7xl mx-auto text-slate-800">
-      <Toaster position="top-right" />
+    <>
+      <div className="px-4 space-y-6 max-w-7xl mx-auto text-slate-800">
+        <Toaster position="top-right" />
 
       {/* Header Banner */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 md:p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -779,12 +780,13 @@ export default function Attendance_Reversal() {
           </div>
         </div>
       )}
+      </div>
 
       {/* MODAL 1: REQUEST ATTENDANCE REGULARIZATION */}
       {showApplyModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95">
-            <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+        <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 !m-0 !mt-0 z-[60] bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="relative bg-white rounded-2xl shadow-2xl max-w-lg w-full border border-slate-200 overflow-hidden my-auto max-h-[calc(100vh-2rem)] flex flex-col animate-in fade-in zoom-in-95">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50 flex-shrink-0">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center font-bold">
                   <LuClock size={20} />
@@ -797,152 +799,154 @@ export default function Attendance_Reversal() {
               <button
                 type="button"
                 onClick={() => setShowApplyModal(false)}
-                className="text-slate-400 hover:text-slate-600 p-1"
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
               >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleApplySubmit} className="p-5 space-y-4 text-xs">
-              {/* Date Selection */}
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Discrepancy Attendance Date *</label>
-                <input
-                  type="date"
-                  max={todayStr}
-                  required
-                  value={applyForm.attendance_date}
-                  onChange={(e) => handleDateChange(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
-                />
-              </div>
-
-              {/* Current Date Punch Preview Banner */}
-              <div className="p-3 rounded-xl border text-xs flex items-center justify-between bg-slate-50 border-slate-200">
+            <form onSubmit={handleApplySubmit} className="flex flex-col overflow-hidden flex-grow">
+              <div className="px-5 py-4 space-y-3.5 text-xs overflow-y-auto flex-grow">
+                {/* Date Selection */}
                 <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-500">Recorded In System For This Date:</span>
-                  <div className="font-semibold text-slate-800 mt-0.5">
-                    {lookupLoading ? (
-                      <span className="text-slate-400">Looking up attendance record...</span>
-                    ) : existingDateRecord ? (
-                      <span>
-                        Status: <strong className="text-rose-600">{existingDateRecord.status}</strong> (In: {existingDateRecord.check_in || "—"}, Out: {existingDateRecord.check_out || "—"})
-                      </span>
-                    ) : (
-                      <span className="text-rose-600 font-bold">Absent / No Check-In Punch Recorded</span>
-                    )}
+                  <label className="block font-semibold text-slate-700 mb-1">Discrepancy Attendance Date *</label>
+                  <input
+                    type="date"
+                    max={todayStr}
+                    required
+                    value={applyForm.attendance_date}
+                    onChange={(e) => handleDateChange(e.target.value)}
+                    className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                </div>
+
+                {/* Current Date Punch Preview Banner */}
+                <div className="p-3 rounded-xl border text-xs flex items-center justify-between bg-slate-50 border-slate-200">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-500">Recorded In System For This Date:</span>
+                    <div className="font-semibold text-slate-800 mt-0.5">
+                      {lookupLoading ? (
+                        <span className="text-slate-400">Looking up attendance record...</span>
+                      ) : existingDateRecord ? (
+                        <span>
+                          Status: <strong className="text-rose-600">{existingDateRecord.status}</strong> (In: {existingDateRecord.check_in || "—"}, Out: {existingDateRecord.check_out || "—"})
+                        </span>
+                      ) : (
+                        <span className="text-rose-600 font-bold">Absent / No Check-In Punch Recorded</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-700">
+                    {existingDateRecord ? "Log Found" : "No Punch"}
                   </div>
                 </div>
-                <div className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-700">
-                  {existingDateRecord ? "Log Found" : "No Punch"}
-                </div>
-              </div>
 
-              {/* Request Type */}
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Discrepancy Category *</label>
-                <select
-                  value={applyForm.request_type}
-                  onChange={(e) => setApplyForm({ ...applyForm, request_type: e.target.value })}
-                  className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none bg-white font-medium"
-                >
-                  {REQUEST_TYPES.map((t) => (
-                    <option key={t.value} value={t.value}>
-                      {t.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* In and Out Timings */}
-              <div className="grid grid-cols-2 gap-3">
+                {/* Request Type */}
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Requested Check-In *</label>
-                  <input
-                    type="time"
-                    required
-                    value={applyForm.requested_check_in}
-                    onChange={(e) => setApplyForm({ ...applyForm, requested_check_in: e.target.value })}
-                    className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Requested Check-Out *</label>
-                  <input
-                    type="time"
-                    required
-                    value={applyForm.requested_check_out}
-                    onChange={(e) => setApplyForm({ ...applyForm, requested_check_out: e.target.value })}
-                    className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none font-mono"
-                  />
-                </div>
-              </div>
-
-              {/* Target Status & Calculated Hours */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Target Status</label>
+                  <label className="block font-semibold text-slate-700 mb-1">Discrepancy Category *</label>
                   <select
-                    value={applyForm.requested_status}
-                    onChange={(e) => setApplyForm({ ...applyForm, requested_status: e.target.value })}
-                    className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                    value={applyForm.request_type}
+                    onChange={(e) => setApplyForm({ ...applyForm, request_type: e.target.value })}
+                    className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none bg-white font-medium"
                   >
-                    <option value="Present">Present</option>
-                    <option value="On Duty">On Duty / Client Visit</option>
-                    <option value="WFH">WFH (Work From Home)</option>
-                    <option value="Half Day">Half Day</option>
+                    {REQUEST_TYPES.map((t) => (
+                      <option key={t.value} value={t.value}>
+                        {t.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Calculated Work Duration</label>
-                  <div className="px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 font-bold font-mono">
-                    {calculatedHours} Hours
+
+                {/* In and Out Timings */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Requested Check-In *</label>
+                    <input
+                      type="time"
+                      required
+                      value={applyForm.requested_check_in}
+                      onChange={(e) => setApplyForm({ ...applyForm, requested_check_in: e.target.value })}
+                      className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none font-mono"
+                    />
                   </div>
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Requested Check-Out *</label>
+                    <input
+                      type="time"
+                      required
+                      value={applyForm.requested_check_out}
+                      onChange={(e) => setApplyForm({ ...applyForm, requested_check_out: e.target.value })}
+                      className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none font-mono"
+                    />
+                  </div>
+                </div>
+
+                {/* Target Status & Calculated Hours */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Target Status</label>
+                    <select
+                      value={applyForm.requested_status}
+                      onChange={(e) => setApplyForm({ ...applyForm, requested_status: e.target.value })}
+                      className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                    >
+                      <option value="Present">Present</option>
+                      <option value="On Duty">On Duty / Client Visit</option>
+                      <option value="WFH">WFH (Work From Home)</option>
+                      <option value="Half Day">Half Day</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Calculated Work Duration</label>
+                    <div className="px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 font-bold font-mono">
+                      {calculatedHours} Hours
+                    </div>
+                  </div>
+                </div>
+
+                {/* Reason Explanation */}
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Detailed Explanation & Justification *</label>
+                  <textarea
+                    rows={3}
+                    required
+                    placeholder="e.g. Attended outdoor client audit at ABC Corp between 10 AM and 5 PM; could not punch biometric scanner. Approved by manager over email."
+                    value={applyForm.reason}
+                    onChange={(e) => setApplyForm({ ...applyForm, reason: e.target.value })}
+                    className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                </div>
+
+                {/* Proof File Attachment */}
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Optional Proof Document (Email confirmation, Travel slip, Client note)
+                  </label>
+                  <label className="flex items-center justify-center gap-2 px-3 py-2 bg-slate-50 border border-dashed border-slate-300 hover:border-blue-500 rounded-lg cursor-pointer text-xs font-medium text-slate-600">
+                    <LuUpload className="text-blue-600" size={15} />
+                    <span>{applyForm.proof_file ? applyForm.proof_file.name : "Choose File (PDF/Image up to 10MB)"}</span>
+                    <input
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      onChange={(e) => setApplyForm({ ...applyForm, proof_file: e.target.files?.[0] || null })}
+                      className="hidden"
+                    />
+                  </label>
                 </div>
               </div>
 
-              {/* Reason Explanation */}
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Detailed Explanation & Justification *</label>
-                <textarea
-                  rows={3}
-                  required
-                  placeholder="e.g. Attended outdoor client audit at ABC Corp between 10 AM and 5 PM; could not punch biometric scanner. Approved by manager over email."
-                  value={applyForm.reason}
-                  onChange={(e) => setApplyForm({ ...applyForm, reason: e.target.value })}
-                  className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
-                />
-              </div>
-
-              {/* Proof File Attachment */}
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Optional Proof Document (Email confirmation, Travel slip, Client note)
-                </label>
-                <label className="flex items-center justify-center gap-2 px-3 py-2 bg-slate-50 border border-dashed border-slate-300 hover:border-blue-500 rounded-lg cursor-pointer text-xs font-medium text-slate-600">
-                  <LuUpload className="text-blue-600" size={15} />
-                  <span>{applyForm.proof_file ? applyForm.proof_file.name : "Choose File (PDF/Image up to 10MB)"}</span>
-                  <input
-                    type="file"
-                    accept=".pdf,.jpg,.jpeg,.png"
-                    onChange={(e) => setApplyForm({ ...applyForm, proof_file: e.target.files?.[0] || null })}
-                    className="hidden"
-                  />
-                </label>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <div className="px-5 py-3 border-t border-slate-100 bg-slate-50/70 flex justify-end gap-2 flex-shrink-0">
                 <button
                   type="button"
                   onClick={() => setShowApplyModal(false)}
-                  className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-semibold"
+                  className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-100 font-semibold transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submittingApply}
-                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold flex items-center gap-2 shadow-md shadow-blue-600/20 disabled:opacity-50"
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold flex items-center gap-2 shadow-md shadow-blue-600/20 disabled:opacity-50 transition-colors"
                 >
                   {submittingApply ? "Submitting..." : "Submit Regularization"}
                 </button>
@@ -954,9 +958,9 @@ export default function Attendance_Reversal() {
 
       {/* MODAL 2: HR ACTION (APPROVE / REJECT / REVERSE) */}
       {actionModal.show && actionModal.record && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95">
-            <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+        <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 !m-0 !mt-0 z-[60] bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full border border-slate-200 overflow-hidden my-auto max-h-[calc(100vh-2rem)] flex flex-col animate-in fade-in zoom-in-95">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50 flex-shrink-0">
               <div className="flex items-center gap-2.5">
                 <div
                   className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-white ${
@@ -991,86 +995,88 @@ export default function Attendance_Reversal() {
               <button
                 type="button"
                 onClick={() => setActionModal({ show: false, type: "APPROVE", record: null, remarks: "", reversalStatus: "Absent" })}
-                className="text-slate-400 hover:text-slate-600 p-1"
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
               >
                 ✕
               </button>
             </div>
 
-            <div className="p-5 space-y-4 text-xs">
-              {/* Summary of request */}
-              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5">
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Discrepancy Date:</span>
-                  <span className="font-bold text-slate-800">{actionModal.record.attendance_date}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Category:</span>
-                  <span className="font-semibold text-blue-700">
-                    {getRequestTypeLabel(actionModal.record.request_type)}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Requested Correction:</span>
-                  <span className="font-bold text-emerald-700">
-                    {actionModal.record.requested_check_in} - {actionModal.record.requested_check_out} ({actionModal.record.requested_status})
-                  </span>
-                </div>
-                <div className="pt-1.5 border-t border-slate-200">
-                  <span className="text-slate-500 block mb-0.5">Staff Reason:</span>
-                  <div className="text-slate-700 italic bg-white p-2 rounded border border-slate-200">
-                    "{actionModal.record.reason}"
+            <div className="flex flex-col overflow-hidden flex-grow">
+              <div className="px-5 py-4 space-y-3.5 text-xs overflow-y-auto flex-grow">
+                {/* Summary of request */}
+                <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5">
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Discrepancy Date:</span>
+                    <span className="font-bold text-slate-800">{actionModal.record.attendance_date}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Category:</span>
+                    <span className="font-semibold text-blue-700">
+                      {getRequestTypeLabel(actionModal.record.request_type)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Requested Correction:</span>
+                    <span className="font-bold text-emerald-700">
+                      {actionModal.record.requested_check_in} - {actionModal.record.requested_check_out} ({actionModal.record.requested_status})
+                    </span>
+                  </div>
+                  <div className="pt-1.5 border-t border-slate-200">
+                    <span className="text-slate-500 block mb-0.5">Staff Reason:</span>
+                    <div className="text-slate-700 italic bg-white p-2 rounded border border-slate-200">
+                      "{actionModal.record.reason}"
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* If Reverse: Target Status */}
-              {actionModal.type === "REVERSE" && (
+                {/* If Reverse: Target Status */}
+                {actionModal.type === "REVERSE" && (
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Target Reversion Status *</label>
+                    <select
+                      value={actionModal.reversalStatus}
+                      onChange={(e) => setActionModal({ ...actionModal, reversalStatus: e.target.value })}
+                      className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none bg-white font-semibold"
+                    >
+                      <option value="Absent">Revert to Absent (Deduct Day)</option>
+                      <option value="Half Day">Revert to Half Day</option>
+                      <option value="Present">Force Mark Present</option>
+                    </select>
+                  </div>
+                )}
+
+                {/* Remarks */}
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Target Reversion Status *</label>
-                  <select
-                    value={actionModal.reversalStatus}
-                    onChange={(e) => setActionModal({ ...actionModal, reversalStatus: e.target.value })}
-                    className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none bg-white font-semibold"
-                  >
-                    <option value="Absent">Revert to Absent (Deduct Day)</option>
-                    <option value="Half Day">Revert to Half Day</option>
-                    <option value="Present">Force Mark Present</option>
-                  </select>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    {actionModal.type === "REJECT" ? "Rejection Reason * (Mandatory)" : "HR Audit Remarks"}
+                  </label>
+                  <textarea
+                    rows={2}
+                    placeholder={
+                      actionModal.type === "APPROVE"
+                        ? "e.g. Approved. Biometric machine sync confirmed with facilities."
+                        : actionModal.type === "REJECT"
+                        ? "e.g. Discrepancy reason could not be verified by reporting manager."
+                        : "e.g. Regularization reversed due to audit discrepancy."
+                    }
+                    value={actionModal.remarks}
+                    onChange={(e) => setActionModal({ ...actionModal, remarks: e.target.value })}
+                    className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
                 </div>
-              )}
 
-              {/* Remarks */}
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  {actionModal.type === "REJECT" ? "Rejection Reason * (Mandatory)" : "HR Audit Remarks"}
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder={
-                    actionModal.type === "APPROVE"
-                      ? "e.g. Approved. Biometric machine sync confirmed with facilities."
-                      : actionModal.type === "REJECT"
-                      ? "e.g. Discrepancy reason could not be verified by reporting manager."
-                      : "e.g. Regularization reversed due to audit discrepancy."
-                  }
-                  value={actionModal.remarks}
-                  onChange={(e) => setActionModal({ ...actionModal, remarks: e.target.value })}
-                  className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
-                />
+                {actionModal.type === "APPROVE" && (
+                  <div className="p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg text-[11px] leading-relaxed">
+                    <strong>Automatic Attendance Sync:</strong> Approving will immediately update the live Attendance record for {actionModal.record.attendance_date} with In: {actionModal.record.requested_check_in}, Out: {actionModal.record.requested_check_out}, and status: {actionModal.record.requested_status}.
+                  </div>
+                )}
               </div>
 
-              {actionModal.type === "APPROVE" && (
-                <div className="p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg text-[11px] leading-relaxed">
-                  <strong>Automatic Attendance Sync:</strong> Approving will immediately update the live Attendance record for {actionModal.record.attendance_date} with In: {actionModal.record.requested_check_in}, Out: {actionModal.record.requested_check_out}, and status: {actionModal.record.requested_status}.
-                </div>
-              )}
-
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <div className="px-5 py-3 border-t border-slate-100 bg-slate-50/70 flex justify-end gap-2 flex-shrink-0">
                 <button
                   type="button"
                   onClick={() => setActionModal({ show: false, type: "APPROVE", record: null, remarks: "", reversalStatus: "Absent" })}
-                  className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-semibold"
+                  className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-100 font-semibold transition-colors"
                 >
                   Cancel
                 </button>
@@ -1078,7 +1084,7 @@ export default function Attendance_Reversal() {
                   type="button"
                   disabled={actionLoading}
                   onClick={handleActionExecute}
-                  className={`px-5 py-2 text-white rounded-lg font-bold flex items-center gap-2 shadow-md disabled:opacity-50 ${
+                  className={`px-5 py-2 text-white rounded-lg font-bold flex items-center gap-2 shadow-md disabled:opacity-50 transition-colors ${
                     actionModal.type === "APPROVE"
                       ? "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20"
                       : actionModal.type === "REJECT"
@@ -1093,6 +1099,6 @@ export default function Attendance_Reversal() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

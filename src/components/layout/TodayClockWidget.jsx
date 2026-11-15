@@ -11,6 +11,12 @@ import api from "../../api";
 export default function TodayClockWidget({ onStatusChange }) {
   const [todayRecord, setTodayRecord] = useState(null);
   const [schedule, setSchedule] = useState(null);
+  const [dayStatusInfo, setDayStatusInfo] = useState({
+    isOffDay: false,
+    offDayType: null,
+    offDayName: null,
+    hasDedicatedWorkday: false,
+  });
   const [now, setNow] = useState(new Date());
   const [checkingOut, setCheckingOut] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -33,8 +39,18 @@ export default function TodayClockWidget({ onStatusChange }) {
           setSchedule(res.data.schedule);
         }
 
-        // Auto-check in on portal load if user is logged into portal and not yet marked today
-        if (!record || !record.check_in || record.check_in === "—") {
+        const isOffDay = Boolean(res.data.isOffDay);
+        const hasDedicatedWorkday = Boolean(res.data.hasDedicatedWorkday);
+        setDayStatusInfo({
+          isOffDay,
+          offDayType: res.data.offDayType || null,
+          offDayName: res.data.offDayName || null,
+          hasDedicatedWorkday,
+        });
+
+        // Only auto-check in on portal load if NOT an unassigned week-off or holiday
+        const shouldSkipCheckIn = isOffDay && !hasDedicatedWorkday;
+        if (!shouldSkipCheckIn && (!record || !record.check_in || record.check_in === "—")) {
           try {
             const checkInRes = await api.post("/attendance/check-in");
             if (checkInRes.data?.success && checkInRes.data.record) {
@@ -260,7 +276,7 @@ export default function TodayClockWidget({ onStatusChange }) {
             style={{
               backgroundColor: isMarked
                 ? (todayRecord?.check_out && todayRecord.check_out !== "—" ? "#6366f1" : "#16a34a")
-                : "#ef4444",
+                : (dayStatusInfo.isOffDay ? "#0284c7" : "#ef4444"),
               color: "#ffffff",
               padding: "6px 14px",
               fontSize: "12px",
@@ -269,7 +285,7 @@ export default function TodayClockWidget({ onStatusChange }) {
           >
             {isMarked
               ? (todayRecord?.check_out && todayRecord.check_out !== "—" ? "Completed" : "Present")
-              : "Not Marked"}
+              : (dayStatusInfo.isOffDay ? (dayStatusInfo.offDayType || "Week Off") : "Not Marked")}
           </Badge>
         </div>
         <hr className="my-3 border-slate-200 dark:border-slate-800 opacity-60" />
@@ -285,7 +301,9 @@ export default function TodayClockWidget({ onStatusChange }) {
                 ? (todayRecord?.check_out && todayRecord.check_out !== "—"
                   ? "Shift completed for today!"
                   : "You are marked present today!")
-                : "Not marked present today"
+                : (dayStatusInfo.isOffDay
+                  ? `Today is your scheduled ${dayStatusInfo.offDayType || "Day Off"}!`
+                  : "Not marked present today")
               }
             </p>
 
@@ -308,9 +326,15 @@ export default function TodayClockWidget({ onStatusChange }) {
                 </div>
               )}
 
-              <div className="d-flex align-items-center" style={{ borderLeft: "3px solid #ef4444", paddingLeft: "8px" }}>
-                <span className="text-slate-700 dark:text-slate-300 font-semibold me-1 text-[11px]">Time left :</span>
-                <strong style={{ fontSize: "11px", color: "#ef4444", fontWeight: "700" }}>{getCheckInTimeLeft()}</strong>
+              <div className="d-flex align-items-center" style={{ borderLeft: `3px solid ${dayStatusInfo.isOffDay && !isMarked ? "#0284c7" : "#ef4444"}`, paddingLeft: "8px" }}>
+                <span className="text-slate-700 dark:text-slate-300 font-semibold me-1 text-[11px]">
+                  {dayStatusInfo.isOffDay && !isMarked ? "Status :" : "Time left :"}
+                </span>
+                <strong style={{ fontSize: "11px", color: dayStatusInfo.isOffDay && !isMarked ? "#0284c7" : "#ef4444", fontWeight: "700" }}>
+                  {dayStatusInfo.isOffDay && !isMarked
+                    ? `${dayStatusInfo.offDayName || "Scheduled Off"} (No working shift)`
+                    : getCheckInTimeLeft()}
+                </strong>
               </div>
             </div>
           </div>
@@ -320,7 +344,7 @@ export default function TodayClockWidget({ onStatusChange }) {
             <svg width="115" height="115" viewBox="0 0 115 115">
               <circle cx="57.5" cy="57.5" r={42} fill="transparent" stroke="currentColor" className="text-slate-100 dark:text-slate-800" strokeWidth="7" />
               <circle cx="57.5" cy="57.5" r={42} fill="transparent"
-                stroke={todayProgress.percent > 0 ? (todayProgress.percent >= 80 ? "#22c55e" : todayProgress.percent >= 50 ? "#eab308" : "#f59e0b") : "transparent"}
+                stroke={isMarked && todayProgress.percent > 0 ? (todayProgress.percent >= 80 ? "#22c55e" : todayProgress.percent >= 50 ? "#eab308" : "#f59e0b") : "transparent"}
                 strokeWidth="8"
                 strokeDasharray={2 * Math.PI * 42}
                 strokeDashoffset={2 * Math.PI * 42 - (todayProgress.percent / 100) * 2 * Math.PI * 42}
@@ -329,15 +353,21 @@ export default function TodayClockWidget({ onStatusChange }) {
               />
             </svg>
             <div className="position-absolute text-center">
-              <div className="fw-bold text-slate-900 dark:text-slate-100" style={{ fontSize: "20px", lineHeight: "1" }}>{todayProgress.percent}%</div>
-              <div className="fw-semibold text-slate-600 dark:text-slate-300 mt-0.5 text-[11px]">in office</div>
+              <div className="fw-bold text-slate-900 dark:text-slate-100" style={{ fontSize: "20px", lineHeight: "1" }}>
+                {dayStatusInfo.isOffDay && !isMarked ? "—" : `${todayProgress.percent}%`}
+              </div>
+              <div className="fw-semibold text-slate-600 dark:text-slate-300 mt-0.5 text-[11px]">
+                {dayStatusInfo.isOffDay && !isMarked ? "scheduled" : "in office"}
+              </div>
               <div style={{
                 fontWeight: "700",
-                color: todayProgress.percent >= 80 ? "#16a34a" : todayProgress.percent >= 50 ? "#ca8a04" : todayProgress.percent > 0 ? "#d97706" : "#94a3b8",
+                color: dayStatusInfo.isOffDay && !isMarked
+                  ? "#0284c7"
+                  : (todayProgress.percent >= 80 ? "#16a34a" : todayProgress.percent >= 50 ? "#ca8a04" : todayProgress.percent > 0 ? "#d97706" : "#94a3b8"),
                 marginTop: "2px",
                 fontSize: "11px"
               }}>
-                {todayProgress.label}
+                {dayStatusInfo.isOffDay && !isMarked ? (dayStatusInfo.offDayType || "WEEK OFF").toUpperCase() : todayProgress.label}
               </div>
             </div>
           </div>

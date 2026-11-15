@@ -1067,7 +1067,7 @@ export default function HRAdminDashboardView() {
                               </Dropdown.Item>
                               <Dropdown.Divider className="my-1 border-slate-100" />
                               <Dropdown.Item
-                                onClick={() => navigate(`/employee/profile/${emp.empId}`)}
+                                onClick={() => navigate(`/profile/${emp.empId}`)}
                                 style={{ display: "flex", alignItems: "center", gap: "10px" }}
                                 className="!flex !flex-row !items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium cursor-pointer transition-colors group"
                               >
@@ -1432,13 +1432,13 @@ export default function HRAdminDashboardView() {
         show={showEditModal}
         onHide={() => setShowEditModal(false)}
         centered
-        size="md"
+        size="lg"
         backdropClassName="bg-slate-950/60 backdrop-blur-md"
         contentClassName="border-0 shadow-2xl rounded-3xl overflow-hidden bg-white ring-1 ring-black/5"
       >
         <form onSubmit={handleSaveEdit}>
           {/* Executive Modal Header */}
-          <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white p-6 relative overflow-hidden flex items-center justify-between">
+          <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white p-6 pb-2.5    relative overflow-hidden flex items-center justify-between">
             {/* Ambient decorative blur */}
             <div className="absolute -right-8 -top-8 w-40 h-40 bg-indigo-500/20 rounded-full blur-2xl pointer-events-none" />
 
@@ -1466,10 +1466,10 @@ export default function HRAdminDashboardView() {
             </button>
           </div>
 
-          <Modal.Body className="p-6 bg-slate-50/60 max-h-[70vh] overflow-y-auto space-y-5">
+          <Modal.Body className="p-6 bg-slate-50/60 max-h-[60vh] overflow-y-auto space-y-5">
             {/* Section 1: Personal Credentials Card */}
-            <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs">
-              <div className="flex items-center gap-2 pb-3 mb-3 border-b border-slate-100">
+            <div className="bg-white rounded-2xl p-3 pb-2 border border-slate-200/80 shadow-2xs">
+              <div className="flex items-center gap-2 pb-3">
                 <div className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600">
                   <LuUser className="h-4 w-4" />
                 </div>
@@ -1535,8 +1535,8 @@ export default function HRAdminDashboardView() {
             </div>
 
             {/* Section 2: Role & Department Card */}
-            <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs">
-              <div className="flex items-center gap-2 pb-3 mb-3 border-b border-slate-100">
+            <div className="bg-white rounded-2xl p-3 pb-2 border border-slate-200/80 shadow-2xs">
+              <div className="flex items-center gap-2 pb-3">
                 <div className="p-1.5 rounded-lg bg-blue-50 text-blue-600">
                   <LuBuilding2 className="h-4 w-4" />
                 </div>
@@ -1638,8 +1638,8 @@ export default function HRAdminDashboardView() {
             </div>
 
             {/* Section 3: Compensation & Appraisal Card */}
-            <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs">
-              <div className="flex items-center gap-2 pb-3 mb-3 border-b border-slate-100">
+            <div className="bg-white rounded-2xl p-3 pb-2 border border-slate-200/80 shadow-2xs">
+              <div className="flex items-center gap-2 pb-3">
                 <div className="p-1.5 rounded-lg bg-amber-50 text-amber-600">
                   <LuIndianRupee className="h-4 w-4" />
                 </div>
@@ -1682,7 +1682,7 @@ export default function HRAdminDashboardView() {
                   />
                 </div>
 
-                {/* <div>
+                <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                     Performance KPI (1-5)
                   </label>
@@ -1696,13 +1696,13 @@ export default function HRAdminDashboardView() {
                     className="w-full text-xs font-semibold text-slate-800 bg-slate-50/50 hover:bg-white focus:bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-indigo-600 focus:ring-4 focus:ring-indigo-600/10 transition-all shadow-2xs font-mono"
                     placeholder="4.8"
                   />
-                </div> */}
+                </div>
               </div>
             </div>
           </Modal.Body>
 
           {/* Modal Footer */}
-          <div className="px-6 py-4 bg-white border-t border-slate-100 flex items-center justify-end gap-3">
+          <div className="px-6 py-3 border-t border-slate-200 bg-white flex items-center justify-end gap-3">
             <button
               type="button"
               onClick={() => setShowEditModal(false)}

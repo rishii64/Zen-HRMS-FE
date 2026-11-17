@@ -354,23 +354,58 @@ export const getAuthDept = () => {
 };
 
 /**
+ * Checks if a designation string represents a Team Lead (TL) role:
+ * Team Lead, Tech Lead, Team Leader, or explicit -TL code.
+ */
+export const isTeamLeadDesignation = (designation = "") => {
+  if (!designation || typeof designation !== "string") return false;
+  const d = designation.trim().toLowerCase();
+  return (
+    /\b(team lead|tech lead|team leader|lead developer|lead engineer|teamlead|tl)\b/i.test(d) ||
+    d.endsWith("-tl") ||
+    d.endsWith("-stl") ||
+    d.includes("team lead") ||
+    d.includes("tech lead")
+  );
+};
+
+/**
+ * Checks if a designation represents Manager tier (L5-L7: Manager, Deputy Manager, Senior Manager).
+ */
+export const isManagerDesignation = (designation = "") => {
+  if (!designation || typeof designation !== "string") return false;
+  const d = designation.trim().toLowerCase();
+  if (isTeamLeadDesignation(d) && !d.includes("manager")) return false;
+  return (
+    /\b(manager|mgr|deputy manager|assistant manager|senior manager|project manager)\b/i.test(d) ||
+    d.includes("manager")
+  );
+};
+
+/**
+ * Checks if a designation represents Head of Department (HOD) tier (L8-L10+: AGM, DGM, GM, VP, CXO).
+ */
+export const isHODDesignation = (designation = "") => {
+  if (!designation || typeof designation !== "string") return false;
+  const d = designation.trim().toLowerCase();
+  return (
+    /\b(hod|head of|department head|agm|dgm|general manager|gm|chro|director|vp|chief)\b/i.test(d) ||
+    d.includes("department head") ||
+    d.includes("head of") ||
+    d.includes("general manager") ||
+    d.includes("assistant general manager") ||
+    d.includes("deputy general manager") ||
+    d.includes("vice president")
+  );
+};
+
+/**
  * Checks if a designation string represents a leadership/management position:
  * TL, Team Lead, HOD, Head, Manager, AGM, DGM, GM, Director, Supervisor, etc.
  */
 export const isLeadershipDesignation = (designation = "") => {
   if (!designation || typeof designation !== "string") return false;
-  const d = designation.trim().toLowerCase();
-  return (
-    /\b(hod|head|manager|mgr|lead|tl|agm|dgm|gm|director|supervisor)\b/i.test(d) ||
-    d.includes("team lead") ||
-    d.includes("tech lead") ||
-    d.includes("department head") ||
-    d.includes("head of") ||
-    d.includes("project manager") ||
-    d.includes("general manager") ||
-    d.includes("assistant general manager") ||
-    d.includes("deputy general manager")
-  );
+  return isTeamLeadDesignation(designation) || isManagerDesignation(designation) || isHODDesignation(designation);
 };
 
 /**
@@ -392,6 +427,58 @@ export const isDepartmentHeadOrManager = () => {
 
 export const isTeamLeadOrAbove = () => {
   return isDepartmentHeadOrManager();
+};
+
+/**
+ * Strict role and hierarchy tier helpers
+ */
+export const isTeamLead = () => {
+  const role = (getAuthRole() || "").toLowerCase().trim();
+  if (["admin", "management", "ceo", "coo", "chro", "hod", "manager", "teamlead"].includes(role)) return true;
+  const desig = getAuthDesignation();
+  const user = getAuthUser();
+  if (user?.is_team_lead || user?.designationProfile?.is_tl_role) return true;
+  if (user?.grade?.rank_level && user.grade.rank_level >= 4) return true;
+  return isTeamLeadDesignation(desig);
+};
+
+export const isManager = () => {
+  const role = (getAuthRole() || "").toLowerCase().trim();
+  if (["admin", "management", "ceo", "coo", "chro", "hod", "manager"].includes(role)) return true;
+  const desig = getAuthDesignation();
+  const user = getAuthUser();
+  if (user?.grade?.rank_level && user.grade.rank_level >= 5) return true;
+  return isManagerDesignation(desig) || isHODDesignation(desig);
+};
+
+export const isHOD = () => {
+  const role = (getAuthRole() || "").toLowerCase().trim();
+  if (["admin", "management", "ceo", "coo", "chro", "hod"].includes(role)) return true;
+  const desig = getAuthDesignation();
+  const user = getAuthUser();
+  if (user?.is_hod || (user?.grade?.rank_level && user.grade.rank_level >= 8)) return true;
+  return isHODDesignation(desig);
+};
+
+export const getHierarchyTier = () => {
+  const role = (getAuthRole() || "").toLowerCase().trim();
+  const desig = getAuthDesignation();
+  const user = getAuthUser();
+  const rank = user?.grade?.rank_level || user?.rank_level || 1;
+
+  if (["admin", "management", "ceo", "coo", "chro", "vp"].includes(role) || rank >= 11) {
+    return "EXECUTIVE";
+  }
+  if (role === "hod" || user?.is_hod || isHODDesignation(desig) || rank >= 8) {
+    return "HOD";
+  }
+  if (role === "manager" || isManagerDesignation(desig) || (rank >= 5 && rank <= 7)) {
+    return "MANAGER";
+  }
+  if (role === "teamlead" || user?.is_team_lead || isTeamLeadDesignation(desig) || rank === 4) {
+    return "TEAM_LEAD";
+  }
+  return "STAFF";
 };
 
 /**

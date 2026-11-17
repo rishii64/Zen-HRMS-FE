@@ -128,10 +128,36 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response Interceptor: 401 handling
+// Response Interceptor: 401 handling & Role Update Detection
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    const roleUpdatedHeader = response.headers?.["x-role-updated"] || response.headers?.["X-Role-Updated"];
+    if (roleUpdatedHeader === "true") {
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("hrms:role_updated", {
+            detail: {
+              message: "Your role has been updated, please re-login to enjoy seamless workflow",
+            },
+          })
+        );
+      }
+    }
+    return response;
+  },
   (error) => {
+    const roleUpdatedHeader = error.response?.headers?.["x-role-updated"] || error.response?.headers?.["X-Role-Updated"];
+    if (roleUpdatedHeader === "true") {
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("hrms:role_updated", {
+            detail: {
+              message: "Your role has been updated, please re-login to enjoy seamless workflow",
+            },
+          })
+        );
+      }
+    }
     if (error.response?.status === 401) {
       console.warn("Unauthorized request (401). Triggering session expiry logout.");
       handleSessionExpired("Your session has expired. Please log in again to continue.");

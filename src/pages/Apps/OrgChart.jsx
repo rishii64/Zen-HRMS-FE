@@ -516,9 +516,24 @@ const OrgChart = () => {
                   <Badge bg="primary" className="bg-blue-50 text-white-700 border border-blue-200 text-3xs">
                     {selectedNode.department_name}
                   </Badge>
+                  {selectedNode.hierarchy_tier === "EXECUTIVE" && (
+                    <Badge bg="warning" className="bg-amber-100 text-amber-800 border border-amber-300 text-3xs">
+                      C-Level / CXO
+                    </Badge>
+                  )}
                   {selectedNode.is_hod && (
                     <Badge bg="purple" className="bg-purple-100 text-purple-800 border border-purple-200 text-3xs">
-                      Dept Head
+                      Dept Head (HOD)
+                    </Badge>
+                  )}
+                  {selectedNode.hierarchy_tier === "MANAGER" && !selectedNode.is_hod && (
+                    <Badge bg="info" className="bg-blue-100 text-blue-800 border border-blue-200 text-3xs">
+                      Manager
+                    </Badge>
+                  )}
+                  {selectedNode.is_team_lead && (
+                    <Badge bg="success" className="bg-emerald-100 text-emerald-800 border border-emerald-200 text-3xs">
+                      Team Lead (TL)
                     </Badge>
                   )}
                 </div>
@@ -541,6 +556,22 @@ const OrgChart = () => {
                   <div className="d-flex justify-content-between">
                     <span className="text-slate-500">Work Location:</span>
                     <span className="text-slate-800">{selectedNode.work_location}</span>
+                  </div>
+                  <div className="d-flex justify-content-between">
+                    <span className="text-slate-500">Team Lead (TL):</span>
+                    <span className="text-slate-800 fw-medium">
+                      {selectedNode.team_lead_name && selectedNode.team_lead_name !== "N/A"
+                        ? `${selectedNode.team_lead_name}${selectedNode.team_lead_id ? ` (${selectedNode.team_lead_id})` : ""}`
+                        : (selectedNode.team_lead_id ? `TL ID: ${selectedNode.team_lead_id}` : "—")}
+                    </span>
+                  </div>
+                  <div className="d-flex justify-content-between">
+                    <span className="text-slate-500">Reporting Manager:</span>
+                    <span className="text-slate-800 fw-medium">
+                      {selectedNode.reporting_manager_name && selectedNode.reporting_manager_name !== "N/A"
+                        ? `${selectedNode.reporting_manager_name}${selectedNode.reporting_manager_id ? ` (${selectedNode.reporting_manager_id})` : ""}`
+                        : (selectedNode.reporting_manager_id ? `Manager ID: ${selectedNode.reporting_manager_id}` : "None (Top Root)")}
+                    </span>
                   </div>
                   <div className="d-flex justify-content-between">
                     <span className="text-slate-500">Department Head / HOD:</span>

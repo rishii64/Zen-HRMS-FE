@@ -64,6 +64,13 @@ const OrgNode = ({
 
   const isExecutive = node.rank_level >= 11;
   const isSeniorLeader = node.rank_level >= 8 && node.rank_level < 11;
+  const isHOD = node.is_hod || isSeniorLeader;
+  const isManager = !isHOD && !isExecutive && (node.rank_level >= 5 && node.rank_level <= 7);
+  const isTeamLead = !isHOD && !isManager && !isExecutive && !!(
+    node.is_team_lead ||
+    node.rank_level === 4 ||
+    /team lead|tech lead|team leader|\btl\b/i.test(node.designation || "")
+  );
 
   return (
     <div className="org-tree-branch d-flex flex-column align-items-center">
@@ -71,7 +78,7 @@ const OrgNode = ({
       <div
         className={`org-node-card position-relative bg-white rounded-3 shadow-sm transition-all text-start ${
           isMatch ? "ring-4 ring-amber-400 border-amber-500 shadow-md scale-105" : "border"
-        } ${isExecutive ? "border-amber-400 bg-gradient-to-b from-amber-50/40 to-white" : isSeniorLeader ? "border-purple-300" : "border-slate-200"}`}
+        } ${isExecutive ? "border-amber-400 bg-gradient-to-b from-amber-50/40 to-white" : isHOD ? "border-purple-300" : isManager ? "border-blue-300" : isTeamLead ? "border-emerald-300 bg-gradient-to-b from-emerald-50/20 to-white" : "border-slate-200"}`}
         style={{
           width: "270px",
           padding: "12px 14px",
@@ -83,7 +90,7 @@ const OrgNode = ({
         }}
         onClick={() => onSelectNode(node)}
       >
-        {/* Top Executive or HOD Ribbon */}
+        {/* Top Executive or HOD or Manager or TL Ribbon */}
         {isExecutive && (
           <div
             className="position-absolute top-0 end-0 bg-amber-500 text-white px-2 py-0.5 rounded-bottom-start-2 text-3xs font-bold uppercase tracking-wider d-flex align-items-center gap-1"
@@ -92,12 +99,28 @@ const OrgNode = ({
             <LuSparkles size={10} /> C-Level / CXO
           </div>
         )}
-        {!isExecutive && node.is_hod && (
+        {!isExecutive && isHOD && (
           <div
             className="position-absolute top-0 end-0 bg-purple-600 text-white px-2 py-0.5 rounded-bottom-start-2 text-3xs font-bold uppercase tracking-wider d-flex align-items-center gap-1"
             style={{ fontSize: "9px" }}
           >
             <LuShieldCheck size={10} /> Dept Head
+          </div>
+        )}
+        {!isExecutive && !isHOD && isManager && (
+          <div
+            className="position-absolute top-0 end-0 bg-blue-600 text-white px-2 py-0.5 rounded-bottom-start-2 text-3xs font-bold uppercase tracking-wider d-flex align-items-center gap-1"
+            style={{ fontSize: "9px" }}
+          >
+            <LuUsers size={10} /> Manager
+          </div>
+        )}
+        {!isExecutive && !isHOD && !isManager && isTeamLead && (
+          <div
+            className="position-absolute top-0 end-0 bg-emerald-600 text-white px-2 py-0.5 rounded-bottom-start-2 text-3xs font-bold uppercase tracking-wider d-flex align-items-center gap-1"
+            style={{ fontSize: "9px" }}
+          >
+            <LuUserCheck size={10} /> Team Lead (TL)
           </div>
         )}
 
@@ -124,9 +147,13 @@ const OrgNode = ({
                 fontSize: "15px",
                 background: isExecutive
                   ? "linear-gradient(135deg, #d97706, #b45309)"
-                  : isSeniorLeader
+                  : isHOD
                   ? "linear-gradient(135deg, #7c3aed, #4c1d95)"
-                  : "linear-gradient(135deg, #2563eb, #1e40af)",
+                  : isManager
+                  ? "linear-gradient(135deg, #2563eb, #1e40af)"
+                  : isTeamLead
+                  ? "linear-gradient(135deg, #059669, #065f46)"
+                  : "linear-gradient(135deg, #64748b, #334155)",
               }}
             >
               {getInitials(node.name)}

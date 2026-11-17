@@ -446,6 +446,7 @@ export default function ApprovalsDesk() {
                 className="w-full sm:w-auto px-3 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none"
               >
                 <option value="ALL">All Modules</option>
+                <option value="WORK_FROM_HOME">Work From Home (WFH)</option>
                 <option value="LEAVE">Leaves</option>
                 <option value="EXPENSE_CLAIM">Expense Claims</option>
                 <option value="OVERTIME">Overtime</option>
@@ -485,8 +486,12 @@ export default function ApprovalsDesk() {
                   {/* Top Bar: Module, Status, Request Number, Dates */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-700/60 pb-3">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="px-2.5 py-1 rounded-md text-[10px] font-extrabold tracking-wider bg-slate-900 text-white dark:bg-blue-600">
-                        {item.module}
+                      <span className={`px-2.5 py-1 rounded-md text-[10px] font-extrabold tracking-wider ${
+                        item.module === "WORK_FROM_HOME"
+                          ? "bg-blue-600 text-white"
+                          : "bg-slate-900 text-white dark:bg-slate-700"
+                      }`}>
+                        {item.module === "WORK_FROM_HOME" ? "WORK FROM HOME" : item.module}
                       </span>
                       <span className="text-xs font-mono font-bold text-slate-500 dark:text-slate-400">
                         {item.request_number}
@@ -524,6 +529,11 @@ export default function ApprovalsDesk() {
                         <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2">
                           {item.description}
                         </p>
+                      )}
+                      {item.metadata?.work_plan && (
+                        <div className="text-xs bg-slate-50 dark:bg-slate-900/60 p-2 rounded-lg border border-slate-100 dark:border-slate-800 text-slate-700 dark:text-slate-300">
+                          <strong className="text-blue-600 dark:text-blue-400">Planned Deliverables:</strong> {item.metadata.work_plan}
+                        </div>
                       )}
                       <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400 pt-1 flex-wrap">
                         <span>

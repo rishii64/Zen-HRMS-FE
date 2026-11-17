@@ -217,15 +217,21 @@ const DepartmentHierarchyView = ({ departments = [], onSelectEmployee }) => {
                             </strong>
                           </div>
                           <div className="bg-white border rounded-2 px-2.5 py-1 text-center shadow-2xs">
-                            <span className="text-3xs text-slate-400 d-block">Sr. Leadership (L8-L10)</span>
+                            <span className="text-3xs text-slate-400 d-block">Dept Heads / HOD (L8-L10)</span>
                             <strong className="text-purple-700 fs-6">
                               {dept.rank_breakdown?.senior_leadership || 0}
                             </strong>
                           </div>
                           <div className="bg-white border rounded-2 px-2.5 py-1 text-center shadow-2xs">
-                            <span className="text-3xs text-slate-400 d-block">Management (L4-L7)</span>
+                            <span className="text-3xs text-slate-400 d-block">Managers (L5-L7)</span>
                             <strong className="text-indigo-700 fs-6">
                               {dept.rank_breakdown?.management || 0}
+                            </strong>
+                          </div>
+                          <div className="bg-white border rounded-2 px-2.5 py-1 text-center shadow-2xs">
+                            <span className="text-3xs text-slate-400 d-block">Team Leads / TL (L4)</span>
+                            <strong className="text-emerald-700 fs-6">
+                              {dept.rank_breakdown?.team_leads || 0}
                             </strong>
                           </div>
                           <div className="bg-white border rounded-2 px-2.5 py-1 text-center shadow-2xs">
@@ -254,9 +260,10 @@ const DepartmentHierarchyView = ({ departments = [], onSelectEmployee }) => {
                       <thead className="table-light text-2xs text-slate-500 uppercase tracking-wider">
                         <tr>
                           <th>Employee</th>
-                          <th>Rank / Level</th>
+                          <th>Rank / Tier</th>
                           <th>Designation</th>
-                          <th>Reports To</th>
+                          <th>Team Lead (TL)</th>
+                          <th>Reporting Manager</th>
                           <th>Employment Type</th>
                           <th>Location</th>
                         </tr>
@@ -277,7 +284,7 @@ const DepartmentHierarchyView = ({ departments = [], onSelectEmployee }) => {
                                       width: "28px",
                                       height: "28px",
                                       fontSize: "11px",
-                                      background: emp.rank_level >= 10 ? "#b45309" : "#2563eb",
+                                      background: emp.rank_level >= 11 ? "#b45309" : emp.rank_level >= 8 ? "#7e22ce" : emp.rank_level >= 5 ? "#2563eb" : emp.is_team_lead || emp.rank_level === 4 ? "#059669" : "#64748b",
                                     }}
                                   >
                                     {emp.name?.slice(0, 2).toUpperCase()}
@@ -291,15 +298,38 @@ const DepartmentHierarchyView = ({ departments = [], onSelectEmployee }) => {
                                 </div>
                               </td>
                               <td>
-                                <span
-                                  className={`badge border text-3xs font-semibold ${
-                                    GRADE_PILLS[emp.grade_code] || "bg-slate-100 text-slate-700"
-                                  }`}
-                                >
-                                  {emp.grade_code}
-                                </span>
+                                <div className="d-flex align-items-center gap-1">
+                                  <span
+                                    className={`badge border text-3xs font-semibold ${
+                                      GRADE_PILLS[emp.grade_code] || "bg-slate-100 text-slate-700"
+                                    }`}
+                                  >
+                                    {emp.grade_code}
+                                  </span>
+                                  {emp.rank_level >= 11 && (
+                                    <span className="badge bg-amber-100 text-amber-800 border border-amber-300 text-3xs">EXEC</span>
+                                  )}
+                                  {emp.rank_level >= 8 && emp.rank_level < 11 && (
+                                    <span className="badge bg-purple-100 text-purple-800 border border-purple-200 text-3xs">HOD</span>
+                                  )}
+                                  {emp.rank_level >= 5 && emp.rank_level <= 7 && (
+                                    <span className="badge bg-blue-100 text-blue-800 border border-blue-200 text-3xs">MGR</span>
+                                  )}
+                                  {(emp.is_team_lead || emp.rank_level === 4) && (
+                                    <span className="badge bg-emerald-100 text-emerald-800 border border-emerald-200 text-3xs">TL</span>
+                                  )}
+                                </div>
                               </td>
                               <td className="text-slate-800 fw-medium">{emp.designation}</td>
+                              <td className="text-slate-600">
+                                {emp.team_lead_id || emp.team_lead_name ? (
+                                  <span className="badge bg-emerald-50 text-emerald-800 border border-emerald-200 font-mono">
+                                    {emp.team_lead_name && emp.team_lead_name !== "N/A" ? emp.team_lead_name : emp.team_lead_id}
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-400 fst-italic">—</span>
+                                )}
+                              </td>
                               <td className="text-slate-600">
                                 {emp.reporting_manager_id ? (
                                   <span className="badge bg-slate-100 text-slate-700 border font-mono">
@@ -319,7 +349,7 @@ const DepartmentHierarchyView = ({ departments = [], onSelectEmployee }) => {
                           ))
                         ) : (
                           <tr>
-                            <td colSpan={6} className="text-center text-slate-400 py-3">
+                            <td colSpan={7} className="text-center text-slate-400 py-3">
                               No employees assigned to this department yet
                             </td>
                           </tr>

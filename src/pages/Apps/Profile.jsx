@@ -842,7 +842,7 @@ export default function Profile() {
     <Container className="py-4">
       <div className="d-flex justify-content-between align-items-center mb-4">
         <div>
-          <h2 className="fw-bold text-primary mb-1">Employee Profile & Records</h2>
+          <h2 className="fw-bold text-primary mb-1 text-xl">Employee Profile & Records</h2>
           <p className="text-muted mb-0">Manage complete personal details, work experience, qualifications, and verification documents.</p>
         </div>
         {/* <Button variant="outline-secondary" onClick={() => navigate("/employee/dashboard")} className="rounded-pill px-4 shadow-sm">

@@ -28,7 +28,9 @@ import {
   LuArrowUp,
   LuArrowDown,
   LuFingerprint,
-  LuRotateCcw
+  LuRotateCcw,
+  LuLaptop,
+  LuLayers
 } from "react-icons/lu";
 import { MdEdit } from "react-icons/md";
 import { getApiBaseUrl, getUploadUrl } from "../../api/axios";
@@ -167,12 +169,23 @@ const MyAttendance = () => {
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(20);
 
   // Modals
   const [showMarkModal, setShowMarkModal] = useState(false);
   const [showBiometricModal, setShowBiometricModal] = useState(false);
   const [selectedNoteRecord, setSelectedNoteRecord] = useState(null);
+  const [showWfhModal, setShowWfhModal] = useState(false);
+  const [wfhSubmitting, setWfhSubmitting] = useState(false);
+  const [wfhForm, setWfhForm] = useState({
+    start_date: new Date().toISOString().split("T")[0],
+    end_date: new Date().toISOString().split("T")[0],
+    day_type: "Full Day",
+    reason_category: "Health / Recovery",
+    reason: "",
+    work_plan: "",
+    emergency_contact: "",
+  });
   const [markForm, setMarkForm] = useState({
     id: null,
     employee_id: "",
@@ -419,6 +432,81 @@ const MyAttendance = () => {
       toast.error("An error occurred while marking attendance.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Calculate dynamic WFH Days
+  const calculateWfhDays = (startDate, endDate, dayType) => {
+    if (dayType === "First Half" || dayType === "Second Half") return 0.5;
+    if (!startDate || !endDate) return 1;
+    const s = new Date(startDate + "T12:00:00");
+    const e = new Date(endDate + "T12:00:00");
+    if (e < s) return 0;
+    const diff = Math.abs(e - s);
+    return Math.round(diff / (1000 * 60 * 60 * 24)) + 1;
+  };
+
+  // Submit Work From Home Request
+  const handleApplyWfh = async (e) => {
+    e.preventDefault();
+    if (!wfhForm.start_date || !wfhForm.end_date) {
+      toast.error("Please specify both start date and end date.");
+      return;
+    }
+    if (wfhForm.end_date < wfhForm.start_date) {
+      toast.error("End date cannot be earlier than start date.");
+      return;
+    }
+    const finalReason = wfhForm.reason.trim()
+      ? `${wfhForm.reason_category ? `[${wfhForm.reason_category}] ` : ""}${wfhForm.reason.trim()}`
+      : wfhForm.reason_category;
+    if (!finalReason) {
+      toast.error("Please enter a reason for your Work From Home request.");
+      return;
+    }
+
+    try {
+      setWfhSubmitting(true);
+      const res = await fetch(`${API}/wfh/apply`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          start_date: wfhForm.start_date,
+          end_date: wfhForm.end_date,
+          day_type: wfhForm.day_type,
+          reason: finalReason,
+          work_plan: wfhForm.work_plan,
+          emergency_contact: wfhForm.emergency_contact,
+        }),
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        toast.success("Work From Home request submitted! Routed to Reporting Manager / HOD for approval.");
+        setShowWfhModal(false);
+        setWfhForm({
+          start_date: new Date().toISOString().split("T")[0],
+          end_date: new Date().toISOString().split("T")[0],
+          day_type: "Full Day",
+          reason_category: "Health / Recovery",
+          reason: "",
+          work_plan: "",
+          emergency_contact: "",
+        });
+        fetchAttendanceList();
+        fetchMonthlyRecords();
+      } else {
+        toast.error(data.error || "Failed to submit Work From Home request");
+      }
+    } catch (err) {
+      console.error("Apply WFH error:", err);
+      toast.error("An error occurred while submitting WFH request.");
+    } finally {
+      setWfhSubmitting(false);
     }
   };
 
@@ -848,6 +936,16 @@ const MyAttendance = () => {
             title="Export Attendance Report (Excel)"
           >
             <LuFileText className="h-4 w-4 text-slate-500 dark:text-slate-400" /> Attendance Report
+          </button>
+
+          {/* Request Work From Home (WFH) Button */}
+          <button
+            onClick={() => setShowWfhModal(true)}
+            className="flex items-center gap-2 bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-xs transition-all cursor-pointer"
+            title="Request Work From Home (WFH) for Manager, HOD & HR Sequential Approval"
+          >
+            <LuLaptop className="h-4 w-4" />
+            <span>Request WFH</span>
           </button>
 
           {/* Regularization & Reversal Desk Button */}
@@ -1375,8 +1473,9 @@ const MyAttendance = () => {
                 </tr>
               ) : (
                 paginatedRecords.map((r) => {
-                  const isLatePunch = r.status === "Late Present" || r.status === "Late" || Number(r.late_count) > 0 || isCheckInLate(r.check_in, r.shift_start);
-                  const effectiveStatus = isLatePunch ? "Late Present" : r.status;
+                  const isWfh = r.status === "WFH" || r.status === "Work from home";
+                  const isLatePunch = !isWfh && (r.status === "Late Present" || r.status === "Late" || Number(r.late_count) > 0 || isCheckInLate(r.check_in, r.shift_start));
+                  const effectiveStatus = isWfh ? "WFH" : (isLatePunch ? "Late Present" : r.status);
                   const sBadge = STATUS_BADGES[effectiveStatus] || STATUS_BADGES.Present;
                   const matchedEmp = employees.find(
                     (e) => (e.employee_code || e.employee_id || "").toLowerCase() === (r.employee_id || "").toLowerCase()
@@ -1611,9 +1710,9 @@ const MyAttendance = () => {
               }}
               className="border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-xs bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-bold focus:outline-none"
             >
-              <option value={10}>10</option>
-              <option value={25}>25</option>
+              <option value={20}>20</option>
               <option value={50}>50</option>
+              <option value={100}>100</option>
             </select>
             <span>
               Showing {filteredRecords.length === 0 ? 0 : (currentPage - 1) * rowsPerPage + 1} to{" "}
@@ -1822,6 +1921,240 @@ const MyAttendance = () => {
             Close
           </Button>
         </Modal.Footer>
+      </Modal>
+
+      {/* WORK FROM HOME (WFH) REQUEST MODAL */}
+      <Modal
+        show={showWfhModal}
+        onHide={() => !wfhSubmitting && setShowWfhModal(false)}
+        centered
+        size="lg"
+        className="rounded-4"
+      >
+        <Modal.Header closeButton className="border-0 pb-1 dark:border-slate-800">
+          <Modal.Title className="fw-bold text-slate-900 dark:text-slate-100 fs-5 flex items-center gap-2.5">
+            <span className="p-2 rounded-xl bg-teal-50 dark:bg-teal-950/60 text-teal-600 dark:text-teal-400 border border-teal-200 dark:border-teal-800">
+              <LuLaptop className="h-5 w-5" />
+            </span>
+            <div>
+              <div className="font-extrabold text-base text-slate-900 dark:text-slate-100">
+                Request Work From Home (WFH)
+              </div>
+              <div className="text-xs font-normal text-slate-500 dark:text-slate-400 mt-0.5">
+                Sequential Approvals: <strong>Reporting Manager ➔ HOD ➔ HR Verification</strong>
+              </div>
+            </div>
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="pt-2 px-4 dark:text-slate-200">
+          <Form onSubmit={handleApplyWfh}>
+            {/* Applicant Summary Banner */}
+            <div className="bg-slate-50 dark:bg-slate-800/80 p-3 rounded-2xl border border-slate-200 dark:border-slate-700/80 mb-3 flex items-center justify-between flex-wrap gap-2 text-xs">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-full bg-teal-600 text-white font-black text-xs flex items-center justify-center shadow-xs">
+                  {getAttendanceInitials(userName)}
+                </div>
+                <div>
+                  <div className="font-extrabold text-slate-800 dark:text-slate-100 text-sm">
+                    {userName}
+                  </div>
+                  <div className="text-slate-500 dark:text-slate-400 font-mono text-[11px]">
+                    ID: <strong>{userEmpId}</strong> • Dept: <strong>{userDept}</strong>
+                  </div>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-teal-50 dark:bg-teal-950/60 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800">
+                  <span className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-pulse" />
+                  WFH Module
+                </span>
+              </div>
+            </div>
+
+            {/* Date Selection & Day Type */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+              <div>
+                <Form.Label className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  From Date *
+                </Form.Label>
+                <Form.Control
+                  type="date"
+                  value={wfhForm.start_date}
+                  onChange={(e) => setWfhForm({ ...wfhForm, start_date: e.target.value })}
+                  required
+                  className="text-xs rounded-xl dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
+                />
+              </div>
+
+              <div>
+                <Form.Label className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  To Date *
+                </Form.Label>
+                <Form.Control
+                  type="date"
+                  value={wfhForm.end_date}
+                  min={wfhForm.start_date}
+                  onChange={(e) => setWfhForm({ ...wfhForm, end_date: e.target.value })}
+                  required
+                  className="text-xs rounded-xl dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
+                />
+              </div>
+
+              <div>
+                <Form.Label className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Day Type
+                </Form.Label>
+                <Form.Select
+                  value={wfhForm.day_type}
+                  onChange={(e) => setWfhForm({ ...wfhForm, day_type: e.target.value })}
+                  className="text-xs rounded-xl dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
+                >
+                  <option value="Full Day">Full Day</option>
+                  <option value="First Half">First Half (0.5 Day)</option>
+                  <option value="Second Half">Second Half (0.5 Day)</option>
+                </Form.Select>
+              </div>
+            </div>
+
+            {/* Calculated Duration & Paid Days Notice */}
+            <div className="mb-3 p-2.5 rounded-xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-800/60 flex items-center justify-between flex-wrap gap-2 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="p-1 rounded-md bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300">
+                  <LuCalendar className="h-3.5 w-3.5" />
+                </span>
+                <span className="text-slate-700 dark:text-slate-300">
+                  Requested Duration:{" "}
+                  <strong className="text-blue-700 dark:text-blue-300 font-extrabold">
+                    {calculateWfhDays(wfhForm.start_date, wfhForm.end_date, wfhForm.day_type)} Day(s)
+                  </strong>{" "}
+                  ({wfhForm.day_type})
+                </span>
+              </div>
+              <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-md border border-emerald-200 dark:border-emerald-800">
+                ✓ 100% Paid Working Day (No Loss of Pay)
+              </span>
+            </div>
+
+            {/* Reason Category & Emergency Phone */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+              <div>
+                <Form.Label className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Reason Category *
+                </Form.Label>
+                <Form.Select
+                  value={wfhForm.reason_category}
+                  onChange={(e) => setWfhForm({ ...wfhForm, reason_category: e.target.value })}
+                  className="text-xs rounded-xl dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
+                >
+                  <option value="Health / Recovery">Health / Recovery</option>
+                  <option value="Personal / Family Obligation">Personal / Family Obligation</option>
+                  <option value="Deep Focus / Sprint Delivery">Deep Focus / Sprint Delivery</option>
+                  <option value="Travel / Relocation Transit">Travel / Relocation Transit</option>
+                  <option value="Weather / Commute Issue">Weather / Commute Issue</option>
+                  <option value="Client Project Alignment">Client Project Alignment</option>
+                  <option value="Other">Other</option>
+                </Form.Select>
+              </div>
+
+              <div>
+                <Form.Label className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Emergency Contact / Phone
+                </Form.Label>
+                <Form.Control
+                  type="text"
+                  placeholder="e.g. +91 9876543210"
+                  value={wfhForm.emergency_contact}
+                  onChange={(e) => setWfhForm({ ...wfhForm, emergency_contact: e.target.value })}
+                  className="text-xs rounded-xl dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
+                />
+              </div>
+            </div>
+
+            {/* Detailed Reason */}
+            <div className="mb-3">
+              <Form.Label className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                Detailed Reason / Explanation *
+              </Form.Label>
+              <Form.Control
+                as="textarea"
+                rows={2}
+                placeholder="Provide context or justification for working remotely on these dates..."
+                value={wfhForm.reason}
+                onChange={(e) => setWfhForm({ ...wfhForm, reason: e.target.value })}
+                required
+                className="text-xs rounded-xl dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
+              />
+            </div>
+
+            {/* Tasks & Work Plan Planned */}
+            <div className="mb-3">
+              <Form.Label className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between">
+                <span>Tasks & Key Deliverables Planned</span>
+                <span className="text-[10px] text-slate-400 font-normal">Optional but recommended</span>
+              </Form.Label>
+              <Form.Control
+                as="textarea"
+                rows={2}
+                placeholder="List major sprint tasks, code reviews, reports or meetings you plan to deliver during WFH..."
+                value={wfhForm.work_plan}
+                onChange={(e) => setWfhForm({ ...wfhForm, work_plan: e.target.value })}
+                className="text-xs rounded-xl dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
+              />
+            </div>
+
+            {/* Sequential Workflow Audit Banner */}
+            <div className="bg-slate-50 dark:bg-slate-800/80 p-3 rounded-2xl border border-slate-200 dark:border-slate-700/80 mb-3">
+              <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <LuShieldCheck className="h-3.5 w-3.5 text-blue-500" />
+                Enterprise Sequential Approval & Payroll Integration
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px]">
+                <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
+                  <span className="font-bold text-slate-800 dark:text-slate-200 block">1. Manager Endorsement</span>
+                  <span className="text-slate-400 text-[10px]">Reporting Manager reviews</span>
+                </div>
+                <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
+                  <span className="font-bold text-slate-800 dark:text-slate-200 block">2. HOD Clearance</span>
+                  <span className="text-slate-400 text-[10px]">Department Head approval</span>
+                </div>
+                <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
+                  <span className="font-bold text-slate-800 dark:text-slate-200 block">3. HR & Accounts Sync</span>
+                  <span className="text-slate-400 text-[10px]">Logged in Attendance & Paid Days</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <Button
+                variant="light"
+                size="sm"
+                onClick={() => setShowWfhModal(false)}
+                disabled={wfhSubmitting}
+                className="text-xs font-semibold rounded-xl px-4 py-2 dark:!bg-slate-800 dark:!text-slate-300 dark:!border-slate-700"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={wfhSubmitting}
+                className="!bg-teal-600 hover:!bg-teal-700 text-white text-xs font-bold rounded-xl px-4 py-2 border-0 shadow-xs flex items-center gap-2 cursor-pointer"
+              >
+                {wfhSubmitting ? (
+                  <>
+                    <Spinner size="sm" animation="border" />
+                    <span>Submitting...</span>
+                  </>
+                ) : (
+                  <>
+                    <LuLaptop className="h-3.5 w-3.5" />
+                    <span>Submit WFH Request</span>
+                  </>
+                )}
+              </Button>
+            </div>
+          </Form>
+        </Modal.Body>
       </Modal>
 
       {/* Biometric Hardware & Real-Time Sync Console Modal */}

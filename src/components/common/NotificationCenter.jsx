@@ -21,6 +21,7 @@ import {
   LuUserCheck,
   LuLogOut,
   LuRadio,
+  LuShieldCheck,
 } from "react-icons/lu";
 import toast from "react-hot-toast";
 import api from "../../api/axios";
@@ -66,43 +67,53 @@ const playNotificationSound = () => {
 
 // Render category icon
 const getNotificationIcon = (type, category) => {
-  const normType = String(type || "").toLowerCase();
-  const normCat = String(category || "").toLowerCase();
+  try {
+    const normType = String(type || "").toLowerCase();
+    const normCat = String(category || "").toLowerCase();
 
-  if (normType === "onboarding" || normCat.includes("onboard")) {
-    return <LuUserCheck className="h-4 w-4 text-violet-600 dark:text-violet-400" />;
+    if (normType === "role_updated" || normCat.includes("role")) {
+      return <LuShieldCheck className="h-4 w-4 text-amber-600 dark:text-amber-400" />;
+    }
+    if (normType === "onboarding" || normCat.includes("onboard")) {
+      return <LuUserCheck className="h-4 w-4 text-violet-600 dark:text-violet-400" />;
+    }
+    if (normType === "resignation" || normCat.includes("resign")) {
+      return <LuLogOut className="h-4 w-4 text-rose-600 dark:text-rose-400" />;
+    }
+    if (normType === "claim" || normCat.includes("claim") || normCat.includes("finance")) {
+      return <LuReceipt className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />;
+    }
+    if (normType === "approval" || normCat.includes("approval")) {
+      return <LuBriefcase className="h-4 w-4 text-amber-600 dark:text-amber-400" />;
+    }
+    if (normType === "leave" || normCat.includes("leave")) {
+      return <LuCalendar className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />;
+    }
+    if (normType === "event" || normCat.includes("event")) {
+      return <LuPartyPopper className="h-4 w-4 text-pink-600 dark:text-pink-400" />;
+    }
+    if (normType === "holiday") {
+      return <LuCalendarCheck className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />;
+    }
+    if (normType === "transfer" || normCat.includes("transfer")) {
+      return <LuArrowLeftRight className="h-4 w-4 text-blue-600 dark:text-blue-400" />;
+    }
+    if (normType === "promotion" || normCat.includes("promotion") || normCat.includes("progression")) {
+      return <LuTrendingUp className="h-4 w-4 text-purple-600 dark:text-purple-400" />;
+    }
+    return <LuMegaphone className="h-4 w-4 text-blue-600 dark:text-blue-400" />;
+  } catch (_) {
+    return <LuMegaphone className="h-4 w-4 text-blue-600 dark:text-blue-400" />;
   }
-  if (normType === "resignation" || normCat.includes("resign")) {
-    return <LuLogOut className="h-4 w-4 text-rose-600 dark:text-rose-400" />;
-  }
-  if (normType === "claim" || normCat.includes("claim") || normCat.includes("finance")) {
-    return <LuReceipt className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />;
-  }
-  if (normType === "approval" || normCat.includes("approval")) {
-    return <LuBriefcase className="h-4 w-4 text-amber-600 dark:text-amber-400" />;
-  }
-  if (normType === "leave" || normCat.includes("leave")) {
-    return <LuCalendar className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />;
-  }
-  if (normType === "event" || normCat.includes("event")) {
-    return <LuPartyPopper className="h-4 w-4 text-pink-600 dark:text-pink-400" />;
-  }
-  if (normType === "holiday") {
-    return <LuCalendarCheck className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />;
-  }
-  if (normType === "transfer" || normCat.includes("transfer")) {
-    return <LuArrowLeftRight className="h-4 w-4 text-blue-600 dark:text-blue-400" />;
-  }
-  if (normType === "promotion" || normCat.includes("promotion") || normCat.includes("progression")) {
-    return <LuTrendingUp className="h-4 w-4 text-purple-600 dark:text-purple-400" />;
-  }
-  return <LuMegaphone className="h-4 w-4 text-blue-600 dark:text-blue-400" />;
 };
 
 const getNotificationBg = (type, category) => {
   const normType = String(type || "").toLowerCase();
   const normCat = String(category || "").toLowerCase();
 
+  if (normType === "role_updated" || normCat.includes("role")) {
+    return "bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700/60";
+  }
   if (normType === "onboarding" || normCat.includes("onboard")) {
     return "bg-violet-50 dark:bg-violet-950/40 border-violet-200 dark:border-violet-800/60";
   }
@@ -178,6 +189,11 @@ export default function NotificationCenter({ className = "" }) {
     // Subscribe to real-time notification socket events
     const unsubscribe = subscribeToNotifications((notif) => {
       if (!notif) return;
+      if (notif.type === "role_updated") {
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("hrms:role_updated", { detail: notif }));
+        }
+      }
       const notifKey = String(
         notif.id || `${notif.title}_${notif.recipient_id || ""}_${notif.created_at || ""}`
       );

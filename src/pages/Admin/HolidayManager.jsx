@@ -354,7 +354,7 @@ const HolidayManager = () => {
                 >
                   <option value="All">All Departments (Branch-wide)</option>
                   <option value="Human Resources (HR)">Human Resources (HR)</option>
-                  <option value="Engineering / Tech">Engineering / Tech</option>
+                  <option value="IT Department">IT Department</option>
                   <option value="Accounts & Finance">Accounts & Finance</option>
                   <option value="Sales & Marketing">Sales & Marketing</option>
                   <option value="Operations">Operations</option>

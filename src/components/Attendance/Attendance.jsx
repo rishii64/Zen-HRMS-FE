@@ -169,7 +169,7 @@ const MyAttendance = () => {
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(20);
 
   // Modals
   const [showMarkModal, setShowMarkModal] = useState(false);
@@ -1710,9 +1710,9 @@ const MyAttendance = () => {
               }}
               className="border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-xs bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-bold focus:outline-none"
             >
-              <option value={10}>10</option>
-              <option value={25}>25</option>
+              <option value={20}>20</option>
               <option value={50}>50</option>
+              <option value={100}>100</option>
             </select>
             <span>
               Showing {filteredRecords.length === 0 ? 0 : (currentPage - 1) * rowsPerPage + 1} to{" "}

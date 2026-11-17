@@ -666,7 +666,7 @@ export default function Separation() {
     };
 
     // 2. Department Specific Matching
-    // Home Department (e.g. Engineering / Tech or matching record.dept)
+    // Home Department (e.g. IT Department or matching record.dept)
     if (targetDeptKey === "dept" || isMatch(targetDeptKey, homeDeptKey) || (homeDeptKey && isMatch(targetDeptKey, "home"))) {
       const homeDeptMatches = eligibleEmployees.filter((emp) => {
         const empCode = String(emp.employee_id || emp.employee_code || emp.employeeCode || emp.id || "").trim().toLowerCase();
@@ -824,7 +824,7 @@ export default function Separation() {
       return d1 === d2 || d1.includes(d2) || d2.includes(d1);
     };
 
-    // Home Department Step (e.g. "Engineering / Tech Clearance" or step.id === "dept")
+    // Home Department Step (e.g. "IT Department Clearance" or step.id === "dept")
     const isHomeDeptStep = stepId === "dept" ||
       (resDept && (matchDept(stepDeptKey, resDept) || matchDept(stepName, resDept)));
     if (isHomeDeptStep) {

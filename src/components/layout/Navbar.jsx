@@ -633,6 +633,8 @@ const AppNavbar = () => {
   };
 
   const location = useLocation();
+  const currentPath = location.pathname.toLowerCase().replace(/\/+$/, "") || "/";
+  const isAuthPage = ["/login", "/register", "/forgot-password"].includes(currentPath);
 
   // Trigger attendance notice popup on login until explicitly acknowledged with Understood
   useEffect(() => {
@@ -1343,11 +1345,11 @@ const AppNavbar = () => {
                   </div>
                 </div>
               </div>
-            ) : (
+            ) : !isAuthPage ? (
               <Link to="/login" className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm no-underline font-medium text-white shadow-sm transition-all duration-200 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
                 Sign In
               </Link>
-            )}
+            ) : null}
           </div>
 
           {/* Mobile action area: Global Theme Toggle + Hamburger menu */}
@@ -1368,15 +1370,17 @@ const AppNavbar = () => {
                 <LuSun className="h-5 w-5 text-amber-500" />
               )}
             </button>
-            <button
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              type="button"
-              className="inline-flex items-center justify-center rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700 focus:outline-none dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-300"
-              aria-expanded={isMobileMenuOpen}
-            >
-              <span className="sr-only">Open main menu</span>
-              {isMobileMenuOpen ? <FiX className="h-6 w-6" /> : <FiMenu className="h-6 w-6" />}
-            </button>
+            {(isLoggedIn || !isAuthPage) && (
+              <button
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                type="button"
+                className="inline-flex items-center justify-center rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700 focus:outline-none dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+                aria-expanded={isMobileMenuOpen}
+              >
+                <span className="sr-only">Open main menu</span>
+                {isMobileMenuOpen ? <FiX className="h-6 w-6" /> : <FiMenu className="h-6 w-6" />}
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -1735,7 +1739,7 @@ const AppNavbar = () => {
                   </div>
                 </div>
               </>
-            ) : (
+            ) : !isAuthPage ? (
               <div className="px-3 py-2">
                 <Link to="/login" onClick={() => setIsMobileMenuOpen(false)}
                   className="flex w-full items-center justify-center rounded-lg bg-blue-600 py-2.5 text-sm no-underline font-medium text-white shadow-sm hover:bg-blue-700"
@@ -1743,7 +1747,7 @@ const AppNavbar = () => {
                   Sign In
                 </Link>
               </div>
-            )}
+            ) : null}
           </div>
         </div>
       )}

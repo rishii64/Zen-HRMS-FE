@@ -48,7 +48,7 @@ import OfferManagementDesk from "./components/OfferManagementDesk";
 // Standard 8 Corporate Departments
 const DEPARTMENTS = [
     "All",
-    "Engineering / Tech",
+    "IT Department",
     "Sales & Marketing",
     "Accounts & Finance",
     "Human Resources (HR)",
@@ -470,7 +470,7 @@ const Requisition = () => {
     const handleOpenRaiseModal = () => {
         setReqForm({
             ...initialReqForm,
-            department: userDept || "Engineering / Tech",
+            department: userDept || "IT Department",
         });
         setApprovalFile(null);
         setShowRaiseReqModal(true);

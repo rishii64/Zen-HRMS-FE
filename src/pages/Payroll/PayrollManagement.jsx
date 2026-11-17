@@ -661,6 +661,7 @@ const PayrollManagement = () => {
             working_days: wDays,
             week_offs: woDays,
             present_days: pDays,
+            wfh_days: attSum.wfh_days ?? (data.defaults?.attendance_summary?.wfh_days ?? 0),
             late_days:
               attSum.late_days ??
               (data.defaults?.attendance_summary?.late_days ?? 0),
@@ -745,6 +746,7 @@ const PayrollManagement = () => {
             working_days: wDays,
             week_offs: woDays,
             present_days: pDays,
+            wfh_days: attSum.wfh_days ?? (data.defaults?.attendance_summary?.wfh_days ?? 0),
             late_days: attSum.late_days ?? 0,
             paid_leaves: lDays,
             leave_days: lDays,
@@ -3107,6 +3109,11 @@ const PayrollManagement = () => {
               <div className="p-3 rounded-3" style={{ background: "#ecfdf5", border: "1px solid #d1fae5" }}>
                 <span className="small text-muted d-block">Present Days</span>
                 <h4 className="fw-bold text-success mb-0 mt-1">{attendance.present_days ?? 0}</h4>
+                {attendance.wfh_days > 0 && (
+                  <span className="badge bg-primary-subtle text-primary mt-1" style={{ fontSize: "10px" }}>
+                    {attendance.wfh_days} WFH (Paid)
+                  </span>
+                )}
               </div>
             </Col>
             <Col xs={6} md={3}>

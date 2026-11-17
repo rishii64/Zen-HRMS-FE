@@ -228,6 +228,8 @@ const EMPTY_FORM = {
   department_id: "",
   designation_id: "",
   grade_id: "",
+  team_lead_id: "",
+  team_lead_name: "",
   reporting_manager_id: "",
   reporting_manager: "",
   hod_id: "",
@@ -241,6 +243,7 @@ const EMPTY_FORM = {
   job_role: "employee",
   status: "Active",
   employment_type: "Permanent",
+  highest_qualification: "",
   current_salary: "",
   salary_type: "Monthly (In Hand)",
   joining_date: "",
@@ -1476,7 +1479,7 @@ const ManageEmployees = () => {
       "Legal Cell",
       "Operations",
       "Sales & Marketing",
-      "Engineering / Tech",
+      "IT Department",
       "Customer Support",
       "HR",
       "Accounts",
@@ -1534,6 +1537,7 @@ const ManageEmployees = () => {
       password: "User@123",
       kpi: emp.kpi || "",
       employment_type: emp.employment_type || "Permanent",
+      highest_qualification: emp.highest_qualification || "",
       tabs_enabled: emp.tabs_enabled || false,
       facilities: fac,
       esi_threshold: hasCustomEsi ? emp.esi_threshold : "",
@@ -1542,6 +1546,8 @@ const ManageEmployees = () => {
       department_id: emp.department_id || "",
       designation_id: emp.designation_id || "",
       grade_id: emp.grade_id || "",
+      team_lead_id: emp.team_lead_id || (employees.find((m) => m.name && m.name.toLowerCase().trim() === (emp.team_lead_name || "").toLowerCase().trim())?.employee_code || ""),
+      team_lead_name: emp.team_lead_name || "",
       reporting_manager_id: emp.reporting_manager_id || (employees.find((m) => m.name && m.name.toLowerCase().trim() === (emp.reporting_manager || "").toLowerCase().trim())?.employee_code || ""),
       reporting_manager: emp.reporting_manager || "",
       hod_id: emp.hod_id || "",
@@ -1639,6 +1645,7 @@ const ManageEmployees = () => {
       hod_name: empForm.hod_name && empForm.hod_name !== "N/A"
         ? empForm.hod_name.trim()
         : (employees.find((m) => (m.employee_code || "").toLowerCase() === (empForm.hod_id || "").toLowerCase())?.name || null),
+      highest_qualification: empForm.highest_qualification ? empForm.highest_qualification.trim() : "",
       current_salary: monthlySalary,
       salary_type: salary_type || "Monthly (In Hand)",
       facilities: empForm.facilities,
@@ -2337,10 +2344,19 @@ const ManageEmployees = () => {
                     </h5>
 
                     {/* Role / Designation Pill */}
-                    <div className="mb-3">
+                    <div className="mb-3 d-flex flex-wrap justify-content-center align-items-center gap-1">
                       <span className="emp-role-pill text-truncate" title={emp.designation || emp.job_role}>
                         {emp.designation || emp.job_role || "Employee"}
                       </span>
+                      {emp.highest_qualification && emp.highest_qualification !== "Not Specified" && (
+                        <span
+                          className="badge bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-1 rounded-pill"
+                          style={{ fontSize: "10.5px", fontWeight: "600" }}
+                          title={`Highest Qualification: ${emp.highest_qualification}`}
+                        >
+                          🎓 {emp.highest_qualification}
+                        </span>
+                      )}
                     </div>
 
                     {/* 3 Circular Action Icon Buttons */}
@@ -2477,6 +2493,11 @@ const ManageEmployees = () => {
                             <div className="fw-bold text-dark">{emp.name}</div>
                             <div className="text-muted small d-flex flex-wrap align-items-center gap-1.5" style={{ fontSize: "11px" }}>
                               <span>{emp.employee_code}</span>
+                              {emp.highest_qualification && emp.highest_qualification !== "Not Specified" && (
+                                <span className="badge bg-indigo-50 text-indigo-700 border border-indigo-200 px-1.5 py-0.5" style={{ fontSize: "10px", fontWeight: "600" }}>
+                                  🎓 {emp.highest_qualification}
+                                </span>
+                              )}
                               {emp.company_name && (
                                 <span className="badge bg-light text-dark border px-1.5 py-0.5" style={{ fontSize: "10px" }}>
                                   🏢 {emp.company_name} • 📍 {emp.work_location || "Kolkata"}
@@ -2818,7 +2839,7 @@ const ManageEmployees = () => {
                     ))
                   ) : (
                     <>
-                      <option value="Engineering / Tech">Engineering / Tech</option>
+                      <option value="IT Department">IT Department</option>
                       <option value="Sales & Marketing">Sales & Marketing</option>
                       <option value="Accounts & Finance">Accounts & Finance</option>
                       <option value="Human Resources (HR)">Human Resources (HR)</option>
@@ -2897,7 +2918,7 @@ const ManageEmployees = () => {
                           <optgroup label="Department Positions">
                             {deptSpecific.map(d => (
                               <option key={d.id} value={d.id}>
-                                {d.title} ({d.grade?.grade_code || "L2"} - Rank {d.grade?.rank_level || 2})
+                                {d.title}{d.is_tl_role ? " [Team Lead]" : d.is_hod_role ? " [HOD]" : ""} ({d.grade?.grade_code || "L2"} - Rank {d.grade?.rank_level || 2})
                               </option>
                             ))}
                           </optgroup>
@@ -2906,7 +2927,7 @@ const ManageEmployees = () => {
                           <optgroup label="Global / Management Positions">
                             {globalRoles.map(d => (
                               <option key={d.id} value={d.id}>
-                                {d.title} ({d.grade?.grade_code || "L5"} - Rank {d.grade?.rank_level || 5})
+                                {d.title}{d.is_tl_role ? " [Team Lead]" : d.is_hod_role ? " [HOD]" : ""} ({d.grade?.grade_code || "L5"} - Rank {d.grade?.rank_level || 5})
                               </option>
                             ))}
                           </optgroup>
@@ -3042,6 +3063,77 @@ const ManageEmployees = () => {
                 <Form.Label className="small fw-bold">Joining Date</Form.Label>
                 <Form.Control size="sm" type="date" name="joining_date" value={empForm.joining_date} onChange={handleChange} />
               </Col>
+              {/* Team Lead (TL) Section */}
+              <Col xs={12} md={6}>
+                <Form.Label className="small fw-bold">
+                  Team Lead (TL)
+                </Form.Label>
+                <Form.Select
+                  size="sm"
+                  value={empForm.team_lead_id || ""}
+                  onChange={(e) => {
+                    const selId = e.target.value;
+                    if (!selId) {
+                      setEmpForm((prev) => ({
+                        ...prev,
+                        team_lead_id: "",
+                        team_lead_name: "N/A"
+                      }));
+                    } else {
+                      const found = employees.find(
+                        (m) => (m.employee_code || "").toLowerCase() === selId.toLowerCase()
+                      );
+                      setEmpForm((prev) => ({
+                        ...prev,
+                        team_lead_id: selId,
+                        team_lead_name: found ? found.name : prev.team_lead_name
+                      }));
+                    }
+                  }}
+                >
+                  <option value="">-- None / Select Team Lead --</option>
+                  {employees
+                    .filter((m) => !editMode || (m.employee_code || "").toLowerCase() !== (empForm.employee_code || "").toLowerCase())
+                    .map((m) => (
+                      <option key={m.employee_code || m.id} value={m.employee_code}>
+                        {m.name} {m.designation ? `(${m.designation})` : ""}
+                      </option>
+                    ))}
+                </Form.Select>
+                <div className="text-muted mt-1" style={{ fontSize: "11px" }}>
+                  Operational Team Lead / Sprint Lead (Grade L4)
+                </div>
+              </Col>
+              <Col xs={12} md={6}>
+                <Form.Label className="small fw-bold d-flex align-items-center gap-1">
+                  Team Lead (TL) ID
+                  <Badge bg="light" text="dark" className="border" style={{ fontSize: "10px" }}>Code</Badge>
+                </Form.Label>
+                <Form.Control
+                  size="sm"
+                  type="text"
+                  placeholder="e.g. EMP-TL-01"
+                  name="team_lead_id"
+                  value={empForm.team_lead_id || ""}
+                  onChange={(e) => {
+                    const val = e.target.value.trim();
+                    const matched = employees.find(
+                      (m) => (m.employee_code || "").toLowerCase() === val.toLowerCase()
+                    );
+                    setEmpForm((prev) => ({
+                      ...prev,
+                      team_lead_id: val,
+                      team_lead_name: matched ? matched.name : (val ? prev.team_lead_name : "N/A")
+                    }));
+                  }}
+                />
+                <div className="text-muted mt-1" style={{ fontSize: "11px" }}>
+                  {empForm.team_lead_name && empForm.team_lead_name !== "N/A"
+                    ? `Mapped TL: ${empForm.team_lead_name}`
+                    : "Direct team lead employee code"}
+                </div>
+              </Col>
+
               <Col xs={12} md={6}>
                 <Form.Label className="small fw-bold">
                   Reporting Manager
@@ -3181,9 +3273,44 @@ const ManageEmployees = () => {
                     : "Assigned department head employee code"}
                 </div>
               </Col>
-              <Col xs={12} md={4}>
+              <Col xs={12} md={6}>
                 <Form.Label className="small fw-bold">Phone</Form.Label>
                 <Form.Control size="sm" name="phone_no" value={empForm.phone_no} onChange={handleChange} />
+              </Col>
+              <Col xs={12} md={6}>
+                <Form.Label className="small fw-bold d-flex align-items-center gap-1">
+                  <LuGraduationCap size={14} className="text-primary" /> Highest Qualification
+                  <Badge bg="light" text="dark" className="border" style={{ fontSize: "10px" }}>Education</Badge>
+                </Form.Label>
+                <Form.Control
+                  size="sm"
+                  list="quick-qual-list"
+                  name="highest_qualification"
+                  placeholder="e.g. B.Tech, M.Tech, MBA, MCA, Ph.D"
+                  value={empForm.highest_qualification || ""}
+                  onChange={handleChange}
+                />
+                <datalist id="quick-qual-list">
+                  <option value="B.Tech" />
+                  <option value="B.E" />
+                  <option value="M.Tech" />
+                  <option value="MBA" />
+                  <option value="MCA" />
+                  <option value="BCA" />
+                  <option value="B.Sc" />
+                  <option value="M.Sc" />
+                  <option value="B.Com" />
+                  <option value="M.Com" />
+                  <option value="B.A" />
+                  <option value="M.A" />
+                  <option value="Ph.D" />
+                  <option value="Diploma" />
+                  <option value="12th / Higher Secondary" />
+                  <option value="10th / Secondary" />
+                </datalist>
+                <div className="text-muted mt-1" style={{ fontSize: "11px" }}>
+                  Employee's highest completed degree / educational credential
+                </div>
               </Col>
 
               {/* PAN Number & Aadhaar Number */}
@@ -3723,6 +3850,16 @@ const ManageEmployees = () => {
                         >
                           {emp.employment_type || "Permanent"}
                         </span>
+                        {emp.highest_qualification && emp.highest_qualification !== "Not Specified" && (
+                          <span
+                            className="px-2.5 py-1 rounded-pill d-inline-flex align-items-center gap-1 shadow-xs bg-indigo-50 text-indigo-700 border border-indigo-200"
+                            style={{ fontSize: "12px", fontWeight: "600" }}
+                            title={`Highest Qualification: ${emp.highest_qualification}`}
+                          >
+                            <LuGraduationCap size={13} className="text-indigo-600" />
+                            {emp.highest_qualification}
+                          </span>
+                        )}
                       </div>
                     </div>
                     {(isAdmin || isHR) && (
@@ -3754,6 +3891,18 @@ const ManageEmployees = () => {
                         <InfoRow label="Aadhaar Number" value={emp.aadhaar_no} />
                         <InfoRow label="Department" value={emp.dept} />
                         <InfoRow label="Employment Type" value={emp.employment_type || "Permanent"} />
+                        <InfoRow
+                          label="Highest Qualification"
+                          value={
+                            emp.highest_qualification && emp.highest_qualification !== "Not Specified" ? (
+                              <span className="fw-semibold text-primary d-inline-flex align-items-center gap-1">
+                                <LuGraduationCap size={13} /> {emp.highest_qualification}
+                              </span>
+                            ) : (
+                              "—"
+                            )
+                          }
+                        />
                         <InfoRow
                           label="Reporting Manager"
                           value={
@@ -3826,6 +3975,49 @@ const ManageEmployees = () => {
                               : ((emp.job_role || "employee").charAt(0).toUpperCase() + (emp.job_role || "employee").slice(1))
                           }
                         />
+
+                        {/* Education History Breakdown if available */}
+                        {(() => {
+                          let eduList = [];
+                          try {
+                            if (emp.education) {
+                              eduList = typeof emp.education === "string" ? JSON.parse(emp.education) : emp.education;
+                            }
+                          } catch {}
+                          if (Array.isArray(eduList) && eduList.length > 0) {
+                            return (
+                              <div className="mt-3 pt-2 border-top">
+                                <div className="d-flex align-items-center justify-content-between mb-2">
+                                  <small className="fw-bold text-muted text-uppercase d-flex align-items-center gap-1" style={{ letterSpacing: "0.5px", fontSize: "11px" }}>
+                                    <LuGraduationCap size={13} className="text-primary" /> Educational Credentials
+                                  </small>
+                                  <span className="badge bg-light text-primary border" style={{ fontSize: "10px" }}>
+                                    {eduList.length} Record{eduList.length > 1 ? "s" : ""}
+                                  </span>
+                                </div>
+                                <div className="d-flex flex-column gap-1.5">
+                                  {eduList.map((item, i) => (
+                                    <div key={i} className="p-2 rounded-2 bg-light border d-flex justify-content-between align-items-center" style={{ fontSize: "11.5px" }}>
+                                      <div className="text-truncate me-2">
+                                        <span className="fw-bold text-dark">{item.degree || "Degree"}</span>
+                                        {(item.institution || item.college_university) && (
+                                          <div className="text-muted text-truncate" style={{ fontSize: "10.5px" }}>
+                                            {item.institution || item.college_university}
+                                          </div>
+                                        )}
+                                      </div>
+                                      <div className="text-nowrap text-muted text-end" style={{ fontSize: "11px" }}>
+                                        {item.year || item.passing_year ? `${item.year || item.passing_year}` : ""}
+                                        {item.gpa ? <div>GPA: {item.gpa}</div> : null}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          }
+                          return null;
+                        })()}
                       </div>
                     </Col>
                   </Row>

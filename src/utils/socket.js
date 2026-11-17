@@ -114,10 +114,26 @@ export const subscribeToNotifications = (handler) => {
   };
 };
 
+/**
+ * Subscribe to real-time role / rank / band updates
+ * @param {Function} handler - Callback invoked when user role/rank/band is updated
+ * @returns {Function} Unsubscribe function
+ */
+export const subscribeToRoleUpdates = (handler) => {
+  const s = getSocket();
+  if (!s) return () => {};
+
+  s.on("role_updated", handler);
+  return () => {
+    s.off("role_updated", handler);
+  };
+};
+
 export default {
   getSocket,
   disconnectSocket,
   reauthenticateSocket,
   subscribeToNotifications,
+  subscribeToRoleUpdates,
   getSocketAuthPayload,
 };

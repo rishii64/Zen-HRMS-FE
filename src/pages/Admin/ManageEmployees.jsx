@@ -1308,23 +1308,42 @@ const ManageEmployees = () => {
     return () => window.removeEventListener("focus", handleFocus);
   }, [role]);
 
-  const fetchEmployees = async (silent = false) => {
+  const fetchEmployees = async (silent = false, retries = 1) => {
     if (!silent) setLoading(true);
     else setRefreshing(true);
+    const token = localStorage.getItem("token") || "";
     try {
       // Query param with timestamp prevents stale HTTP browser cache
       const res = await fetch(`${API}/employees?_t=${Date.now()}`, {
         cache: "no-store",
-        headers: { "Cache-Control": "no-cache", Pragma: "no-cache", role },
+        headers: {
+          "Cache-Control": "no-cache",
+          Pragma: "no-cache",
+          role,
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
       });
       const data = await res.json();
-      if (data.success) setEmployees(Array.isArray(data.data) ? data.data : []);
-      else if (!silent) toast.error("Error fetching employees");
+      if (data && data.success) {
+        setEmployees(Array.isArray(data.data) ? data.data : []);
+      } else {
+        if (retries > 0) {
+          // Retry once after 600ms to gracefully absorb transient EC2 connection bursts
+          await new Promise((resolve) => setTimeout(resolve, 600));
+          return fetchEmployees(silent, retries - 1);
+        }
+        if (!silent) toast.error(data?.error || "Error fetching employees");
+      }
     } catch (e) {
-      if (!silent) toast.error("Error: " + e.message);
+      if (retries > 0) {
+        await new Promise((resolve) => setTimeout(resolve, 600));
+        return fetchEmployees(silent, retries - 1);
+      }
+      if (!silent) toast.error("Error: " + (e?.message || "Failed to connect to server"));
+    } finally {
+      if (!silent) setLoading(false);
+      else setRefreshing(false);
     }
-    if (!silent) setLoading(false);
-    else setRefreshing(false);
   };
 
   const fetchOrgMasters = async () => {

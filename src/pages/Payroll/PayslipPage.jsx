@@ -178,7 +178,12 @@ const PayslipPage = () => {
         }),
         fetch(`${API}/payroll/settings?_t=${Date.now()}`, {
           cache: "no-store",
-          headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
+          headers: {
+            "Cache-Control": "no-cache",
+            Pragma: "no-cache",
+            role: userRole,
+            Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
+          },
         }).catch(() => null),
       ]);
       const empJson = await empRes.json();
